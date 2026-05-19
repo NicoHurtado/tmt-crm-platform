@@ -74,29 +74,27 @@ export function AliadoDrawer({
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 20;
 
-  const fetchReservas = async (signal: AbortSignal) => {
-    if (!aliadoId) return;
-    setLoading(true);
-    setError(null);
-    setReservas([]);
-    try {
-      const res = await fetch(`/api/aliados/${aliadoId}/reservas`, { signal });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const data = await res.json();
-      setReservas(data.reservas ?? data ?? []);
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return;
-      setError('No se pudieron cargar las reservas');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (!open || !aliadoId) return;
     setPage(0);
     const controller = new AbortController();
-    fetchReservas(controller.signal);
+    const fetchReservas = async () => {
+      setLoading(true);
+      setError(null);
+      setReservas([]);
+      try {
+        const res = await fetch(`/api/aliados/${aliadoId}/reservas`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const data = await res.json();
+        setReservas(data.reservas ?? data ?? []);
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        setError('No se pudieron cargar las reservas');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReservas();
     return () => controller.abort();
   }, [open, aliadoId]);
 

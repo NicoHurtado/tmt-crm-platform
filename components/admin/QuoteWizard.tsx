@@ -88,16 +88,17 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
 
     // ── PRICE BREAKDOWN ──────────────────────────────────────────────────────
     // Subtotal comes from formData (calculated in Step1TripDetails)
+    const tarifaMunicipioConfig = (formData as unknown as Record<string, unknown>).tarifaMunicipioConfig as number || 0;
     const subtotal = useMemo(() => {
         return (
             (formData.precioBase || 0) +
             (formData.precioAdicionales || 0) +
             (formData.recargoNocturno || 0) +
             (formData.tarifaMunicipio || 0) +
-            ((formData as any).tarifaMunicipioConfig || 0)
+            tarifaMunicipioConfig
         );
     }, [formData.precioBase, formData.precioAdicionales, formData.recargoNocturno,
-        formData.tarifaMunicipio, (formData as any).tarifaMunicipioConfig]);
+        formData.tarifaMunicipio, tarifaMunicipioConfig]);
 
     const { comisionAliado } = useAliadoCommission(aliadoId, service.id, subtotal);
 

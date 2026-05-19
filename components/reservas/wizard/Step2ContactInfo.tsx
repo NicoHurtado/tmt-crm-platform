@@ -79,6 +79,7 @@ export default function Step2ContactInfo({ formData, updateFormData, onNext, onB
 
             updateFormData({ asistentes: newAsistentes });
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData.numeroPasajeros, esAeropuerto, isAlly]);
 
     // Sync contact info to first attendee when contact fields change

@@ -373,6 +373,10 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         service.nombre,
         service.esPorHoras,
         service.esCompartido,
+        service.destinoAutoFill,
+        service.infoTourCompartido,
+        formData.lugarRecogida,
+        formData.trasladoDestino,
         updateFormData
     ]);
 
@@ -1079,9 +1083,10 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                             </div>
                             {formData.municipioConfigId && (() => {
                                 const sel = municipiosConfig.find((m) => m.id === formData.municipioConfigId);
-                                return sel && Number(sel.recargo) > 0 ? (
+                                const recargo = Number(sel?.recargo ?? 0);
+                                return recargo > 0 ? (
                                     <p className="text-xs text-amber-600 mt-1">
-                                        + ${Number(sel.recargo).toLocaleString('es-CO')} {language === 'es' ? 'recargo por municipio' : 'municipality surcharge'}
+                                        + ${recargo.toLocaleString('es-CO')} {language === 'es' ? 'recargo por municipio' : 'municipality surcharge'}
                                     </p>
                                 ) : null;
                             })()}

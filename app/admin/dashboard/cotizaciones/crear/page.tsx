@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { FiLoader, FiChevronDown, FiChevronUp, FiMapPin } from 'react-icons/fi';
 import QuoteWizard from '@/components/admin/QuoteWizard';
 import { getLocalizedText } from '@/types/multi-language';
@@ -150,12 +151,13 @@ export default function CreateQuotePage() {
                                     className="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-[#D6A75D] hover:shadow-md transition-all group"
                                 >
                                     <div className="flex items-start gap-3">
-                                        <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg overflow-hidden group-hover:ring-2 group-hover:ring-[#D6A75D] transition-all">
+                                        <div className="relative flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg overflow-hidden group-hover:ring-2 group-hover:ring-[#D6A75D] transition-all">
                                             {service.imagen && (
-                                                <img
+                                                <Image
                                                     src={service.imagen}
                                                     alt={getLocalizedText(service.nombre, 'ES')}
-                                                    className="w-full h-full object-cover"
+                                                    fill
+                                                    style={{ objectFit: 'cover' }}
                                                 />
                                             )}
                                         </div>
@@ -213,12 +215,13 @@ export default function CreateQuotePage() {
                                                     className="text-left p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all group"
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <div className="flex-shrink-0 w-10 h-10 bg-gray-100 rounded-lg overflow-hidden group-hover:ring-2 group-hover:ring-blue-500 transition-all">
+                                                        <div className="relative flex-shrink-0 w-10 h-10 bg-gray-100 rounded-lg overflow-hidden group-hover:ring-2 group-hover:ring-blue-500 transition-all">
                                                             {service.imagen && (
-                                                                <img
+                                                                <Image
                                                                     src={service.imagen}
                                                                     alt={getLocalizedText(service.nombre, 'ES')}
-                                                                    className="w-full h-full object-cover"
+                                                                    fill
+                                                                    style={{ objectFit: 'cover' }}
                                                                 />
                                                             )}
                                                         </div>

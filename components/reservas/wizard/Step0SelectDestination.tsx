@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { FiMapPin, FiClock, FiChevronRight, FiSearch } from 'react-icons/fi';
 import { useLanguage, t } from '@/lib/i18n';
 import { getLocalizedText } from '@/types/multi-language';
@@ -158,10 +159,12 @@ export default function Step0SelectDestination({ onSelectDestination }: Step0Sel
                                 {/* Image or color block */}
                                 <div className={`relative h-32 overflow-hidden ${isSelected ? 'bg-[#D6A75D]/10' : 'bg-gray-50'}`}>
                                     {viaje.imagen ? (
-                                        <img
+                                        <Image
                                             src={viaje.imagen}
                                             alt={nombre}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            fill
+                                            style={{ objectFit: 'cover' }}
+                                            className="group-hover:scale-105 transition-transform duration-300"
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center">

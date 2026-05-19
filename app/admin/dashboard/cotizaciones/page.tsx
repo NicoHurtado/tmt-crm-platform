@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Search, Plus, Clock, ChevronDown, ChevronUp, Eye, Copy, Check, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -195,11 +196,12 @@ export default function CotizacionesPage() {
                     >
                       <div className="flex items-center gap-3">
                         {svc.imagen && (
-                          <div className="w-10 h-10 rounded-md overflow-hidden flex-shrink-0">
-                            <img
+                          <div className="relative w-10 h-10 rounded-md overflow-hidden flex-shrink-0">
+                            <Image
                               src={svc.imagen}
                               alt={getLocalizedText(svc.nombre, 'ES')}
-                              className="w-full h-full object-cover"
+                              fill
+                              style={{ objectFit: 'cover' }}
                             />
                           </div>
                         )}

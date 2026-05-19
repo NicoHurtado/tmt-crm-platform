@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Image from 'next/image';
 import { ArrowLeft, Save, Plus, X, Languages } from 'lucide-react';
 import Link from 'next/link';
 import ImageUploader from '@/components/admin/ImageUploader';
@@ -803,11 +804,12 @@ export default function EditarServicioPage() {
                                                     className="w-4 h-4 text-[#D6A75D] border-gray-300 rounded focus:ring-[#D6A75D] cursor-pointer"
                                                 />
 
-                                                <div className="w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                                                    <img
+                                                <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                                    <Image
                                                         src={vehiculo.imagen || '/placeholder.jpg'}
                                                         alt={vehiculo.nombre}
-                                                        className="w-full h-full object-cover"
+                                                        fill
+                                                        style={{ objectFit: 'cover' }}
                                                     />
                                                 </div>
 

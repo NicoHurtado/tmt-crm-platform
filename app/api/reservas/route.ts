@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { EstadoReserva } from '@prisma/client';
+import { EstadoReserva, Prisma } from '@prisma/client';
 import { buildDatosFromBody } from '@/types/reserva-datos';
 import { calculateBoldCommission } from '@/lib/bold';
 import { getServerSession } from 'next-auth';
@@ -199,8 +199,15 @@ export async function POST(request: Request) {
         const datosReserva = buildDatosFromBody(body);
 
         // WR-01: retry on P2002 unique constraint violation (race condition in code generation)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let reserva: any;
+        let reserva!: Prisma.ReservaGetPayload<{
+            include: {
+                servicio: true;
+                aliado: true;
+                asistentes: true;
+                vehiculo: true;
+                adicionalesSeleccionados: { include: { adicional: true } };
+            };
+        }>;
         {
             let retries = 3;
             let codigoActual = codigo;
