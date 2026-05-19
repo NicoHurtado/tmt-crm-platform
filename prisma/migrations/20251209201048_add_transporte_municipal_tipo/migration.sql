@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "TipoServicio" ADD VALUE 'TRANSPORTE_MUNICIPAL';
