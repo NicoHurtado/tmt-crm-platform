@@ -30,7 +30,7 @@ async function main() {
             nombre: 'Van 7 pasajeros',
             capacidadMinima: 1,
             capacidadMaxima: 7,
-            imagen: '/van-removebg-preview.png',
+            imagen: 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779235985/tmt/vehiculos/vehiculo_van.png',
             activo: true,
         },
     });
@@ -44,12 +44,12 @@ async function main() {
         create: {
             id: 'test-servicio-1',
             nombre: { es: 'Tour Guatapé', en: 'Guatapé Tour' },
-            tipo: 'TOUR_GUATAPE',
+            tipoServicio: 'TOUR_GUATAPE',
             descripcion: {
                 es: 'Tour completo al pueblo más colorido de Colombia. Incluye transporte, guía y tiempo libre.',
                 en: 'Complete tour to Colombia\'s most colorful town. Includes transport, guide and free time.'
             },
-            imagen: '/guatape.jpg',
+            imagen: 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779235986/tmt/servicios/servicio_guatape.jpg',
             activo: true,
             duracion: '8 horas',
             incluye: {
