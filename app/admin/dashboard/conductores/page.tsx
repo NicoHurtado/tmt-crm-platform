@@ -162,7 +162,7 @@ export default function ConductoresPage() {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await fetch('/api/upload', { method: 'POST', body: fd })
+      const res = await fetch('/api/upload?folder=conductores', { method: 'POST', body: fd })
       const data = await res.json()
       if (data.success) setFormData((prev) => ({ ...prev, foto: data.url }))
     } catch (error) {

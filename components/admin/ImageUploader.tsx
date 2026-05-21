@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react';
 import { FiUpload, FiImage, FiX } from 'react-icons/fi';
-import Image from 'next/image';
 
 interface ImageUploaderProps {
     currentImageUrl?: string;
@@ -155,11 +154,11 @@ export default function ImageUploader({ currentImageUrl, onImageUploaded, label 
                 <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-700">Vista Previa:</p>
                     <div className="relative w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
-                        <Image
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
                             src={previewUrl}
                             alt="Preview"
-                            fill
-                            className="object-cover"
+                            className="w-full h-full object-cover"
                         />
                     </div>
                 </div>

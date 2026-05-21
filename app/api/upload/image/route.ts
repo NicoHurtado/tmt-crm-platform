@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Subir a Vercel Blob (carpeta: servicios)
+        // Subir a Cloudinary (carpeta: tmt/servicios)
         const url = await uploadImageToBlob(file, 'servicios');
 
         return NextResponse.json({

@@ -20,8 +20,12 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Subir a Vercel Blob (carpeta: vehiculos)
-        const url = await uploadImageToBlob(file, 'vehiculos');
+        const folderParam = request.nextUrl.searchParams.get('folder');
+        const folder = (['servicios', 'vehiculos', 'conductores'] as const).includes(folderParam as any)
+            ? (folderParam as 'servicios' | 'vehiculos' | 'conductores')
+            : 'vehiculos';
+
+        const url = await uploadImageToBlob(file, folder);
 
         return NextResponse.json({
             success: true,
