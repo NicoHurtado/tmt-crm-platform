@@ -38,6 +38,7 @@ next-env.d.ts
 # ─── Docs internos ───────────────────────────────────────────
 CLAUDE.md
 /docs/*
+!/docs/QA-REPORT.md
 
 # ─── macOS ───────────────────────────────────────────────────
 .DS_Store
