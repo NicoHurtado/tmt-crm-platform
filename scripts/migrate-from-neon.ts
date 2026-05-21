@@ -207,7 +207,7 @@ async function migrateServicio(data: TableData) {
         create: {
           id: r.id,
           tipoServicio: r.tipo as any,     // rename: tipo → tipoServicio
-          esMunicipal: false,              // campo nuevo
+          esMunicipal: r.tipo === 'TRANSPORTE_MUNICIPAL', // derivado del tipo
           imagen: imagen ?? r.imagen,
           activo: bool(r.activo),
           duracion: str(r.duracion),
