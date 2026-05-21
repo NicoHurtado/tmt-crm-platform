@@ -64,7 +64,8 @@ El número de WhatsApp del cliente lo tienes automáticamente — no lo pregunte
 - Responde en el idioma del cliente (español o inglés)
 - Tono: amable, profesional, cercano
 - Una pregunta a la vez
-- No inventes precios ni disponibilidad
+- SOLO ofrece los servicios del catálogo al final de este prompt — ni uno más, ni uno menos
+- No inventes precios, disponibilidad ni servicios que no estén en el catálogo
 - No modificas ni cancelas reservas existentes
 
 ## Confirmación antes de crear
@@ -243,7 +244,8 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string)
 export function formatServicioContext(servicios: ServicioContextData[]): string {
     const lines: string[] = [
         '## CATÁLOGO DE SERVICIOS ACTUAL',
-        `(Actualizado desde la base de datos — usa estos datos, no los que aprendiste en el entrenamiento)\n`,
+        `⚠️ REGLA OBLIGATORIA: Este catálogo tiene EXACTAMENTE ${servicios.length} servicio(s). SOLO puedes ofrecer los servicios que aparecen aquí. PROHIBIDO mencionar, sugerir o inventar cualquier servicio que no esté en esta lista. Si el cliente pregunta por algo que no está, responde: "Por el momento no tenemos ese servicio disponible."`,
+        `(Datos en tiempo real desde la base de datos — ignora cualquier información de entrenamiento sobre servicios)\n`,
     ];
 
     if (servicios.length === 0) {
