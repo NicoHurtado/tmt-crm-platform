@@ -199,8 +199,25 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string)
         }
     }
 
+    // ── Checklist explícito de lo que el agente DEBE recopilar ──────────────────
+    lines.push('\nDATO REQUERIDOS PARA RESERVAR (pregunta uno a la vez en este orden):');
+    lines.push('1. Nombre completo del cliente');
+    lines.push('2. Correo electrónico');
+    lines.push('3. Número de pasajeros');
+    lines.push('4. Fecha del servicio (formato YYYY-MM-DD)');
+    lines.push('5. Hora de inicio (formato HH:MM en 24h)');
     if (campos.length > 0) {
-        lines.push('\nCAMPOS PARA datosDinamicos (pregunta estos datos al cliente):');
+        let idx = 6;
+        for (const campo of campos) {
+            const req = campo.requerido ? 'REQUERIDO' : 'opcional';
+            lines.push(`${idx}. ${campo.etiqueta.es} / ${campo.etiqueta.en} [${req}] → clave: ${campo.clave}`);
+            if (campo.tipo === 'SELECT' && campo.opciones?.length) {
+                const opcStr = campo.opciones.map((o) => o.valor).join(' | ');
+                lines.push(`   Opciones: ${opcStr}`);
+            }
+            idx++;
+        }
+        lines.push('\nDETALLE DE CAMPOS DINÁMICOS (para datosDinamicos):');
         for (const campo of campos) {
             formatCampo(campo).forEach((l) => lines.push(l));
         }
