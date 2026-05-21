@@ -29,7 +29,6 @@
         "@fullcalendar/react": "^6.1.19",
         "@prisma/client": "^5.7.1",
         "@tabler/icons-react": "^3.44.0",
-        "@vercel/blob": "^2.0.0",
         "bcryptjs": "^2.4.3",
         "class-variance-authority": "^0.7.1",
         "cloudinary": "^2.10.0",

@@ -312,6 +312,8 @@ model SiteContent {
   @@index([key])
 }
 
+/// @deprecated Tabla legacy con datos importados de la BD anterior. No usar en código nuevo.
+/// Conservar mientras existan registros históricos consultados por reportes externos.
 model BdAntigua {
   id                    Int       @id @default(autoincrement())
   hora_reserva          DateTime?
