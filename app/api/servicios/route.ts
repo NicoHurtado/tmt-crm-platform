@@ -34,8 +34,6 @@ export async function GET(request: Request) {
         const servicios = await prisma.servicio.findMany({
             where,
             include: {
-                adicionales: true,
-                tarifasMunicipios: true,
                 tarifasAliados: {
                     include: {
                         aliado: true,
@@ -128,7 +126,6 @@ export async function POST(request: Request) {
                 activo: body.activo !== undefined ? body.activo : true,
             },
             include: {
-                adicionales: true,
             },
         });
 

@@ -20,8 +20,6 @@ export async function GET(
         const servicio = await prisma.servicio.findUnique({
             where: { id },
             include: {
-                adicionales: true,
-                tarifasMunicipios: true,
                 tarifasAliados: {
                     include: {
                         aliado: true,
@@ -110,7 +108,6 @@ export async function PUT(
             where: { id },
             data: updateData,
             include: {
-                adicionales: true,
             },
         });
 

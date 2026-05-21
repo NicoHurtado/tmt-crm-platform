@@ -6,7 +6,6 @@ import { FiArrowLeft, FiSave, FiPlus, FiX } from 'react-icons/fi';
 import Link from 'next/link';
 import DynamicFieldBuilder from '@/components/admin/DynamicFieldBuilder';
 import { DynamicField } from '@/types/dynamic-fields';
-import { Municipio } from '@prisma/client';
 
 interface Vehiculo {
     id: string;
@@ -16,15 +15,6 @@ interface Vehiculo {
     imagen: string;
 }
 
-const MUNICIPIOS_ORIGEN = [
-    { value: 'MEDELLIN', label: 'Medellín' },
-    { value: 'POBLADO', label: 'El Poblado' },
-    { value: 'LAURELES', label: 'Laureles' },
-    { value: 'SABANETA', label: 'Sabaneta' },
-    { value: 'BELLO', label: 'Bello' },
-    { value: 'ITAGUI', label: 'Itagüí' },
-    { value: 'ENVIGADO', label: 'Envigado' },
-];
 
 export default function CrearViajeMunicipalPage() {
     const router = useRouter();
@@ -45,11 +35,6 @@ export default function CrearViajeMunicipalPage() {
     // Vehículos y Precios
     const [vehiculosSeleccionados, setVehiculosSeleccionados] = useState<
         { vehiculoId: string; precio: number }[]
-    >([]);
-
-    // Tarifas por Municipio de Origen
-    const [tarifasMunicipios, setTarifasMunicipios] = useState<
-        { municipio: Municipio; valorExtra: number }[]
     >([]);
 
     // Campos Dinámicos (Opcionales)
@@ -124,28 +109,6 @@ export default function CrearViajeMunicipalPage() {
         );
     };
 
-    // Handlers para Tarifas por Municipio
-    const handleAddTarifaMunicipio = () => {
-        setTarifasMunicipios([
-            ...tarifasMunicipios,
-            { municipio: 'MEDELLIN' as Municipio, valorExtra: 0 },
-        ]);
-    };
-
-    const handleRemoveTarifaMunicipio = (index: number) => {
-        setTarifasMunicipios(tarifasMunicipios.filter((_, i) => i !== index));
-    };
-
-    const handleTarifaMunicipioChange = (
-        index: number,
-        field: 'municipio' | 'valorExtra',
-        value: any
-    ) => {
-        const updated = [...tarifasMunicipios];
-        updated[index] = { ...updated[index], [field]: value };
-        setTarifasMunicipios(updated);
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -195,12 +158,6 @@ export default function CrearViajeMunicipalPage() {
                 
                 // Vehículos
                 vehiculosPermitidos: vehiculosSeleccionados,
-                
-                // Tarifas por municipio de origen
-                tarifasPorMunicipio: tarifasMunicipios.reduce((acc, t) => {
-                    acc[t.municipio] = t.valorExtra;
-                    return acc;
-                }, {} as Record<string, number>),
                 
                 // Campos dinámicos opcionales
                 camposPersonalizados,
@@ -465,60 +422,6 @@ export default function CrearViajeMunicipalPage() {
                                 );
                             })}
                         </div>
-                    </div>
-
-                    {/* Tarifas por Municipio de Origen */}
-                    <div className="bg-white rounded-xl shadow-sm p-6">
-                        <h2 className="text-xl font-bold mb-4">Tarifas por Municipio de Origen</h2>
-                        <p className="text-sm text-gray-600 mb-4">
-                            Configura tarifas adicionales según el municipio de origen del viaje
-                        </p>
-
-                        {tarifasMunicipios.map((tarifa, index) => (
-                            <div key={index} className="flex gap-4 mb-3">
-                                <select
-                                    value={tarifa.municipio}
-                                    onChange={(e) =>
-                                        handleTarifaMunicipioChange(index, 'municipio', e.target.value)
-                                    }
-                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D6A75D] outline-none"
-                                >
-                                    {MUNICIPIOS_ORIGEN.map((m) => (
-                                        <option key={m.value} value={m.value}>
-                                            {m.label}
-                                        </option>
-                                    ))}
-                                </select>
-                                <input
-                                    type="number"
-                                    value={tarifa.valorExtra}
-                                    onChange={(e) =>
-                                        handleTarifaMunicipioChange(
-                                            index,
-                                            'valorExtra',
-                                            Number(e.target.value)
-                                        )
-                                    }
-                                    placeholder="Valor extra (COP)"
-                                    className="w-48 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D6A75D] outline-none"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => handleRemoveTarifaMunicipio(index)}
-                                    className="px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
-                                >
-                                    <FiX />
-                                </button>
-                            </div>
-                        ))}
-
-                        <button
-                            type="button"
-                            onClick={handleAddTarifaMunicipio}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                        >
-                            <FiPlus /> Agregar Tarifa
-                        </button>
                     </div>
 
                     {/* Campos Dinámicos (Opcionales) */}

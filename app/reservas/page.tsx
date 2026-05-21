@@ -36,7 +36,6 @@ interface Service {
     camposPersonalizados: any[];
     adicionales: any[];
     vehiculosPermitidos?: any[];
-    tarifasMunicipios?: any[];
 }
 
 export default function ReservasPage() {
@@ -51,7 +50,6 @@ export default function ReservasPage() {
 
     // Custom pricing state
     const [preciosPersonalizados, setPreciosPersonalizados] = useState<any>(null);
-    const [tarifasMunicipios, setTarifasMunicipios] = useState<any[]>([]);
 
     // Cart state
     const [isCartOpen, setIsCartOpen] = useState(false);
@@ -82,7 +80,6 @@ export default function ReservasPage() {
         if (prevAliadoIdRef.current === currentId) return;
         prevAliadoIdRef.current = currentId;
         setPreciosPersonalizados(null);
-        setTarifasMunicipios([]);
         setLoading(true);
         fetchServices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,10 +222,6 @@ export default function ReservasPage() {
             });
             setPreciosPersonalizados(pricingMap);
 
-            // Fetch municipality surcharges
-            const resTarifas = await fetch(`/api/aliados/${aliadoId}/tarifas-municipios`);
-            const dataTarifas = await resTarifas.json();
-            setTarifasMunicipios(dataTarifas.data || []);
         } catch (error) {
             console.error('Error loading aliado config:', error);
         }
@@ -415,7 +408,6 @@ export default function ReservasPage() {
                     aliadoTipo={aliado?.tipo || null}
                     aliadoNombre={aliado?.nombre || null}
                     preciosPersonalizados={preciosPersonalizados}
-                    tarifasMunicipios={tarifasMunicipios}
                 />
             )}
 

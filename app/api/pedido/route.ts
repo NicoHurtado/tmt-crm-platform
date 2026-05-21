@@ -134,8 +134,6 @@ export async function POST(request: Request) {
 
             // 2. Crear todas las reservas
             const reservasCreadas = [];
-            // Cache adicionales by servicioId to avoid N+1 queries
-            const adicionalesDefaultCache = new Map<string, Array<{ id: string; precio: any }>>();
             for (let i = 0; i < body.cartItems.length; i++) {
                 const item = body.cartItems[i];
                 // Usar el código pre-generado
@@ -236,32 +234,6 @@ export async function POST(request: Request) {
 
                 reservasCreadas.push(reserva);
 
-                // Auto-include adicionales marked as incluidoPorDefecto
-                if (!adicionalesDefaultCache.has(item.servicioId)) {
-                    const servicioConAdicionales = await tx.servicio.findUnique({
-                        where: { id: item.servicioId },
-                        select: {
-                            adicionales: {
-                                where: { incluidoPorDefecto: true, activo: true }
-                            }
-                        }
-                    });
-                    adicionalesDefaultCache.set(item.servicioId, servicioConAdicionales?.adicionales || []);
-                }
-                const adicionalesDefault = adicionalesDefaultCache.get(item.servicioId) || [];
-
-                if (adicionalesDefault.length) {
-                    await tx.reservaAdicional.createMany({
-                        data: adicionalesDefault.map((ad) => ({
-                            reservaId: reserva.id,
-                            adicionalId: ad.id,
-                            cantidad: 1,
-                            precioUnitario: Number(ad.precio),
-                            precioTotal: Number(ad.precio),
-                        })),
-                        skipDuplicates: true,
-                    });
-                }
             }
 
             // 3. Retornar pedido con todas las reservas
@@ -275,9 +247,6 @@ export async function POST(request: Request) {
                             vehiculo: true,
                             aliado: true,
                             asistentes: true,
-                            adicionalesSeleccionados: {
-                                include: { adicional: true },
-                            },
                         }
                     },
                     aliado: true,

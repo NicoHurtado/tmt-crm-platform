@@ -60,19 +60,6 @@ export default function CrearServicioPage() {
     const [esMunicipal, setEsMunicipal] = useState(false);
     const [destinoAutoFill, setDestinoAutoFill] = useState('');
 
-    // Municipal: tarifas por municipio de origen
-    const [tarifasMunicipios, setTarifasMunicipios] = useState<{ municipio: string; valorExtra: number }[]>([]);
-
-    const MUNICIPIOS_ORIGEN = [
-        { value: 'MEDELLIN', label: 'Medellín' },
-        { value: 'POBLADO', label: 'El Poblado' },
-        { value: 'LAURELES', label: 'Laureles' },
-        { value: 'SABANETA', label: 'Sabaneta' },
-        { value: 'BELLO', label: 'Bello' },
-        { value: 'ITAGUI', label: 'Itagüí' },
-        { value: 'ENVIGADO', label: 'Envigado' },
-    ];
-
     // Display order in public catalog
     const [orden, setOrden] = useState(999);
 
@@ -188,7 +175,6 @@ export default function CrearServicioPage() {
                     esMunicipal,
                     destinoAutoFill: destinoAutoFill || null,
                     infoTourCompartido: esCompartido ? infoTourCompartido : null,
-                    tarifasMunicipios: esMunicipal ? tarifasMunicipios : [],
                     guiaEspanolDisponible,
                     precioGuiaEspanol: guiaEspanolDisponible ? precioGuiaEspanol : null,
                     guiaInglesDisponible,

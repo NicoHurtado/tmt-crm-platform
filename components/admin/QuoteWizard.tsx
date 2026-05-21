@@ -33,7 +33,6 @@ interface Service {
     camposPersonalizados: any[];
     adicionales: any[];
     vehiculosPermitidos?: any[];
-    tarifasMunicipios?: any[];
 }
 
 interface QuoteWizardProps {
@@ -402,7 +401,6 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
                             onNext={handleNext}
                             onBack={handleBack}
                             preciosPersonalizados={null}
-                            tarifasMunicipios={[]}
                             aliadoTipo={null}
                             aliadoNombre={null}
                         />

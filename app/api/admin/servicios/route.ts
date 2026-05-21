@@ -51,7 +51,6 @@ export async function GET(req: NextRequest) {
                         reservas: true,
                     },
                 },
-                tarifasMunicipios: true,
             },
         });
 
@@ -135,7 +134,6 @@ export async function POST(req: NextRequest) {
             guiaInglesDisponible,
             precioGuiaIngles,
             vehiculos,
-            tarifasMunicipios,
             orden,
         } = body;
 
@@ -190,14 +188,6 @@ export async function POST(req: NextRequest) {
                         create: vehiculos.map((v: any) => ({
                             vehiculoId: v.vehiculoId,
                             precio: v.precio,
-                        })),
-                    }
-                    : undefined,
-                tarifasMunicipios: tarifasMunicipios && tarifasMunicipios.length > 0
-                    ? {
-                        create: tarifasMunicipios.map((t: any) => ({
-                            municipio: t.municipio,
-                            valorExtra: t.valorExtra,
                         })),
                     }
                     : undefined,

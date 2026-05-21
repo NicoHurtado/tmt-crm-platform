@@ -38,9 +38,7 @@ interface Service {
     infoTourCompartido?: unknown;
     destinoAutoFill: string | null;
     camposPersonalizados: any[];
-    adicionales: any[];
     vehiculosPermitidos?: any[];
-    tarifasMunicipios?: any[];
 }
 
 interface ReservationWizardProps {
@@ -52,12 +50,11 @@ interface ReservationWizardProps {
     aliadoTipo?: string | null;
     aliadoNombre?: string | null;
     preciosPersonalizados?: any;
-    tarifasMunicipios?: any[];
     clientePaga?: boolean;
     isStaffFlow?: boolean;
 }
 
-export default function ReservationWizard({ service, isOpen, onClose, initialStep = 0, aliadoId, aliadoTipo, aliadoNombre, preciosPersonalizados, tarifasMunicipios, clientePaga: clientePagaProp, isStaffFlow = false }: ReservationWizardProps) {
+export default function ReservationWizard({ service, isOpen, onClose, initialStep = 0, aliadoId, aliadoTipo, aliadoNombre, preciosPersonalizados, clientePaga: clientePagaProp, isStaffFlow = false }: ReservationWizardProps) {
     const { language } = useLanguage();
     const [currentStep, setCurrentStep] = useState(0);
     const [maxStepReached, setMaxStepReached] = useState(0);
@@ -544,7 +541,6 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                             onNext={handleNext}
                             onBack={handleBack}
                             preciosPersonalizados={preciosPersonalizados}
-                            tarifasMunicipios={tarifasMunicipios}
                             aliadoTipo={aliadoTipo}
                             aliadoNombre={aliadoNombre}
                         />

@@ -136,7 +136,6 @@ export async function DELETE(
         // Limpiar configuraciones relacionadas y borrar aliado
         await prisma.$transaction([
             prisma.tarifaAliado.deleteMany({ where: { aliadoId: id } }),
-            prisma.tarifaMunicipioAliado.deleteMany({ where: { aliadoId: id } }),
             prisma.servicioAliado.deleteMany({ where: { aliadoId: id } }),
             prisma.aliado.delete({ where: { id } }),
         ]);

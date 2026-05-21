@@ -15,16 +15,6 @@ export interface ServicioVehiculoData {
     vehiculo: VehiculoData;
 }
 
-export interface TarifaMunicipioData {
-    municipio: string;
-    valorExtra: number;
-}
-
-export interface AdicionalData {
-    nombre: string;
-    precio: number;
-    incluidoPorDefecto: boolean;
-}
 
 export interface ServicioContextData {
     id: string;
@@ -42,8 +32,6 @@ export interface ServicioContextData {
     esMunicipal: boolean;
     configuracion: unknown;
     vehiculosPermitidos: ServicioVehiculoData[];
-    tarifasMunicipios: TarifaMunicipioData[];
-    adicionales: AdicionalData[];
 }
 
 // ─── Mía Persona (static) ─────────────────────────────────────────────────────
@@ -226,25 +214,6 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string,
         lines.push(
             `\nRECARGO NOCTURNO: +${formatCOP(Number(svc.montoRecargoNocturno))} entre ${svc.recargoNocturnoInicio} – ${svc.recargoNocturnoFin}`
         );
-    }
-
-    const municipiosConRecargo = svc.tarifasMunicipios.filter((t) => Number(t.valorExtra) > 0);
-    if (municipiosConRecargo.length > 0) {
-        lines.push('\nRECARGOS POR MUNICIPIO (suma al precio base):');
-        for (const t of municipiosConRecargo) {
-            lines.push(`• ${t.municipio}: +${formatCOP(Number(t.valorExtra))}`);
-        }
-    }
-
-    const extras = svc.adicionales.filter((a) => !a.incluidoPorDefecto);
-    const defaults = svc.adicionales.filter((a) => a.incluidoPorDefecto);
-    if (extras.length > 0) {
-        lines.push('\nEXTRAS OPCIONALES (el cliente puede solicitarlos):');
-        for (const a of extras) lines.push(`• ${a.nombre}: +${formatCOP(Number(a.precio))}`);
-    }
-    if (defaults.length > 0) {
-        lines.push('INCLUIDO POR DEFECTO:');
-        for (const a of defaults) lines.push(`• ${a.nombre}`);
     }
 
     lines.push('');

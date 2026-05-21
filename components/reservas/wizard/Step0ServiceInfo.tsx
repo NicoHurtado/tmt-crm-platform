@@ -8,7 +8,6 @@ interface Service {
     imagen: string;
     duracion: string | null;
     incluye: string[];
-    adicionales: any[];
 }
 
 interface Step0Props {
@@ -60,21 +59,6 @@ export default function Step0ServiceInfo({ service, onNext, onBack }: Step0Props
                 </div>
             )}
 
-            {service.adicionales && service.adicionales.length > 0 && (
-                <div>
-                    <h3 className="text-xl font-bold mb-3">{t('reservas.paso0_adicionales', language)}</h3>
-                    <ul className="space-y-2">
-                        {service.adicionales.map((adicional: any, index: number) => (
-                            <li key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span className="text-gray-700">{adicional.nombre}</span>
-                                <span className="text-[#D6A75D] font-bold">
-                                    +${Number(adicional.precio).toLocaleString('es-CO')}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
         </div>
     );
 }

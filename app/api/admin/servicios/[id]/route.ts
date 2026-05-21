@@ -26,13 +26,11 @@ export async function GET(
                         vehiculo: true,
                     },
                 },
-                adicionales: true,
                 _count: {
                     select: {
                         reservas: true,
                     },
                 },
-                tarifasMunicipios: true,
             },
         });
 
@@ -98,7 +96,6 @@ export async function PUT(
             precioGuiaIngles,
             orden,
             vehiculos, // Array of { vehiculoId, precio? }
-            tarifasMunicipios, // Array of { municipio, valorExtra }
         } = body;
 
         // Validate multi-language format if provided
@@ -188,16 +185,6 @@ export async function PUT(
                         })),
                     }
                     : undefined,
-                // Update municipality pricing
-                tarifasMunicipios: tarifasMunicipios
-                    ? {
-                        deleteMany: {}, // Delete all existing
-                        create: tarifasMunicipios.map((t: any) => ({
-                            municipio: t.municipio,
-                            valorExtra: t.valorExtra,
-                        })),
-                    }
-                    : undefined,
             },
             include: {
                 vehiculosPermitidos: {
@@ -205,7 +192,6 @@ export async function PUT(
                         vehiculo: true,
                     },
                 },
-                tarifasMunicipios: true,
             },
         });
 

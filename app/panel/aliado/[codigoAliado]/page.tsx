@@ -37,7 +37,6 @@ interface Service {
     camposPersonalizados: any[];
     adicionales: any[];
     vehiculosPermitidos?: any[];
-    tarifasMunicipios?: any[];
 }
 
 interface AliadoData {
@@ -64,7 +63,6 @@ export default function PanelAliadoPage() {
 
     // Custom pricing state
     const [preciosPersonalizados, setPreciosPersonalizados] = useState<any>(null);
-    const [tarifasMunicipios, setTarifasMunicipios] = useState<any[]>([]);
 
     const validateAliado = useCallback(async (codigo: string) => {
         try {
@@ -123,9 +121,6 @@ export default function PanelAliadoPage() {
             });
             setPreciosPersonalizados(pricingMap);
 
-            const resTarifas = await fetch(`/api/aliados/${aliadoId}/tarifas-municipios`);
-            const dataTarifas = await resTarifas.json();
-            setTarifasMunicipios(dataTarifas.data || []);
         } catch (error) {
             console.error('Error loading aliado config:', error);
         }
@@ -341,7 +336,6 @@ export default function PanelAliadoPage() {
                     aliadoTipo={aliado?.tipo || null}
                     aliadoNombre={aliado?.nombre || null}
                     preciosPersonalizados={preciosPersonalizados}
-                    tarifasMunicipios={tarifasMunicipios}
                     isStaffFlow={true}
                 />
             )}

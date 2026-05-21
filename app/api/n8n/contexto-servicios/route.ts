@@ -16,10 +16,6 @@ export async function GET(request: NextRequest) {
                     where: { vehiculo: { activo: true } },
                     include: { vehiculo: true },
                 },
-                tarifasMunicipios: true,
-                adicionales: {
-                    where: { activo: true },
-                },
             },
             orderBy: { orden: 'asc' },
         });
@@ -47,15 +43,6 @@ export async function GET(request: NextRequest) {
                     capacidadMaxima: sv.vehiculo.capacidadMaxima,
                     precioBase: Number(sv.vehiculo.precioBase),
                 },
-            })),
-            tarifasMunicipios: s.tarifasMunicipios.map((t) => ({
-                municipio: t.municipio,
-                valorExtra: Number(t.valorExtra),
-            })),
-            adicionales: s.adicionales.map((a) => ({
-                nombre: a.nombre,
-                precio: Number(a.precio),
-                incluidoPorDefecto: a.incluidoPorDefecto,
             })),
         }));
 

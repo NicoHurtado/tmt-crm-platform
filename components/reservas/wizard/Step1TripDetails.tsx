@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ReservationFormData } from '@/types/reservation';
 import { Municipio, Idioma } from '@prisma/client';
-import { calculateTotalPrice, isNightSurchargeApplicable, formatPrice, MUNICIPALITY_PRICES } from '@/lib/pricing';
+import { calculateTotalPrice, isNightSurchargeApplicable, formatPrice } from '@/lib/pricing';
 import { FiAlertCircle, FiCheck, FiUsers, FiUser } from 'react-icons/fi';
 import { Plane } from 'lucide-react';
 import Image from 'next/image';
@@ -33,12 +33,11 @@ interface Step1Props {
     onNext: () => void;
     onBack: () => void;
     preciosPersonalizados?: any;
-    tarifasMunicipios?: any[];
     aliadoTipo?: string | null;
     aliadoNombre?: string | null;
 }
 
-export default function Step1TripDetails({ service, formData, updateFormData, onNext, onBack, preciosPersonalizados, tarifasMunicipios, aliadoTipo, aliadoNombre }: Step1Props) {
+export default function Step1TripDetails({ service, formData, updateFormData, onNext, onBack, preciosPersonalizados, aliadoTipo, aliadoNombre }: Step1Props) {
     const { language } = useLanguage();
     const [showNightSurcharge, setShowNightSurcharge] = useState(false);
     const [dynamicPrice, setDynamicPrice] = useState(0);
@@ -295,38 +294,20 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         // Total = service price + vehicle price (additive, not override)
         // vehiclePrice=0 means no vehicle selected or vehicle has no price
 
-        // Calculate municipality fee (custom or default)
-        let municipalityFee = 0;
-
-        if (tarifasMunicipios && tarifasMunicipios.length > 0) {
-            const customTariff = tarifasMunicipios.find(t => t.municipio === formData.municipio);
-            if (customTariff) {
-                municipalityFee = Number(customTariff.valorExtra);
-            }
-        }
-
-        // Dynamic municipioConfig recargo
+        // Recargo de municipio — viene exclusivamente de MunicipioConfig
         const selectedMunicipioConfig = formData.municipioConfigId
             ? municipiosConfig.find((m) => m.id === formData.municipioConfigId)
             : null;
         const tarifaMunicipioConfigValue = selectedMunicipioConfig ? Number(selectedMunicipioConfig.recargo) : 0;
 
         // Price = service.precioBase + vehiculo.precioBase + surcharges
-        // NO usar precioAdicionales aquí para evitar loop
         const pricing = calculateTotalPrice({
             basePrice: basePrice + vehiclePrice,
-            vehiclePrice: 0, // Already folded into basePrice above
-            municipality: formData.municipio as Municipio,
+            vehiclePrice: 0,
+            municipality: Municipio.OTRO, // Siempre OTRO — el recargo real viene de MunicipioConfig
             nightSurcharge,
-            additionals: 0, // Siempre 0 aquí, sumamos después
+            additionals: 0,
         });
-
-        // Override municipality fee if we have a custom one (already calculated above, but ensuring it's in pricing)
-        if (municipalityFee > 0) {
-            pricing.municipalityFee = municipalityFee;
-            // Recalculate total with custom municipality fee
-            pricing.total = pricing.subtotal + pricing.municipalityFee + pricing.nightSurcharge - pricing.allyDiscount;
-        }
 
         // Sumar precio dinámico y recargo municipioConfig al total
         const totalConDinamico = pricing.total + dynamicPrice + tarifaMunicipioConfigValue;
@@ -362,7 +343,6 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         formData.cantidadHoras,
         availableVehicles,
         preciosPersonalizados,
-        tarifasMunicipios,
         municipiosConfig,
         service.aplicaRecargoNocturno,
         service.montoRecargoNocturno,

@@ -30,7 +30,6 @@ model Aliado {
   reservas          Reserva[]
   serviciosAliado   ServicioAliado[]
   tarifas           TarifaAliado[]
-  tarifasMunicipios TarifaMunicipioAliado[]
 
   @@index([codigo])
 }
@@ -66,11 +65,9 @@ model Servicio {
   orden                 Int                       @default(999)
   calificaciones        Calificacion[]
   reservas              Reserva[]
-  adicionales           ServicioAdicional[]
   serviciosAliado       ServicioAliado[]
   vehiculosPermitidos   ServicioVehiculo[]
   tarifasAliados        TarifaAliado[]
-  tarifasMunicipios     TarifaMunicipioServicio[]
 }
 
 model Vehiculo {
@@ -169,7 +166,6 @@ model Reserva {
   pedido                   Pedido?            @relation(fields: [pedidoId], references: [id])
   servicio                 Servicio           @relation(fields: [servicioId], references: [id])
   vehiculo                 Vehiculo?          @relation(fields: [vehiculoId], references: [id])
-  adicionalesSeleccionados ReservaAdicional[]
 
   @@index([codigo])
   @@index([estado])
@@ -194,32 +190,6 @@ model Asistente {
   reserva         Reserva       @relation(fields: [reservaId], references: [id], onDelete: Cascade)
 }
 
-model ServicioAdicional {
-  id                String             @id @default(cuid())
-  servicioId        String
-  nombre            String
-  precio            Decimal            @db.Decimal(10, 2)
-  tipo              TipoAdicional
-  activo            Boolean            @default(true)
-  incluidoPorDefecto Boolean           @default(false)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  reservas          ReservaAdicional[]
-  servicio          Servicio           @relation(fields: [servicioId], references: [id], onDelete: Cascade)
-}
-
-model ReservaAdicional {
-  id             String            @id @default(cuid())
-  reservaId      String
-  adicionalId    String
-  cantidad       Int               @default(1)
-  precioUnitario Decimal           @db.Decimal(10, 2)
-  precioTotal    Decimal           @db.Decimal(10, 2)
-  adicional      ServicioAdicional @relation(fields: [adicionalId], references: [id], onDelete: Cascade)
-  reserva        Reserva           @relation(fields: [reservaId], references: [id], onDelete: Cascade)
-
-  @@unique([reservaId, adicionalId])
-}
 
 model TarifaAliado {
   id                 String      @id @default(cuid())
@@ -319,18 +289,6 @@ model PrecioVehiculoAliado {
   @@index([vehiculoId])
 }
 
-model TarifaMunicipioAliado {
-  id         String    @id @default(cuid())
-  aliadoId   String
-  municipio  Municipio
-  valorExtra Decimal   @db.Decimal(10, 2)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  aliado     Aliado    @relation(fields: [aliadoId], references: [id], onDelete: Cascade)
-
-  @@unique([aliadoId, municipio])
-  @@index([aliadoId])
-}
 
 model MunicipioConfig {
   id        String    @id @default(cuid())
@@ -377,16 +335,6 @@ model BdAntigua {
   @@map("bd_antigua")
 }
 
-model TarifaMunicipioServicio {
-  id         String    @id @default(cuid())
-  servicioId String
-  municipio  Municipio
-  valorExtra Decimal   @default(0) @db.Decimal(10, 2)
-  servicio   Servicio  @relation(fields: [servicioId], references: [id], onDelete: Cascade)
-
-  @@unique([servicioId, municipio])
-  @@map("tarifas_municipio_servicio")
-}
 
 enum TipoAliado {
   HOTEL
@@ -458,11 +406,6 @@ enum TipoDocumento {
   CE
 }
 
-enum TipoAdicional {
-  FIJO
-  POR_PERSONA
-  POR_CANTIDAD
-}
 
 enum TipoCampo {
   TEXT

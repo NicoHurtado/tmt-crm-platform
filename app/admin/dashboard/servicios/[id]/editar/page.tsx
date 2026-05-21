@@ -63,19 +63,6 @@ export default function EditarServicioPage() {
     const [esMunicipal, setEsMunicipal] = useState(false);
     const [destinoAutoFill, setDestinoAutoFill] = useState('');
 
-    // Municipal: tarifas por municipio de origen
-    const [tarifasMunicipios, setTarifasMunicipios] = useState<{ municipio: string; valorExtra: number }[]>([]);
-
-    const MUNICIPIOS_ORIGEN = [
-        { value: 'MEDELLIN', label: 'Medellín' },
-        { value: 'POBLADO', label: 'El Poblado' },
-        { value: 'LAURELES', label: 'Laureles' },
-        { value: 'SABANETA', label: 'Sabaneta' },
-        { value: 'BELLO', label: 'Bello' },
-        { value: 'ITAGUI', label: 'Itagüí' },
-        { value: 'ENVIGADO', label: 'Envigado' },
-    ];
-
     // Display order in public catalog
     const [orden, setOrden] = useState(999);
 
@@ -141,12 +128,6 @@ export default function EditarServicioPage() {
                     setInfoTourCompartido(infoTourCompartidoForAdminForm(servicio.infoTourCompartido));
                     setEsMunicipal(servicio.esMunicipal || false);
                     setDestinoAutoFill(servicio.destinoAutoFill || '');
-                    if (servicio.tarifasMunicipios?.length > 0) {
-                        setTarifasMunicipios(servicio.tarifasMunicipios.map((t: any) => ({
-                            municipio: t.municipio,
-                            valorExtra: Number(t.valorExtra),
-                        })));
-                    }
                     setOrden(servicio.orden ?? 999);
 
                     // Load custom fields
@@ -253,7 +234,6 @@ export default function EditarServicioPage() {
                     esMunicipal,
                     destinoAutoFill: destinoAutoFill || null,
                     infoTourCompartido: esCompartido ? infoTourCompartido : null,
-                    tarifasMunicipios: esMunicipal ? tarifasMunicipios : [],
                     guiaEspanolDisponible,
                     precioGuiaEspanol: guiaEspanolDisponible ? precioGuiaEspanol : null,
                     guiaInglesDisponible,
