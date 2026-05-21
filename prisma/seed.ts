@@ -60,7 +60,7 @@ async function main() {
             aplicaRecargoNocturno: false,
             esAeropuerto: false,
             destinoAutoFill: 'Guatapé',
-            camposPersonalizados: [],
+            configuracion: {},
         },
     });
     console.log('✅ Servicio creado:', servicio.nombre);
