@@ -23,7 +23,14 @@ export async function GET() {
             },
         });
 
-        return NextResponse.json({ data: testimonios });
+        return NextResponse.json(
+            { data: testimonios },
+            {
+                headers: {
+                    'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+                },
+            }
+        );
     } catch (error) {
         console.error('Error fetching testimonios:', error);
         return NextResponse.json(

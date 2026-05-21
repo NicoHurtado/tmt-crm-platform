@@ -20,7 +20,14 @@ export async function GET() {
             take: 3,
         });
 
-        return NextResponse.json({ data: calificaciones });
+        return NextResponse.json(
+            { data: calificaciones },
+            {
+                headers: {
+                    'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+                },
+            }
+        );
     } catch (error) {
         console.error('Error fetching featured calificaciones:', error);
         return NextResponse.json(
