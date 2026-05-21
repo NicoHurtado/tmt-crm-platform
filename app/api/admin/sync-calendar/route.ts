@@ -38,9 +38,6 @@ export async function GET(request: Request) {
                 vehiculo: true,
                 aliado: true,
                 asistentes: true,
-                adicionalesSeleccionados: {
-                    include: { adicional: true },
-                },
             },
             orderBy: {
                 fecha: 'desc'

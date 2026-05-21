@@ -31,7 +31,6 @@ export async function POST(request: NextRequest) {
                 conductor: true,
                 aliado: true,
                 asistentes: true,
-                adicionalesSeleccionados: true,
             },
         });
 
@@ -83,7 +82,6 @@ export async function POST(request: NextRequest) {
                 conductor: true,
                 aliado: true,
                 asistentes: true,
-                adicionalesSeleccionados: true,
             },
         });
 

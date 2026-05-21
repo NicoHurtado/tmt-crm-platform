@@ -23,11 +23,6 @@ export async function GET(
                 calificacion: true,
                 aliado: true,
                 asistentes: true,
-                adicionalesSeleccionados: {
-                    include: {
-                        adicional: true,
-                    },
-                },
             },
         });
 
@@ -169,11 +164,6 @@ export async function PUT(
                 calificacion: true,
                 aliado: true,
                 asistentes: true,
-                adicionalesSeleccionados: {
-                    include: {
-                        adicional: true,
-                    },
-                },
             },
         });
 

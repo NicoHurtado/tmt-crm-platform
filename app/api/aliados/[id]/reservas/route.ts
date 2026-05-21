@@ -59,11 +59,6 @@ export async function GET(
                     },
                 },
                 asistentes: true,
-                adicionalesSeleccionados: {
-                    include: {
-                        adicional: true,
-                    },
-                },
             },
         });
 

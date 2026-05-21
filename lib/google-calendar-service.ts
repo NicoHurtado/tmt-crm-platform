@@ -13,14 +13,6 @@ type ReservaConRelaciones = Reserva & {
         tipoDocumento: string;
         numeroDocumento: string;
     }>;
-    adicionalesSeleccionados?: Array<{
-        cantidad: number;
-        precioUnitario: { toNumber(): number } | number;
-        precioTotal: { toNumber(): number } | number;
-        adicional: {
-            nombre: string;
-        };
-    }>;
 };
 
 /**
@@ -187,24 +179,6 @@ function formatEventDetails(reserva: ReservaConRelaciones): {
         `💳 Método de Pago: ${metodoPagoLabel}${estadoPagoBold ? ` (${estadoPagoBold})` : ''}`,
         ``,
     );
-
-    // Adicionales seleccionados
-    if (reserva.adicionalesSeleccionados && reserva.adicionalesSeleccionados.length > 0) {
-        descripcionParts.push(
-            `🛍️ ADICIONALES`,
-            `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-            ``
-        );
-        reserva.adicionalesSeleccionados.forEach((ra, index) => {
-            const precioTotal = typeof ra.precioTotal === 'object'
-                ? ra.precioTotal.toNumber()
-                : Number(ra.precioTotal);
-            descripcionParts.push(
-                `${index + 1}. ${ra.adicional.nombre} x${ra.cantidad} — $${precioTotal.toLocaleString('es-CO')} COP`
-            );
-        });
-        descripcionParts.push(``);
-    }
 
     // Información de Pasajeros (Asistentes)
     if (reserva.asistentes && reserva.asistentes.length > 0) {

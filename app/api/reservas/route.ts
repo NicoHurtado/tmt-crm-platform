@@ -205,7 +205,6 @@ export async function POST(request: Request) {
                 aliado: true;
                 asistentes: true;
                 vehiculo: true;
-                adicionalesSeleccionados: { include: { adicional: true } };
             };
         }>;
         {
@@ -273,9 +272,6 @@ export async function POST(request: Request) {
                             aliado: true,
                             asistentes: true,
                             vehiculo: true,
-                            adicionalesSeleccionados: {
-                                include: { adicional: true },
-                            },
                         },
                     });
                     break; // success

@@ -96,9 +96,6 @@ async function handleReservaPayment(orderId: string) {
             vehiculo: true,
             aliado: true,
             asistentes: true,
-            adicionalesSeleccionados: {
-                include: { adicional: true },
-            },
         }
     });
 

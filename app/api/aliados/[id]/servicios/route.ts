@@ -18,7 +18,6 @@ export async function GET(
             prisma.servicio.findMany({
                 where: { activo: true },
                 include: {
-                    adicionales: true,
                     vehiculosPermitidos: { select: { vehiculoId: true } }
                 }
             }),
@@ -102,7 +101,7 @@ export async function GET(
                 destinoAutoFill: servicio.destinoAutoFill,
                 infoTourCompartido: servicio.infoTourCompartido,
                 camposPersonalizados: servicio.camposPersonalizados ?? [],
-                adicionales: servicio.adicionales ?? [],
+                adicionales: [],
                 configuracion: servicio.configuracion,
                 orden: servicio.orden,
             };

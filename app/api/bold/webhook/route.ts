@@ -153,9 +153,6 @@ export async function POST(req: NextRequest) {
                                 vehiculo: true,
                                 aliado: true,
                                 asistentes: true,
-                                adicionalesSeleccionados: {
-                                    include: { adicional: true },
-                                },
                             },
                         });
 
