@@ -245,7 +245,7 @@ export default function ReservaAliadoPage() {
                                     >
                                         <div className="relative h-56 overflow-hidden">
                                             <Image
-                                                src={service.imagen || '/medellin.jpg'}
+                                                src={service.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368602/tmt/servicios/gasahtldulliounqtmot.jpg'}
                                                 alt={getLocalizedText(service.nombre, language)}
                                                 fill
                                                 className="object-cover transition-transform duration-500 group-hover:scale-110"
@@ -290,7 +290,7 @@ export default function ReservaAliadoPage() {
                                 >
                                     <div className="relative h-56 overflow-hidden">
                                         <Image
-                                            src="/antioquia.jpg"
+                                            src={serviciosMunicipales[0]?.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368600/tmt/servicios/epyidj9zt9icdjxwi3ed.jpg'}
                                             alt={language === 'es' ? 'Transporte Municipal Antioquia' : 'Antioquia Municipal Transport'}
                                             fill
                                             className="object-cover transition-transform duration-500 group-hover:scale-110"
