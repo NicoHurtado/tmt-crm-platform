@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { Plus, Edit2, Trash2, Users } from 'lucide-react'
-import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,14 +25,13 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from '@/components/ui/alert-dialog'
-import ImageUpload from '@/components/admin/ImageUpload'
+import { VehicleIcon, getVehicleType } from '@/components/ui/VehicleIcon'
 
 interface Vehiculo {
   id: string
   nombre: string
   capacidadMinima: number
   capacidadMaxima: number
-  imagen: string
   activo: boolean
   precioBase: number
 }
@@ -43,13 +40,11 @@ const EMPTY_FORM = {
   nombre: '',
   capacidadMinima: 1,
   capacidadMaxima: 4,
-  imagen: '',
   activo: true,
   precioBase: 0,
 }
 
 export default function VehiculosPage() {
-  const router = useRouter()
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -114,7 +109,6 @@ export default function VehiculosPage() {
       nombre: v.nombre,
       capacidadMinima: v.capacidadMinima,
       capacidadMaxima: v.capacidadMaxima,
-      imagen: v.imagen,
       activo: v.activo,
       precioBase: Number(v.precioBase || 0),
     })
@@ -188,12 +182,8 @@ export default function VehiculosPage() {
                 ${idx < vehiculos.length - 1 ? 'border-b border-neutral-100' : ''}`}
             >
               {/* Thumbnail */}
-              <div className="relative h-12 w-16 bg-neutral-100 rounded overflow-hidden shrink-0">
-                {v.imagen ? (
-                  <Image src={v.imagen} alt={v.nombre} fill className="object-contain p-1" unoptimized />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-neutral-300 text-lg">🚗</div>
-                )}
+              <div className="h-12 w-16 bg-neutral-50 rounded flex items-center justify-center shrink-0">
+                <VehicleIcon nombre={v.nombre} size="sm" />
               </div>
 
               {/* Name */}
@@ -336,14 +326,18 @@ export default function VehiculosPage() {
                 </div>
               </div>
 
-              {/* Right column — image */}
+              {/* Right column — icon preview */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-neutral-700">Imagen del vehículo</Label>
-                <ImageUpload
-                  value={formData.imagen}
-                  onChange={(url) => setFormData({ ...formData, imagen: url })}
-                  label=""
-                />
+                <Label className="text-xs font-medium text-neutral-700">Ícono del vehículo</Label>
+                <div className="border border-neutral-200 rounded-lg bg-neutral-50 flex flex-col items-center justify-center gap-3 py-8">
+                  <VehicleIcon nombre={formData.nombre} size="lg" />
+                  <p className="text-xs text-neutral-400 capitalize">
+                    {getVehicleType(formData.nombre)}
+                  </p>
+                </div>
+                <p className="text-[11px] text-neutral-400">
+                  El ícono se asigna automáticamente según el nombre del vehículo.
+                </p>
               </div>
             </div>
 
