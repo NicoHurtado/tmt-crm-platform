@@ -182,7 +182,7 @@ export default function VehiculosPage() {
                 ${idx < vehiculos.length - 1 ? 'border-b border-neutral-100' : ''}`}
             >
               {/* Thumbnail */}
-              <div className="h-12 w-16 bg-neutral-50 rounded flex items-center justify-center shrink-0">
+              <div className="h-12 w-16 bg-white rounded-lg border border-neutral-100 flex items-center justify-center shrink-0 overflow-hidden">
                 <VehicleIcon nombre={v.nombre} size="sm" />
               </div>
 
@@ -329,7 +329,7 @@ export default function VehiculosPage() {
               {/* Right column — icon preview */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-neutral-700">Ícono del vehículo</Label>
-                <div className="border border-neutral-200 rounded-lg bg-neutral-50 flex flex-col items-center justify-center gap-3 py-8">
+                <div className="border border-neutral-200 rounded-lg bg-white flex flex-col items-center justify-center gap-3 py-8">
                   <VehicleIcon nombre={formData.nombre} size="lg" />
                   <p className="text-xs text-neutral-400 capitalize">
                     {getVehicleType(formData.nombre)}
