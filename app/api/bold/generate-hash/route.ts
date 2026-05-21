@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { generateBoldHash, calculateBoldCommission } from '@/lib/bold';
+import { generateBoldHash } from '@/lib/bold';
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic';
@@ -18,8 +18,6 @@ export async function POST(req: NextRequest) {
         }
 
         let orderId: string;
-        let baseAmount: number;
-        let comisionBold: number;
         let finalAmount: number;
         let entityType: 'reserva' | 'pedido';
 
@@ -70,20 +68,11 @@ export async function POST(req: NextRequest) {
             }
 
             orderId = reserva.codigo;
-            baseAmount = Number(reserva.precioTotal);
-
-            // Calcular comisión Bold
-            comisionBold = Math.round(calculateBoldCommission(baseAmount));
-            finalAmount = Math.round(baseAmount + comisionBold);
+            // reserva.precioTotal already includes the Bold commission (added at creation
+            // in /api/reservas POST). Re-adding it here was charging customers 6% twice
+            // whenever the tracking page regenerated the hash.
+            finalAmount = Math.round(Number(reserva.precioTotal));
             entityType = 'reserva';
-
-            // Actualizar la reserva con la comisión Bold
-            await prisma.reserva.update({
-                where: { id: reservaId },
-                data: {
-                    comisionBold: comisionBold,
-                },
-            });
         }
 
         // Generar hash de Bold
