@@ -162,7 +162,7 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string,
     const config = getConfiguracion(svc.configuracion);
     const campos = [...config.camposCustom].sort((a, b) => a.orden - b.orden);
 
-    const base = appUrl ?? 'https://www.medellintransportes.com';
+    const base = (appUrl ?? 'https://www.medellintransportes.com').replace(/\/$/, '');
     const reservaUrl = `${base}/reservas?serviceId=${svc.id}&form=1`;
 
     lines.push('---');
