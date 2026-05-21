@@ -110,7 +110,7 @@ function ServiceCard({ servicio, language }: { servicio: Servicio; language: 'es
             >
                 <div className="relative h-56 overflow-hidden flex-shrink-0">
                     <Image
-                        src={servicio.imagen || '/medellin.jpg'}
+                        src={servicio.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368602/tmt/servicios/gasahtldulliounqtmot.jpg'}
                         alt={getLocalizedText(servicio.nombre, language)}
                         fill
                         className="object-cover transition-transform duration-500 group-hover/card:scale-110"

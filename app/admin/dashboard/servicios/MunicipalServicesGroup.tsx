@@ -95,7 +95,7 @@ export default function MunicipalServicesGroup({
                                 <div className="flex items-center gap-4">
                                     <div className="relative w-16 h-16 rounded-md overflow-hidden flex-shrink-0 bg-gray-100">
                                         <Image
-                                            src={servicio.imagen || '/placeholder.jpg'}
+                                            src={servicio.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368602/tmt/servicios/gasahtldulliounqtmot.jpg'}
                                             alt={getLocalizedText(servicio.nombre, 'ES')}
                                             fill
                                             className="object-cover"

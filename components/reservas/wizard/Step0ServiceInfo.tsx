@@ -23,7 +23,7 @@ export default function Step0ServiceInfo({ service, onNext, onBack }: Step0Props
         <div className="space-y-6">
             <div className="relative h-64 w-full rounded-xl overflow-hidden">
                 <Image
-                    src={service.imagen || '/medellin.jpg'}
+                    src={service.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368602/tmt/servicios/gasahtldulliounqtmot.jpg'}
                     alt={service.nombre}
                     fill
                     className="object-cover"

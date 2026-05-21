@@ -786,7 +786,7 @@ export default function EditarServicioPage() {
 
                                                 <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                                                     <Image
-                                                        src={vehiculo.imagen || '/placeholder.jpg'}
+                                                        src={vehiculo.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368602/tmt/servicios/gasahtldulliounqtmot.jpg'}
                                                         alt={vehiculo.nombre}
                                                         fill
                                                         style={{ objectFit: 'cover' }}

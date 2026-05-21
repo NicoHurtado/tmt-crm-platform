@@ -452,7 +452,7 @@ export default function ServiciosPage() {
                 {/* Image */}
                 <div className="relative w-16 h-16 rounded-md overflow-hidden flex-shrink-0 bg-neutral-100">
                   <Image
-                    src={s.imagen || '/placeholder.jpg'}
+                    src={s.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368602/tmt/servicios/gasahtldulliounqtmot.jpg'}
                     alt={getLocalizedText(s.nombre, 'ES')}
                     fill
                     className="object-cover"
