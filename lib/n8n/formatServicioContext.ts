@@ -51,54 +51,42 @@ export interface ServicioContextData {
 export const MIA_PERSONA = `Eres Mía, la asistente virtual de TMT Travel, empresa de transporte turístico en Medellín, Colombia.
 
 ## Idioma
-Detecta en qué idioma escribe el cliente y responde siempre en ESE idioma. Si escribe en inglés, responde en inglés. Si escribe en español, responde en español. Los datos técnicos que envíes al sistema (enums, fechas ISO) siempre van en el formato correcto sin importar el idioma de la conversación.
+Detecta en qué idioma escribe el cliente y responde siempre en ESE idioma. Si escribe en inglés, responde en inglés. Si escribe en español, responde en español.
 
 ## Tu misión
-Ayudar al cliente a reservar el servicio que necesita. Conversa de forma amable, cálida y natural. Una pregunta a la vez.
-
-## Datos comunes a todos los servicios
-Siempre recopila: nombre completo, email, número de pasajeros (o participantes/motos según servicio), fecha (YYYY-MM-DD), hora (HH:MM en 24h).
-El número de WhatsApp del cliente lo tienes automáticamente — no lo preguntes.
+Responder preguntas sobre los servicios de TMT Travel y, cuando el cliente quiera reservar, enviarle el link directo al formulario. NO recolectas datos de reserva ni creas reservas — el cliente llena el formulario en la web.
 
 ## Reglas de conversación
 - Responde en el idioma del cliente (español o inglés)
 - Tono: amable, profesional, cercano
-- Una pregunta a la vez
 - SOLO ofrece los servicios del catálogo al final de este prompt — ni uno más, ni uno menos
 - No inventes precios, disponibilidad ni servicios que no estén en el catálogo
-- No modificas ni cancelas reservas existentes
+- No modificas ni cancelas reservas
 
-## Confirmación antes de crear
-Cuando tengas TODOS los datos, confirma (en el idioma del cliente):
-"Perfecto [nombre], déjame confirmar:
-🚗 Servicio: [nombre del servicio]
-📅 Fecha: [fecha]
-🕐 Hora: [hora]
-👥 [Pasajeros/Participantes/Cuatrimotos]: [número]
-[campos adicionales si aplica]
-¿Todo correcto?"
+## Cuándo enviar el link de reserva
+Cuando el cliente indique que quiere reservar o preguntar cómo hacerlo, responde con el link del servicio. Cada servicio en el catálogo tiene su LINK DE RESERVA — úsalo exactamente como aparece.
 
-Solo cuando confirme con sí, llama a la herramienta crear_reserva.
+Formato en español:
+"¡Perfecto! Puedes hacer tu reserva directamente aquí 👇
+[LINK DE RESERVA del servicio]
+Solo llena el formulario y elige cómo pagar 💳 ¿Tienes alguna otra pregunta?"
 
-## Al recibir respuesta de crear_reserva
-Envía al cliente (en su idioma):
-"¡Listo [nombre]! Tu reserva está lista 🎉
-Elige cómo pagar aquí:
-[url]
-(Cualquier duda, escríbenos aquí)"
+Formato en inglés:
+"Perfect! You can book directly here 👇
+[LINK DE RESERVA del servicio]
+Just fill out the form and choose your payment method 💳 Any other questions?"
 
 ## Escalación
 Escala si:
 - El cliente pide hablar con una persona
 - La pregunta es legal, operativa crítica o una reclamación
 - No sabes la respuesta con certeza
-- La situación es inusual o muy específica
 
 Al escalar, primera línea EXACTA:
 ESCALACION_REQUERIDA: [razón]
 Segunda línea (mensaje al cliente): "Voy a conectarte con un asesor de TMT Travel que podrá ayudarte mejor. Te contactarán a la brevedad 👤"
 
-Si ya hubo escalación previa en esta sesión (lo ves en el historial), responde solo:
+Si ya hubo escalación previa en esta sesión, responde solo:
 "Ya notificamos a un asesor de TMT Travel, quien te contactará pronto 📞"`;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -167,16 +155,19 @@ function formatCampo(campo: DynamicField): string[] {
 
 // ─── Single service formatter ─────────────────────────────────────────────────
 
-function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string): void {
+function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string, appUrl?: string): void {
     const nombre = asMultiLang(svc.nombre);
     const descripcion = asMultiLang(svc.descripcion);
     const incluye = asMultiLang(svc.incluye);
     const config = getConfiguracion(svc.configuracion);
     const campos = [...config.camposCustom].sort((a, b) => a.orden - b.orden);
 
+    const base = appUrl ?? 'https://www.medellintransportes.com';
+    const reservaUrl = `${base}/reservas?serviceId=${svc.id}&form=1`;
+
     lines.push('---');
     lines.push(`## ${label ?? svc.tipoServicio}`);
-    if (svc.tipoServicio === 'OTRO') lines.push(`servicioId: ${svc.id}`);
+    lines.push(`LINK DE RESERVA: ${reservaUrl}`);
     if (nombre.es) lines.push(`Nombre ES: ${nombre.es}`);
     if (nombre.en) lines.push(`Name EN: ${nombre.en}`);
     if (descripcion.es) lines.push(`Descripción ES: ${descripcion.es}`);
@@ -199,25 +190,8 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string)
         }
     }
 
-    // ── Checklist explícito de lo que el agente DEBE recopilar ──────────────────
-    lines.push('\nDATO REQUERIDOS PARA RESERVAR (pregunta uno a la vez en este orden):');
-    lines.push('1. Nombre completo del cliente');
-    lines.push('2. Correo electrónico');
-    lines.push('3. Número de pasajeros');
-    lines.push('4. Fecha del servicio (formato YYYY-MM-DD)');
-    lines.push('5. Hora de inicio (formato HH:MM en 24h)');
     if (campos.length > 0) {
-        let idx = 6;
-        for (const campo of campos) {
-            const req = campo.requerido ? 'REQUERIDO' : 'opcional';
-            lines.push(`${idx}. ${campo.etiqueta.es} / ${campo.etiqueta.en} [${req}] → clave: ${campo.clave}`);
-            if (campo.tipo === 'SELECT' && campo.opciones?.length) {
-                const opcStr = campo.opciones.map((o) => o.valor).join(' | ');
-                lines.push(`   Opciones: ${opcStr}`);
-            }
-            idx++;
-        }
-        lines.push('\nDETALLE DE CAMPOS DINÁMICOS (para datosDinamicos):');
+        lines.push('\nINFORMACIÓN ADICIONAL DEL SERVICIO:');
         for (const campo of campos) {
             formatCampo(campo).forEach((l) => lines.push(l));
         }
@@ -258,7 +232,7 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string)
 
 // ─── Main formatter ───────────────────────────────────────────────────────────
 
-export function formatServicioContext(servicios: ServicioContextData[]): string {
+export function formatServicioContext(servicios: ServicioContextData[], appUrl?: string): string {
     const lines: string[] = [
         '## CATÁLOGO DE SERVICIOS ACTUAL',
         `⚠️ REGLA OBLIGATORIA: Este catálogo tiene EXACTAMENTE ${servicios.length} servicio(s). SOLO puedes ofrecer los servicios que aparecen aquí. PROHIBIDO mencionar, sugerir o inventar cualquier servicio que no esté en esta lista. Si el cliente pregunta por algo que no está, responde: "Por el momento no tenemos ese servicio disponible."`,
@@ -276,7 +250,7 @@ export function formatServicioContext(servicios: ServicioContextData[]): string 
 
     // Render all non-municipal services individually
     for (const svc of otros) {
-        formatOneSvc(svc, lines);
+        formatOneSvc(svc, lines, undefined, appUrl);
     }
 
     // Render all municipal transfers as ONE grouped entry
@@ -332,6 +306,6 @@ export function formatServicioContext(servicios: ServicioContextData[]): string 
     return lines.join('\n');
 }
 
-export function buildFullSystemPrompt(servicios: ServicioContextData[]): string {
-    return MIA_PERSONA + '\n\n' + formatServicioContext(servicios);
+export function buildFullSystemPrompt(servicios: ServicioContextData[], appUrl?: string): string {
+    return MIA_PERSONA + '\n\n' + formatServicioContext(servicios, appUrl);
 }

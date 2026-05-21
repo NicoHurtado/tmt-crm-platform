@@ -59,7 +59,8 @@ export async function GET(request: NextRequest) {
             })),
         }));
 
-        const systemPrompt = buildFullSystemPrompt(servicios);
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.medellintransportes.com';
+        const systemPrompt = buildFullSystemPrompt(servicios, appUrl);
 
         return NextResponse.json({
             systemPrompt,
