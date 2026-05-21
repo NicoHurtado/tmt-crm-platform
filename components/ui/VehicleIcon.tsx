@@ -2,13 +2,11 @@ import Image from 'next/image'
 
 export type VehicleType = 'auto' | 'camioneta' | 'van' | 'bus'
 
-const CLOUDINARY_BASE = 'https://res.cloudinary.com/dnv8wdclp/image/upload'
-
 const VEHICLE_IMAGES: Record<VehicleType, string> = {
-  auto:      `${CLOUDINARY_BASE}/vehicles/auto.png`,
-  camioneta: `${CLOUDINARY_BASE}/vehicles/camioneta.png`,
-  van:       `${CLOUDINARY_BASE}/vehicles/van.png`,
-  bus:       `${CLOUDINARY_BASE}/vehicles/bus.png`,
+  auto:      'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779384382/vehicles/auto.png',
+  camioneta: 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779384384/vehicles/camioneta.png',
+  van:       'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779384385/vehicles/van.png',
+  bus:       'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779384386/vehicles/bus.png',
 }
 
 export function getVehicleType(nombre: string): VehicleType {
