@@ -150,19 +150,9 @@ describe('formatServicioContext', () => {
         expect(out.split('## TRANSPORTE_MUNICIPAL').length - 1).toBe(1);
     });
 
-    it('muestra adicionales opcionales y los incluidos por defecto', () => {
-        const svc: ServicioContextData = {
-            ...svcBase,
-            adicionales: [
-                { nombre: 'Almuerzo típico', precio: 35_000, incluidoPorDefecto: false },
-                { nombre: 'Seguro de viaje', precio: 0, incluidoPorDefecto: true },
-            ],
-        };
-        const out = formatServicioContext([svc]);
-        expect(out).toContain('Almuerzo típico');
-        expect(out).toContain('35.000');
-        expect(out).toContain('Seguro de viaje');
-    });
+    // ServicioAdicional was removed from the schema (see commit 161d35d).
+    // The Mía context no longer surfaces optional add-ons, so this test is
+    // intentionally dropped instead of being re-implemented.
 
     it('no muestra sección de campos si no hay camposCustom', () => {
         const out = formatServicioContext([svcBase]);

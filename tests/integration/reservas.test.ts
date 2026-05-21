@@ -63,6 +63,12 @@ vi.mock('@/lib/email-service', () => ({
     sendReservaConfirmadaEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Admin GET /api/reservas now requires an authenticated session.
+vi.mock('next-auth', () => ({
+    getServerSession: vi.fn().mockResolvedValue({ user: { id: 'admin', email: 'admin@test' } }),
+}));
+vi.mock('@/lib/auth', () => ({ authOptions: {} }));
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('GET /api/reservas', () => {
