@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -8,6 +10,11 @@ export const dynamic = 'force-dynamic';
  * Body: { orderedIds: string[] }  — array of MunicipioConfig IDs in the new order
  */
 export async function PATCH(req: NextRequest) {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+        return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     try {
         const { orderedIds } = await req.json();
 
