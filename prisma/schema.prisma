@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -16,53 +17,53 @@ model User {
 }
 
 model Aliado {
-  id                String                  @id @default(cuid())
-  nombre            String
-  tipo              TipoAliado
-  codigo            String                  @unique
-  linkToken         String?                 @unique
-  email             String
-  contacto          String
-  activo            Boolean                 @default(true)
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
-  pedidos           Pedido[]
-  reservas          Reserva[]
-  serviciosAliado   ServicioAliado[]
-  tarifas           TarifaAliado[]
+  id              String           @id @default(cuid())
+  nombre          String
+  tipo            TipoAliado
+  codigo          String           @unique
+  linkToken       String?          @unique
+  email           String
+  contacto        String
+  activo          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  pedidos         Pedido[]
+  reservas        Reserva[]
+  serviciosAliado ServicioAliado[]
+  tarifas         TarifaAliado[]
 
   @@index([codigo])
 }
 
 model Servicio {
-  id                    String                    @id @default(cuid())
-  tipoServicio          TipoServicio              @default(OTRO)
-  esMunicipal           Boolean                   @default(false)
+  id                    String             @id @default(cuid())
+  tipoServicio          TipoServicio       @default(OTRO)
+  esMunicipal           Boolean            @default(false)
   imagen                String
-  activo                Boolean                   @default(true)
+  activo                Boolean            @default(true)
   duracion              String?
-  precioBase            Decimal                   @db.Decimal(10, 2)
-  aplicaRecargoNocturno Boolean                   @default(false)
+  precioBase            Decimal            @db.Decimal(10, 2)
+  aplicaRecargoNocturno Boolean            @default(false)
   recargoNocturnoInicio String?
   recargoNocturnoFin    String?
-  montoRecargoNocturno  Decimal?                  @db.Decimal(10, 2)
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
+  montoRecargoNocturno  Decimal?           @db.Decimal(10, 2)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
   /// Configuración unificada: { camposCustom: [...], infoCompartido: {...} }
-  configuracion         Json                      @default("{}")
+  configuracion         Json               @default("{}")
   destinoAutoFill       String?
-  esAeropuerto          Boolean                   @default(false)
-  esTraslado            Boolean                   @default(false)
+  esAeropuerto          Boolean            @default(false)
+  esTraslado            Boolean            @default(false)
   nombre                Json
   descripcion           Json
   incluye               Json
-  esPorHoras            Boolean                   @default(false)
-  esCompartido          Boolean                   @default(false)
-  guiaEspanolDisponible Boolean                   @default(false)
-  precioGuiaEspanol     Decimal?                  @db.Decimal(10, 2)
-  guiaInglesDisponible  Boolean                   @default(false)
-  precioGuiaIngles      Decimal?                  @db.Decimal(10, 2)
-  orden                 Int                       @default(999)
+  esPorHoras            Boolean            @default(false)
+  esCompartido          Boolean            @default(false)
+  guiaEspanolDisponible Boolean            @default(false)
+  precioGuiaEspanol     Decimal?           @db.Decimal(10, 2)
+  guiaInglesDisponible  Boolean            @default(false)
+  precioGuiaIngles      Decimal?           @db.Decimal(10, 2)
+  orden                 Int                @default(999)
   calificaciones        Calificacion[]
   reservas              Reserva[]
   serviciosAliado       ServicioAliado[]
@@ -113,60 +114,60 @@ model Conductor {
 }
 
 model Reserva {
-  id                       String             @id @default(cuid())
-  codigo                   String             @unique
-  nombreCliente            String
-  whatsappCliente          String
-  emailCliente             String
-  servicioId               String
-  fecha                    DateTime
-  hora                     String
-  idioma                   Idioma
-  municipio                Municipio?
-  otroMunicipio            String?
-  numeroPasajeros          Int
-  vehiculoId               String?
-  datos                    Json               @default("{}")
-  precioBase               Decimal            @db.Decimal(10, 2)
-  precioAdicionales        Decimal            @default(0) @db.Decimal(10, 2)
-  recargoNocturno          Decimal            @default(0) @db.Decimal(10, 2)
-  tarifaMunicipio          Decimal            @default(0) @db.Decimal(10, 2)
-  descuentoAliado          Decimal            @default(0) @db.Decimal(10, 2)
-  precioTotal              Decimal            @db.Decimal(10, 2)
-  comisionBold             Decimal?           @db.Decimal(10, 2)
-  comisionAliado           Decimal?           @db.Decimal(10, 2)
-  estado                   EstadoReserva
-  estadoPago               EstadoPago?
-  conductorId              String?
-  conductorAsignadoAt      DateTime?
-  aliadoId                 String?
-  esReservaAliado          Boolean            @default(false)
-  notas                    String?
-  notasInternas            String?
-  hashPago                 String?
-  pagoId                   String?
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
-  canceladaAt              DateTime?
-  metodoPago               MetodoPago         @default(TARJETA)
-  googleCalendarEventId    String?
-  esCotizacion             Boolean            @default(false)
-  linkCotizacion           String?            @unique
-  precioManual             Boolean            @default(false)
-  clientePaga              Boolean            @default(true)
-  pagoConductor            Boolean            @default(false)
-  esPedido                 Boolean            @default(false)
-  origen                   String             @default("web_directa")
-  municipioConfigId        String?
-  municipioConfig          MunicipioConfig?   @relation(fields: [municipioConfigId], references: [id])
-  pedidoId                 String?
-  asistentes               Asistente[]
-  calificacion             Calificacion?
-  aliado                   Aliado?            @relation(fields: [aliadoId], references: [id])
-  conductor                Conductor?         @relation(fields: [conductorId], references: [id])
-  pedido                   Pedido?            @relation(fields: [pedidoId], references: [id])
-  servicio                 Servicio           @relation(fields: [servicioId], references: [id])
-  vehiculo                 Vehiculo?          @relation(fields: [vehiculoId], references: [id])
+  id                    String           @id @default(cuid())
+  codigo                String           @unique
+  nombreCliente         String
+  whatsappCliente       String
+  emailCliente          String
+  servicioId            String
+  fecha                 DateTime
+  hora                  String
+  idioma                Idioma
+  municipio             Municipio?
+  otroMunicipio         String?
+  numeroPasajeros       Int
+  vehiculoId            String?
+  datos                 Json             @default("{}")
+  precioBase            Decimal          @db.Decimal(10, 2)
+  precioAdicionales     Decimal          @default(0) @db.Decimal(10, 2)
+  recargoNocturno       Decimal          @default(0) @db.Decimal(10, 2)
+  tarifaMunicipio       Decimal          @default(0) @db.Decimal(10, 2)
+  descuentoAliado       Decimal          @default(0) @db.Decimal(10, 2)
+  precioTotal           Decimal          @db.Decimal(10, 2)
+  comisionBold          Decimal?         @db.Decimal(10, 2)
+  comisionAliado        Decimal?         @db.Decimal(10, 2)
+  estado                EstadoReserva
+  estadoPago            EstadoPago?
+  conductorId           String?
+  conductorAsignadoAt   DateTime?
+  aliadoId              String?
+  esReservaAliado       Boolean          @default(false)
+  notas                 String?
+  notasInternas         String?
+  hashPago              String?
+  pagoId                String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  canceladaAt           DateTime?
+  metodoPago            MetodoPago       @default(TARJETA)
+  googleCalendarEventId String?
+  esCotizacion          Boolean          @default(false)
+  linkCotizacion        String?          @unique
+  precioManual          Boolean          @default(false)
+  clientePaga           Boolean          @default(true)
+  esPedido              Boolean          @default(false)
+  origen                String           @default("web_directa")
+  municipioConfigId     String?
+  pedidoId              String?
+  pagoConductor         Boolean          @default(false)
+  asistentes            Asistente[]
+  calificacion          Calificacion?
+  aliado                Aliado?          @relation(fields: [aliadoId], references: [id])
+  conductor             Conductor?       @relation(fields: [conductorId], references: [id])
+  municipioConfig       MunicipioConfig? @relation(fields: [municipioConfigId], references: [id])
+  pedido                Pedido?          @relation(fields: [pedidoId], references: [id])
+  servicio              Servicio         @relation(fields: [servicioId], references: [id])
+  vehiculo              Vehiculo?        @relation(fields: [vehiculoId], references: [id])
 
   @@index([codigo])
   @@index([estado])
@@ -191,19 +192,18 @@ model Asistente {
   reserva         Reserva       @relation(fields: [reservaId], references: [id], onDelete: Cascade)
 }
 
-
 model TarifaAliado {
-  id                 String      @id @default(cuid())
+  id                 String       @id @default(cuid())
   aliadoId           String
   servicioId         String
-  precioEspecial     Decimal?    @db.Decimal(10, 2)
-  comisionPorcentaje Decimal     @db.Decimal(10, 2)
-  descuentoEspecial  Decimal     @default(0) @db.Decimal(10, 2)
+  precioEspecial     Decimal?     @db.Decimal(10, 2)
+  comisionPorcentaje Decimal      @db.Decimal(10, 2)
+  descuentoEspecial  Decimal      @default(0) @db.Decimal(10, 2)
   tipoComision       TipoComision @default(PORCENTAJE)
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-  aliado             Aliado      @relation(fields: [aliadoId], references: [id], onDelete: Cascade)
-  servicio           Servicio    @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  aliado             Aliado       @relation(fields: [aliadoId], references: [id], onDelete: Cascade)
+  servicio           Servicio     @relation(fields: [servicioId], references: [id], onDelete: Cascade)
 
   @@unique([aliadoId, servicioId])
 }
@@ -290,7 +290,6 @@ model PrecioVehiculoAliado {
   @@index([vehiculoId])
 }
 
-
 model MunicipioConfig {
   id        String    @id @default(cuid())
   nombreES  String
@@ -306,7 +305,7 @@ model MunicipioConfig {
 model SiteContent {
   id        String   @id @default(cuid())
   key       String   @unique
-  value     String   @db.Text
+  value     String
   updatedAt DateTime @updatedAt
   updatedBy String?
 
@@ -337,7 +336,6 @@ model BdAntigua {
 
   @@map("bd_antigua")
 }
-
 
 enum TipoAliado {
   HOTEL
@@ -408,7 +406,6 @@ enum TipoDocumento {
   TI
   CE
 }
-
 
 enum TipoCampo {
   TEXT

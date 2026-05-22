@@ -35,10 +35,16 @@ next-env.d.ts
 /public/uploads/*
 !/public/uploads/.gitkeep
 
-# ─── Docs internos ───────────────────────────────────────────
+# ─── Docs internos (solo local) ──────────────────────────────
 CLAUDE.md
-/docs/*
-!/docs/QA-REPORT.md
+/docs/
+
+# ─── Backups y archivos Railway ──────────────────────────────
+*.sql
+nixpacks.toml
+
+# ─── Archivos temporales Prisma ──────────────────────────────
+prisma/Untitled
 
 # ─── macOS ───────────────────────────────────────────────────
 .DS_Store
