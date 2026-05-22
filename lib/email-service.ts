@@ -81,6 +81,20 @@ export async function sendCambioEstadoEmail(
   await send(reserva.emailCliente, subject, html);
 }
 
+// ─── TRIGGER 3b: Reserva Pendiente de Pago (creación con tarjeta) ────────────
+
+export async function sendPendientePagoEmail(
+  reserva: ReservaWithRelations,
+  language: 'ES' | 'EN' = 'ES'
+) {
+  const lang = toLang(language);
+  const html = tplPendientePago(reserva as unknown as ReservaTemplate, lang);
+  const subject = lang === 'EN'
+    ? `Booking Received — ${reserva.codigo}`
+    : `Reserva Recibida — ${reserva.codigo}`;
+  await send(reserva.emailCliente, subject, html);
+}
+
 // ─── TRIGGER 3: Pago Aprobado ─────────────────────────────────────────────────
 
 export async function sendPagoAprobadoEmail(

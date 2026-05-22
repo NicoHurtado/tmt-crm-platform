@@ -306,7 +306,9 @@ export async function POST(request: Request) {
                             null
                         );
                     } else {
-                        console.log(`📧 [Pedido] Reserva externa ${reserva.codigo}: email se enviará al confirmar pago`);
+                        // Reserva externa con Bold: enviar email de pendiente de pago inmediatamente
+                        const { sendPendientePagoEmail } = await import('@/lib/email-service');
+                        await sendPendientePagoEmail(reserva as any, body.idioma || 'ES');
                     }
                     console.log(`✅ [Pedido] Email sent successfully for reserva: ${reserva.codigo} to ${reserva.emailCliente}${aliadoEmail ? ` + ally: ${aliadoEmail}` : ''}`);
                 } catch (emailError) {

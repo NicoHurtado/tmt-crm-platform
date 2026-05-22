@@ -333,8 +333,9 @@ export async function POST(request: Request) {
                 // Reserva externa con pago en efectivo: enviar confirmación inmediatamente
                 await sendReservaConfirmadaEmail(reserva as any, body.idioma || 'ES', null);
             } else {
-                // Reserva externa con Bold: el email se enviará al confirmar pago
-                console.log('📧 [Reserva Externa] Email de confirmación se enviará al confirmar pago');
+                // Reserva externa con Bold: enviar email de pendiente de pago inmediatamente
+                const { sendPendientePagoEmail } = await import('@/lib/email-service');
+                await sendPendientePagoEmail(reserva as any, body.idioma || 'ES');
             }
             console.log(`✅ [Reserva] Email flow completed in ${Date.now() - emailStart}ms`);
         } catch (emailError) {
