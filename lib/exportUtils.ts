@@ -1,9 +1,10 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { getLocalizedText } from '@/types/multi-language';
 import { getStateLabel } from '@/lib/state-transitions';
 
-export const exportarReservasPDF = (data: any[], viewMode: 'nueva' | 'antigua', filtros: any) => {
+export const exportarReservasPDF = async (data: any[], viewMode: 'nueva' | 'antigua', filtros: any) => {
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+
     // 1. Crear documento (orientación horizontal para que quepan las columnas)
     const doc = new jsPDF({ orientation: 'landscape' });
 

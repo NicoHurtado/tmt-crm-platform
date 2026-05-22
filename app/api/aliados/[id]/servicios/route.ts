@@ -72,6 +72,7 @@ export async function GET(
                     capacidadMinima: v.capacidadMinima,
                     capacidadMaxima: v.capacidadMaxima,
                     precioBase: Number(v.precioBase ?? 0),
+                    imagen: v.imagen ?? null,
                     activo: defaultActivo
                 };
             });
@@ -177,45 +178,27 @@ export async function POST(
             }
         });
 
-        // Upsert PrecioVehiculoAliado with only activo boolean
+        // Upsert PrecioVehiculoAliado with only activo boolean (in parallel)
         if (vehiculos && Array.isArray(vehiculos)) {
-            for (const v of vehiculos) {
-                await prisma.precioVehiculoAliado.upsert({
+            await Promise.all(vehiculos.map((v: any) =>
+                prisma.precioVehiculoAliado.upsert({
                     where: {
                         servicioAliadoId_vehiculoId: {
                             servicioAliadoId: servicioAliado.id,
                             vehiculoId: v.vehiculoId
                         }
                     },
-                    update: {
-                        activo: v.activo
-                    },
+                    update: { activo: v.activo },
                     create: {
                         servicioAliadoId: servicioAliado.id,
                         vehiculoId: v.vehiculoId,
                         activo: v.activo
                     }
-                });
-            }
+                })
+            ));
         }
 
-        // Obtain updated configuration
-        const updated = await prisma.servicioAliado.findUnique({
-            where: { id: servicioAliado.id },
-            include: {
-                servicio: true,
-                preciosVehiculos: {
-                    include: {
-                        vehiculo: true
-                    }
-                }
-            }
-        });
-
-        return NextResponse.json({
-            success: true,
-            data: updated
-        });
+        return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error saving servicio aliado:', error);
         return NextResponse.json(

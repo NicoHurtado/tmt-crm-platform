@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 /**
  * GET /api/municipios
@@ -15,7 +15,9 @@ export async function GET(req: NextRequest) {
             select: { id: true, nombreES: true, nombreEN: true, recargo: true },
         });
 
-        return NextResponse.json({ success: true, data: municipios });
+        return NextResponse.json({ success: true, data: municipios }, {
+            headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=60' }
+        });
     } catch (error) {
         console.error('Error fetching public municipios:', error);
         return NextResponse.json(

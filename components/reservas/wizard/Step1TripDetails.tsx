@@ -155,6 +155,7 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                     capacidadMinima: v.capacidadMinima,
                     capacidadMaxima: v.capacidadMaxima,
                     precioBase: Number(v.precioBase ?? 0),
+                    imagen: v.imagen ?? null,
                 }));
         }
         // 2. Fallback to service allowed vehicles (public API: vehiculosPermitidos[].vehiculo.precioBase)

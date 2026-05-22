@@ -1,38 +1,27 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { getLocalizedText } from '@/types/multi-language';
 import * as XLSX from 'xlsx';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import dynamic from 'next/dynamic';
 import ReservaDetailSheet, { type ReservaDetail } from '@/components/admin/ReservaDetailSheet';
 import { getDatos } from '@/types/reserva-datos';
+import type { CalendarEvent } from './CalendarioView';
 
-interface CalendarEvent {
-    id: string;
-    title: string;
-    start: string;
-    end: string;
-    backgroundColor: string;
-    borderColor: string;
-    textColor: string;
-    extendedProps: {
-        codigo: string;
-        cliente: string;
-        estado: string;
-        hora: string;
-        servicio: string;
-        whatsappCliente: string;
-        lugarRecogida: string;
-        lugarDestino: string;
-        estadoPago: string;
-        asistentes: any[];
-    };
-}
+const CalendarioView = dynamic(() => import('./CalendarioView'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex items-center justify-center h-96 border border-neutral-200 rounded-xl bg-white">
+            <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500 mx-auto" />
+                <p className="mt-3 text-sm text-neutral-500">Cargando calendario...</p>
+            </div>
+        </div>
+    ),
+});
 
 const estadoColors: Record<string, { bg: string; border: string; text: string }> = {
     'PENDING_PAYMENT': { bg: '#EAB308', border: '#CA8A04', text: '#ffffff' },
@@ -46,13 +35,11 @@ const estadoColors: Record<string, { bg: string; border: string; text: string }>
 
 export default function CalendarioPage() {
     const router = useRouter();
-    const calendarRef = useRef<any>(null);
     const [rawReservas, setRawReservas] = useState<any[]>([]);
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [reservasForSheet, setReservasForSheet] = useState<ReservaDetail[]>([]);
-    const calendarContainerRef = useRef<HTMLDivElement>(null);
     const [currentMonth, setCurrentMonth] = useState<{ start: Date; end: Date; label: string }>({
         start: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         end: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
@@ -61,24 +48,6 @@ export default function CalendarioPage() {
 
     useEffect(() => {
         fetchReservas();
-    }, []);
-
-    // Resize calendar fluidly when container changes (sidebar collapse/expand)
-    useEffect(() => {
-        const container = calendarContainerRef.current;
-        if (!container) return;
-        let rafId: number;
-        const observer = new ResizeObserver(() => {
-            cancelAnimationFrame(rafId);
-            rafId = requestAnimationFrame(() => {
-                calendarRef.current?.getApi()?.updateSize();
-            });
-        });
-        observer.observe(container);
-        return () => {
-            observer.disconnect();
-            cancelAnimationFrame(rafId);
-        };
     }, []);
 
     useEffect(() => {
@@ -192,7 +161,9 @@ export default function CalendarioPage() {
                         lugarRecogida,
                         lugarDestino,
                         estadoPago: reserva.estadoPago || 'PENDIENTE',
-                        asistentes: reserva.asistentes || []
+                        asistentes: reserva.asistentes || [],
+                        esReservaAliado: reserva.esReservaAliado ?? false,
+                        aliado: reserva.aliado?.nombre ?? null,
                     }
                 };
             });
@@ -343,63 +314,21 @@ export default function CalendarioPage() {
                   </span>
                 );
               })}
+              <span
+                className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border"
+                style={{ backgroundColor: '#f59e0b18', borderColor: '#f59e0b55', color: '#374151' }}
+              >
+                <span className="text-[10px] leading-none">★</span>
+                Vía aliado
+              </span>
             </div>
 
-            {/* Full-width calendar */}
-            <div ref={calendarContainerRef} className="border border-neutral-200 rounded-xl overflow-hidden bg-white w-full">
-                <style>{`
-                    .fc { font-family: inherit; }
-                    .fc .fc-toolbar { padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
-                    .fc .fc-toolbar-title { font-size: 15px; font-weight: 600; color: #111827; }
-                    .fc .fc-button { background: white; border: 1px solid #d1d5db; color: #374151; font-size: 13px; font-weight: 500; padding: 5px 12px; border-radius: 6px; }
-                    .fc .fc-button:hover { background: #f3f4f6; }
-                    .fc .fc-button-active, .fc .fc-button-primary:not(:disabled):active { background: #f59e0b !important; border-color: #f59e0b !important; color: white !important; box-shadow: none !important; }
-                    .fc .fc-button-primary:disabled { opacity: 0.5; }
-                    .fc .fc-col-header-cell { background: #f9fafb; padding: 8px 0; font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid #d1d5db; border-right: 1px solid #d1d5db; }
-                    .fc .fc-scrollgrid { border-color: #d1d5db !important; }
-                    .fc .fc-scrollgrid-section > td { border-color: #d1d5db !important; }
-                    .fc td, .fc th { border-color: #d1d5db !important; }
-                    .fc .fc-daygrid-day { background: white; }
-                    .fc .fc-daygrid-day-number { font-size: 12px; color: #9ca3af; padding: 6px 8px; }
-                    .fc .fc-day-other { background: #fafafa; }
-                    .fc .fc-day-other .fc-daygrid-day-number { color: #d1d5db; }
-                    .fc .fc-day-today { background: #fffbeb !important; }
-                    .fc .fc-day-today .fc-daygrid-day-number { color: #d97706; font-weight: 700; }
-                    .fc .fc-event { border-radius: 3px; font-size: 11px; font-weight: 500; padding: 2px 5px; cursor: pointer; border-left-width: 2px !important; border-top: none !important; border-right: none !important; border-bottom: none !important; }
-                    .fc .fc-event:hover { filter: brightness(0.95); }
-                    .fc .fc-more-link { font-size: 11px; color: #6b7280; font-weight: 500; padding: 1px 4px; }
-                    .fc .fc-daygrid-more-link:hover { background: #f3f4f6; border-radius: 3px; }
-                    .fc .fc-daygrid-day-events { padding: 2px 3px 3px; gap: 1px; }
-                    .fc .fc-daygrid-event-harness { margin-bottom: 1px; }
-                `}</style>
-                <FullCalendar
-                    ref={calendarRef}
-                    plugins={[dayGridPlugin, interactionPlugin]}
-                    initialView="dayGridMonth"
-                    locale="es"
-                    events={events}
-                    eventOrder="start"
-                    eventClick={handleEventClick}
-                    datesSet={handleDatesSet}
-                    headerToolbar={{
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: 'dayGridMonth,dayGridWeek,dayGridDay'
-                    }}
-                    buttonText={{
-                        today: 'Hoy',
-                        month: 'Mes',
-                        week: 'Semana',
-                        day: 'Día'
-                    }}
-                    height="auto"
-                    windowResizeDelay={0}
-                    eventDisplay="block"
-                    displayEventTime={false}
-                    dayMaxEvents={4}
-                    eventClassNames="cursor-pointer"
-                />
-            </div>
+            {/* Full-width calendar — lazy loaded */}
+            <CalendarioView
+                events={events}
+                onEventClick={handleEventClick}
+                onDatesSet={handleDatesSet}
+            />
 
             {/* Side panel — same as Reservas */}
             <ReservaDetailSheet

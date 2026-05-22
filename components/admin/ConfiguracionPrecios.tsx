@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { getLocalizedText } from '@/types/multi-language';
@@ -110,6 +110,7 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
   const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const initialRef = useRef<Map<string, string>>(new Map());
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,15 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
       }));
       setServicios(mapped);
       setExpandedServices(new Set());
+      // Snapshot del estado inicial para detectar cambios al guardar
+      const snapshot = new Map<string, string>();
+      mapped.forEach(s => snapshot.set(s.servicioId, JSON.stringify({
+        activo: s.activo,
+        tipoComision: s.tipoComision,
+        comisionValor: s.comisionValor,
+        vehiculos: s.vehiculos.map(v => ({ vehiculoId: v.vehiculoId, activo: v.activo })),
+      })));
+      initialRef.current = snapshot;
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -176,10 +186,26 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
   // ── Save ───────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
+    // Solo guardar servicios que cambiaron respecto al estado inicial
+    const changed = servicios.filter(s => {
+      const current = JSON.stringify({
+        activo: s.activo,
+        tipoComision: s.tipoComision,
+        comisionValor: s.comisionValor,
+        vehiculos: s.vehiculos.map(v => ({ vehiculoId: v.vehiculoId, activo: v.activo })),
+      });
+      return initialRef.current.get(s.servicioId) !== current;
+    });
+
+    if (changed.length === 0) {
+      onClose();
+      return;
+    }
+
     setSaving(true);
     try {
-      for (const s of servicios) {
-        await fetch(`/api/aliados/${aliadoId}/servicios`, {
+      const results = await Promise.allSettled(changed.map(s =>
+        fetch(`/api/aliados/${aliadoId}/servicios`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -189,8 +215,27 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
             comisionValor: s.comisionValor,
             vehiculos: s.vehiculos.map(v => ({ vehiculoId: v.vehiculoId, activo: v.activo })),
           }),
-        });
+        })
+      ));
+
+      const failed = results.filter(r => r.status === 'rejected');
+      if (failed.length > 0) {
+        console.error('Error saving some servicios:', failed);
+        alert(`Error al guardar ${failed.length} servicio(s). Por favor intenta de nuevo.`);
+        await fetchData(); // Re-sincronizar estado con el servidor
+        return;
       }
+
+      // Actualizar snapshot para que ediciones posteriores detecten cambios correctamente
+      const newSnapshot = new Map<string, string>();
+      servicios.forEach(s => newSnapshot.set(s.servicioId, JSON.stringify({
+        activo: s.activo,
+        tipoComision: s.tipoComision,
+        comisionValor: s.comisionValor,
+        vehiculos: s.vehiculos.map(v => ({ vehiculoId: v.vehiculoId, activo: v.activo })),
+      })));
+      initialRef.current = newSnapshot;
+
       onSave();
       onClose();
     } catch (error) {

@@ -15,6 +15,13 @@ const nextConfig = {
             },
         ],
     },
+    experimental: {
+        optimizePackageImports: [
+            '@tabler/icons-react',
+            'react-icons',
+            'lucide-react',
+        ],
+    },
 };
 
 module.exports = nextConfig;

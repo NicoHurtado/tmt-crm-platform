@@ -3,8 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
-// Force dynamic rendering to prevent build-time execution
-export const dynamic = 'force-dynamic';
+export const revalidate = 600;
 
 /**
  * GET /api/vehiculos
@@ -30,7 +29,9 @@ export async function GET(request: Request) {
             },
         });
 
-        return NextResponse.json({ data: vehiculos });
+        return NextResponse.json({ data: vehiculos }, {
+            headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=60' }
+        });
     } catch (error) {
         console.error('Error fetching vehiculos:', error);
         return NextResponse.json(

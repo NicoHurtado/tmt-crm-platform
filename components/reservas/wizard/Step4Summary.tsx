@@ -15,6 +15,7 @@ interface Step4Props {
     selectedPaymentMethod: 'TARJETA' | 'EFECTIVO' | null;
     onPaymentMethodChange: (method: 'TARJETA' | 'EFECTIVO') => void;
     clientePaga?: boolean;
+    preciosPersonalizados?: any;
 }
 
 export default function Step4Summary({
@@ -26,8 +27,25 @@ export default function Step4Summary({
     selectedPaymentMethod,
     onPaymentMethodChange,
     clientePaga,
+    preciosPersonalizados,
 }: Step4Props) {
     const { language } = useLanguage();
+
+    // Vehículo seleccionado — funciona tanto en flujo público (vehiculosPermitidos) como aliado (preciosPersonalizados)
+    const resolvedVehicle: any = (() => {
+        if (!formData.vehiculoId) return null;
+        const fromPermitidos = service.vehiculosPermitidos?.find(
+            (v: any) => (v.vehiculo?.id ?? v.id) === formData.vehiculoId
+        );
+        if (fromPermitidos) return fromPermitidos.vehiculo ?? fromPermitidos;
+        if (preciosPersonalizados && service.id) {
+            const av = (preciosPersonalizados[service.id]?.vehiculos ?? []).find(
+                (v: any) => v.vehiculoId === formData.vehiculoId
+            );
+            if (av) return { id: av.vehiculoId, nombre: av.nombre, capacidadMinima: av.capacidadMinima, capacidadMaxima: av.capacidadMaxima, imagen: av.imagen ?? null, precioBase: Number(av.precioBase ?? 0) };
+        }
+        return null;
+    })();
 
     const municipioLabels: Record<string, string> = {
         MEDELLIN: 'Medellín',
@@ -123,7 +141,7 @@ export default function Step4Summary({
 
                     {/* Selected Vehicle */}
                     {(() => {
-                        const selectedVehicle = service.vehiculosPermitidos?.find((v: any) => v.vehiculo.id === formData.vehiculoId)?.vehiculo;
+                        const selectedVehicle = resolvedVehicle;
                         if (selectedVehicle) {
                             return (
                                 <div className="col-span-2 flex items-center gap-4 bg-white p-3 rounded-lg border border-gray-200 mt-2">
@@ -312,13 +330,10 @@ export default function Step4Summary({
                         <div className="flex justify-between">
                             <span>
                                 {(() => {
-                                    const selectedVehicle = service.vehiculosPermitidos?.find((v: any) => (v.vehiculo?.id ?? v.id) === formData.vehiculoId)?.vehiculo
-                                        ?? service.vehiculosPermitidos?.find((v: any) => (v.vehiculo?.id ?? v.id) === formData.vehiculoId);
-                                    const vehicleName = selectedVehicle ? (selectedVehicle.nombre ?? selectedVehicle.vehiculo?.nombre) : t('reservas.paso4_precio_base', language);
+                                    const vehicleName = resolvedVehicle ? resolvedVehicle.nombre : t('reservas.paso4_precio_base', language);
 
                                     if (service.esPorHoras && formData.cantidadHoras) {
-                                        const selectedVehicleData = service.vehiculosPermitidos?.find((v: any) => (v.vehiculo?.id ?? v.vehiculoId) === formData.vehiculoId);
-                                        const precioHora = selectedVehicleData ? Number(selectedVehicleData.vehiculo?.precioBase ?? selectedVehicleData.precioBase ?? 0) : 0;
+                                        const precioHora = resolvedVehicle ? Number(resolvedVehicle.precioBase ?? 0) : 0;
                                         return `${vehicleName} (${formatPrice(precioHora)} × ${formData.cantidadHoras} ${language === 'es' ? 'horas' : 'hours'})`;
                                     }
 

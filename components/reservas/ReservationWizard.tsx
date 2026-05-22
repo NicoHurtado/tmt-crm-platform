@@ -462,7 +462,7 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
 
                 {/* Staff-only clientePaga toggle — visible only in staff portal flow */}
                 {isStaffFlow && (
-                    <div className="flex items-center justify-between px-6 py-2.5 bg-neutral-50 border-b border-neutral-100">
+                    <div className="flex items-center justify-center gap-3 px-6 py-2.5 bg-neutral-50 border-b border-neutral-100">
                         <span className="text-xs text-neutral-500">
                             {language === 'es' ? '¿El cliente paga?' : 'Does client pay?'}
                         </span>
@@ -573,6 +573,7 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                             selectedPaymentMethod={selectedPaymentMethod}
                             onPaymentMethodChange={setSelectedPaymentMethod}
                             clientePaga={clientePaga}
+                            preciosPersonalizados={preciosPersonalizados}
                         />
                     )}
                     {currentStep === 5 && (

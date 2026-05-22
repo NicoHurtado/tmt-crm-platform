@@ -69,6 +69,9 @@ model Servicio {
   serviciosAliado       ServicioAliado[]
   vehiculosPermitidos   ServicioVehiculo[]
   tarifasAliados        TarifaAliado[]
+
+  @@index([activo])
+  @@index([orden])
 }
 
 model Vehiculo {
@@ -174,6 +177,7 @@ model Reserva {
   @@index([fecha])
   @@index([servicioId])
   @@index([aliadoId])
+  @@index([conductorId])
   @@index([linkCotizacion])
   @@index([pedidoId])
   @@index([municipioConfigId])

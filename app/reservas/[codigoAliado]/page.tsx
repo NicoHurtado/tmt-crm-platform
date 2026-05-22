@@ -362,7 +362,7 @@ export default function ReservaAliadoPage() {
                     aliadoTipo={aliado?.tipo || null}
                     aliadoNombre={aliado?.nombre || null}
                     preciosPersonalizados={preciosPersonalizados}
-                    isStaffFlow={true}
+                    isStaffFlow={false}
                 />
             )}
         </>
