@@ -103,6 +103,9 @@ export async function PUT(
         if (body.notas !== undefined) {
             updateData.notas = body.notas === '' ? null : body.notas;
         }
+        if (body.pagoConductor !== undefined) {
+            updateData.pagoConductor = Boolean(body.pagoConductor);
+        }
 
         // Fields that live in datos JSON — merge instead of writing to columns
         const datosPatch: Record<string, unknown> = {};

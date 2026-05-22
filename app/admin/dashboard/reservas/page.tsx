@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Search, ChevronLeft, ChevronRight, RefreshCw, ChevronsUpDown, Check, FileDown } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, RefreshCw, ChevronsUpDown, Check, FileDown, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -47,6 +47,7 @@ interface Reserva extends ReservaDetail {
   esReservaAliado?: boolean
   servicio?: { nombre: string; esCompartido?: boolean }
   asistentes?: Array<{ id: string; nombre: string; tipoDocumento: string; numeroDocumento: string }>
+  pagoConductor?: boolean
 }
 
 const ESTADOS = [
@@ -215,6 +216,20 @@ export default function ReservasPage() {
     const d = iso.split('T')[0]
     const [y, m, day] = d.split('-')
     return `${day}/${m}/${y}`
+  }
+
+  const handleTogglePagoConductor = async (reservaId: string, currentValue: boolean, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setReservas(prev => prev.map(r => r.id === reservaId ? { ...r, pagoConductor: !currentValue } : r))
+    try {
+      await fetch(`/api/reservas/by-id/${reservaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pagoConductor: !currentValue }),
+      })
+    } catch {
+      setReservas(prev => prev.map(r => r.id === reservaId ? { ...r, pagoConductor: currentValue } : r))
+    }
   }
 
   return (
@@ -475,7 +490,7 @@ export default function ReservasPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-neutral-50 hover:bg-neutral-50">
-              {['Creada', 'Código', 'Cliente', 'Servicio', 'Fecha', 'Estado', 'Pago', 'Pago cliente', 'Aliado', 'Total', 'Comisión'].map(
+              {['Creada', 'Código', 'Cliente', 'Servicio', 'Fecha', 'Estado', 'Pago', 'Pago cliente', 'Aliado', 'Total', 'Comisión', 'Pago conductor'].map(
                 (h) => (
                   <TableHead
                     key={h}
@@ -491,7 +506,7 @@ export default function ReservasPage() {
             {loading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 11 }).map((_, j) => (
+                  {Array.from({ length: 12 }).map((_, j) => (
                     <TableCell key={j} className="py-3 first:pl-5 last:pr-5">
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -500,7 +515,7 @@ export default function ReservasPage() {
               ))
             ) : paginated.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="py-16 text-center text-sm text-neutral-400">
+                <TableCell colSpan={12} className="py-16 text-center text-sm text-neutral-400">
                   No se encontraron reservas
                 </TableCell>
               </TableRow>
@@ -598,7 +613,7 @@ export default function ReservasPage() {
                       ${Number(r.precioTotal).toLocaleString('es-CO')}
                     </span>
                   </TableCell>
-                  <TableCell className="py-3 pr-5">
+                  <TableCell className="py-3">
                     {r.esReservaAliado && r.comisionAliado && Number(r.comisionAliado) > 0 ? (
                       <span className="text-xs font-medium text-purple-700 whitespace-nowrap">
                         ${Number(r.comisionAliado).toLocaleString('es-CO')}
@@ -606,6 +621,19 @@ export default function ReservasPage() {
                     ) : (
                       <span className="text-neutral-300 text-xs">—</span>
                     )}
+                  </TableCell>
+                  <TableCell className="py-3 pr-5" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={(e) => handleTogglePagoConductor(r.id, r.pagoConductor ?? false, e)}
+                      className={`inline-flex items-center justify-center w-7 h-7 rounded border transition-colors ${
+                        r.pagoConductor
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                          : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'
+                      }`}
+                      title={r.pagoConductor ? 'Conductor pagado — clic para desmarcar' : 'Conductor no pagado — clic para marcar como pagado'}
+                    >
+                      {r.pagoConductor ? <Check size={13} /> : <X size={13} />}
+                    </button>
                   </TableCell>
                 </TableRow>
               ))

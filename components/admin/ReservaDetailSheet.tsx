@@ -39,6 +39,7 @@ export interface ReservaDetail {
   numeroPasajeros?: number
   notas?: string
   datos?: Record<string, any>
+  pagoConductor?: boolean
 }
 
 interface ReservaDetailSheetProps {
@@ -146,6 +147,10 @@ export default function ReservaDetailSheet({
                 <Field
                   label="Vehículo"
                   value={reserva.vehiculo?.nombre ?? 'Sin asignar'}
+                />
+                <Field
+                  label="Pago conductor"
+                  value={reserva.pagoConductor ? 'Sí' : 'No'}
                 />
               </Section>
 

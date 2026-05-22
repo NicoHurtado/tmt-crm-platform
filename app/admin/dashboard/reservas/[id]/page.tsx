@@ -990,6 +990,7 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                                         Asignar Conductor
                                     </button>
                                 )}
+                                <Field label="Pago conductor" value={reserva.pagoConductor ? 'Sí' : 'No'} />
                             </div>
                         </div>
 

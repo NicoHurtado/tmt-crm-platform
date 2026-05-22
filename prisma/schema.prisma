@@ -154,6 +154,7 @@ model Reserva {
   linkCotizacion           String?            @unique
   precioManual             Boolean            @default(false)
   clientePaga              Boolean            @default(true)
+  pagoConductor            Boolean            @default(false)
   esPedido                 Boolean            @default(false)
   origen                   String             @default("web_directa")
   municipioConfigId        String?
