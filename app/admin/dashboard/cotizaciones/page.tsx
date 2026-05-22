@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Search, Plus, Clock, ChevronDown, ChevronUp, Eye, Copy, Check, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Plus, Clock, ChevronDown, ChevronUp, Eye, Copy, Check, ExternalLink, ChevronLeft, ChevronRight, Building2, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -23,6 +23,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import QuoteWizard from '@/components/admin/QuoteWizard'
 import { getLocalizedText } from '@/types/multi-language'
@@ -49,6 +55,9 @@ export default function CotizacionesPage() {
   const [selectedService, setSelectedService] = useState<any>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [municipalExpanded, setMunicipalExpanded] = useState(false)
+  const [aliados, setAliados] = useState<{ id: string; nombre: string; tipo: string }[]>([])
+  const [aliadoSelectorOpen, setAliadoSelectorOpen] = useState(false)
+  const [selectedAliadoId, setSelectedAliadoId] = useState<string | null>(null)
 
   const [cotizaciones, setCotizaciones] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
@@ -70,6 +79,10 @@ export default function CotizacionesPage() {
       .then((d) => setServices(d.data || []))
       .catch(console.error)
       .finally(() => setLoadingServices(false))
+    fetch('/api/aliados?activo=true')
+      .then((r) => r.json())
+      .then((d) => setAliados(d.data || d || []))
+      .catch(console.error)
   }, [status])
 
   useEffect(() => {
@@ -86,12 +99,26 @@ export default function CotizacionesPage() {
 
   const handleSelectService = (svc: any) => {
     setSelectedService(svc)
+    setSelectedAliadoId(null)
+    setAliadoSelectorOpen(true)
+  }
+
+  const handleAliadoConfirm = (aliadoId: string | null) => {
+    setSelectedAliadoId(aliadoId)
+    setAliadoSelectorOpen(false)
     setWizardOpen(true)
+  }
+
+  const handleAliadoSelectorCancel = () => {
+    setAliadoSelectorOpen(false)
+    setSelectedService(null)
+    setSelectedAliadoId(null)
   }
 
   const handleWizardClose = () => {
     setWizardOpen(false)
     setSelectedService(null)
+    setSelectedAliadoId(null)
     if (activeTab === 'historial') {
       setLoadingHistory(true)
       fetch('/api/admin/cotizaciones')
@@ -478,8 +505,20 @@ export default function CotizacionesPage() {
         )}
       </div>
 
+      <AliadoSelectorDialog
+        open={aliadoSelectorOpen}
+        aliados={aliados}
+        onConfirm={handleAliadoConfirm}
+        onCancel={handleAliadoSelectorCancel}
+      />
+
       {selectedService && (
-        <QuoteWizard service={selectedService} isOpen={wizardOpen} onClose={handleWizardClose} />
+        <QuoteWizard
+          service={selectedService}
+          isOpen={wizardOpen}
+          onClose={handleWizardClose}
+          aliadoId={selectedAliadoId}
+        />
       )}
     </div>
   )
@@ -508,5 +547,132 @@ function TabBtn({
       {icon}
       {label}
     </button>
+  )
+}
+
+const TIPO_LABELS: Record<string, string> = {
+  HOTEL: 'Hotel',
+  AIRBNB: 'Airbnb',
+  AGENCIA: 'Agencia',
+}
+
+function AliadoSelectorDialog({
+  open,
+  aliados,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean
+  aliados: { id: string; nombre: string; tipo: string }[]
+  onConfirm: (aliadoId: string | null) => void
+  onCancel: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (open) {
+      setQuery('')
+      setSelected(null)
+    }
+  }, [open])
+
+  const filtered = aliados.filter((a) =>
+    a.nombre.toLowerCase().includes(query.toLowerCase()),
+  )
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
+      <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-5 pb-4 border-b border-neutral-100">
+          <DialogTitle className="text-base font-semibold text-neutral-900">
+            ¿Esta cotización es para un aliado?
+          </DialogTitle>
+          <p className="text-xs text-neutral-500 mt-0.5">
+            Selecciona el aliado o continúa sin asociar uno.
+          </p>
+        </DialogHeader>
+
+        <div className="px-4 pt-3 pb-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" size={13} />
+            <Input
+              placeholder="Buscar aliado..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-8 h-8 text-sm border-neutral-200 bg-neutral-50"
+              autoFocus
+            />
+          </div>
+        </div>
+
+        <div className="px-4 pb-2 max-h-64 overflow-y-auto flex flex-col gap-1">
+          <button
+            onClick={() => setSelected(null)}
+            className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 rounded-lg border transition-all text-sm ${
+              selected === null
+                ? 'border-amber-400 bg-amber-50 text-amber-800'
+                : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50'
+            }`}
+          >
+            <div className="w-7 h-7 rounded-md bg-neutral-100 flex items-center justify-center flex-shrink-0">
+              <X size={13} className="text-neutral-500" />
+            </div>
+            <div>
+              <p className="font-medium text-xs">Sin aliado</p>
+              <p className="text-[11px] text-neutral-400">Cotización directa de Transportes Medellín</p>
+            </div>
+          </button>
+
+          {filtered.length > 0 && (
+            <div className="border-t border-neutral-100 my-1" />
+          )}
+
+          {filtered.map((aliado) => (
+            <button
+              key={aliado.id}
+              onClick={() => setSelected(aliado.id)}
+              className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 rounded-lg border transition-all ${
+                selected === aliado.id
+                  ? 'border-amber-400 bg-amber-50'
+                  : 'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50'
+              }`}
+            >
+              <div className="w-7 h-7 rounded-md bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <Building2 size={13} className="text-amber-700" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-neutral-800 truncate">{aliado.nombre}</p>
+              </div>
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-500 flex-shrink-0">
+                {TIPO_LABELS[aliado.tipo] ?? aliado.tipo}
+              </span>
+            </button>
+          ))}
+
+          {filtered.length === 0 && query && (
+            <p className="text-xs text-neutral-400 text-center py-4">Sin resultados para "{query}"</p>
+          )}
+        </div>
+
+        <div className="px-4 py-3 border-t border-neutral-100 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 h-9 text-sm border-neutral-200"
+            onClick={onCancel}
+          >
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            className="flex-1 h-9 text-sm bg-amber-500 hover:bg-amber-600 text-white"
+            onClick={() => onConfirm(selected)}
+          >
+            Continuar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
