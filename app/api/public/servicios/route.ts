@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { buildFullSystemPrompt, formatServicioContext, type ServicioContextData } from '@/lib/n8n/formatServicioContext';
 import { getLocalizedText } from '@/types/multi-language';
+
+type ServicioWithVehiculos = Prisma.ServicioGetPayload<{
+    include: {
+        vehiculosPermitidos: {
+            include: { vehiculo: true };
+        };
+    };
+}>;
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +66,7 @@ export async function GET(request: NextRequest) {
     const cacheKey = `${formato}-${lang}`;
 
     // ── Try DB ────────────────────────────────────────────────────────────────
-    let rawServicios: Awaited<ReturnType<typeof prisma.servicio.findMany>> | null = null;
+    let rawServicios: ServicioWithVehiculos[] | null = null;
 
     try {
         rawServicios = await prisma.servicio.findMany({
