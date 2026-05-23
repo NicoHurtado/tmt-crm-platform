@@ -280,14 +280,12 @@ export function formatServicioContext(servicios: ServicioContextData[], appUrl?:
         lines.push(`\nDESTINOS DISPONIBLES (${municipales.length} municipios):`);
         lines.push(destinations.join(', '));
 
-        lines.push(
-            '\nPARA RESERVAR: pregunta al cliente el municipio destino y usa `servicioId` del destino específico.'
-        );
-        lines.push('DESTINOS CON servicioId:');
+        const base2 = (appUrl ?? 'https://www.medellintransportes.com').replace(/\/$/, '');
+        lines.push('\nLINKS DE RESERVA POR DESTINO:');
         for (const s of municipales) {
             const n = asMultiLang(s.nombre);
             const dest = n.es || n.en || s.id;
-            lines.push(`• ${dest}: ${s.id}`);
+            lines.push(`• ${dest}: ${base2}/reservas?serviceId=${s.id}&form=1`);
         }
         lines.push('');
     }
