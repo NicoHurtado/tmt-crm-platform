@@ -438,7 +438,6 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
                             <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-2">
                                 <h3 className="font-semibold text-gray-800 mb-3">Desglose calculado</h3>
 
-                                <BreakdownRow label="Precio base (servicio + vehículo)" value={formData.precioBase || 0} />
 
                                 {dynamicFields.length > 0 && formData.datosDinamicos && dynamicFields.map((field: any) => {
                                     const fieldKey = field.key || field.id || field.name || field.clave;

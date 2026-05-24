@@ -631,6 +631,19 @@ export const tplServicioCompletado = (r: ReservaTemplate, lang: 'ES' | 'EN'): st
           ${ctaBtn(isES ? 'Calificar mi Experiencia' : 'Rate my Experience', ratingUrl)}
         </td></tr>
       </table>
+      ${process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL ? `
+      <table width="100%" cellpadding="0" cellspacing="0" border="0"
+        style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin:0 0 20px;">
+        <tr><td style="padding:20px;text-align:center;">
+          <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#1e40af;">
+            ${isES ? '⭐ Ayúdanos también en Google' : '⭐ Help us on Google too'}
+          </p>
+          <p style="margin:0 0 14px;font-size:13px;color:#1e3a8a;">
+            ${isES ? 'Una reseña en Google nos ayuda muchísimo a llegar a más viajeros.' : 'A Google review helps us reach more travelers.'}
+          </p>
+          ${ctaBtn(isES ? 'Reseñar en Google' : 'Review on Google', process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL)}
+        </td></tr>
+      </table>` : ''}
       <p style="text-align:center;margin:0 0 28px;font-size:14px;color:#374151;">
         ${isES ? '¡Esperamos verte pronto de nuevo!' : 'We hope to see you again soon!'}
       </p>`;

@@ -429,7 +429,7 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                             saving={sectionSaving}
                         >
                             {editingSection === 'cliente' ? (
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs text-gray-500 mb-1">Nombre</label>
                                         <input
@@ -470,19 +470,29 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                                     </div>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                                    <Field label="Nombre" value={reserva.nombreCliente} />
-                                    <Field label="Email" value={
-                                        <a href={`mailto:${reserva.emailCliente}`} className="text-[#D6A75D] hover:underline flex items-center gap-1">
-                                            <FiMail size={11} /> {reserva.emailCliente}
-                                        </a>
-                                    } />
-                                    <Field label="WhatsApp" value={
-                                        <a href={`https://wa.me/${reserva.whatsappCliente?.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline flex items-center gap-1">
-                                            <FiPhone size={11} /> {reserva.whatsappCliente}
-                                        </a>
-                                    } />
-                                    <Field label="Idioma" value={reserva.idioma === 'EN' ? 'Inglés' : 'Español'} />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 min-w-0">
+                                    <div className="min-w-0">
+                                        <Field label="Nombre" value={<span className="break-words">{reserva.nombreCliente}</span>} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <Field label="Email" value={
+                                            <a href={`mailto:${reserva.emailCliente}`} className="text-[#D6A75D] hover:underline flex items-center gap-1 min-w-0">
+                                                <FiMail size={11} className="flex-shrink-0" />
+                                                <span className="truncate">{reserva.emailCliente}</span>
+                                            </a>
+                                        } />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <Field label="WhatsApp" value={
+                                            <a href={`https://wa.me/${reserva.whatsappCliente?.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline flex items-center gap-1 min-w-0">
+                                                <FiPhone size={11} className="flex-shrink-0" />
+                                                <span className="truncate">{reserva.whatsappCliente}</span>
+                                            </a>
+                                        } />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <Field label="Idioma" value={reserva.idioma === 'EN' ? 'Inglés' : 'Español'} />
+                                    </div>
                                 </div>
                             )}
                         </SectionCard>
@@ -498,8 +508,8 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                             saving={sectionSaving}
                         >
                             {editingSection === 'servicio' ? (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="col-span-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="sm:col-span-2">
                                         <label className="block text-xs text-gray-500 mb-1">Servicio</label>
                                         <p className="text-sm font-semibold text-gray-900">
                                             {reserva.servicio?.nombre ? getLocalizedText(reserva.servicio.nombre, 'ES') : 'N/A'}
@@ -592,7 +602,7 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                                             />
                                         </div>
                                     )}
-                                    <div className="col-span-2">
+                                    <div className="sm:col-span-2">
                                         <label className="block text-xs text-gray-500 mb-1">Notas</label>
                                         <textarea
                                             value={notas}
@@ -604,8 +614,8 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-                                        <div className="col-span-2 md:col-span-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 min-w-0">
+                                        <div className="sm:col-span-2 lg:col-span-3">
                                             <Field label="Servicio" value={
                                                 <span className="font-semibold">
                                                     {reserva.servicio?.nombre ? getLocalizedText(reserva.servicio.nombre, 'ES') : 'N/A'}
@@ -656,7 +666,7 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                                             <div key={asistente.id || index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                                                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Pasajero {index + 1}</p>
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                                    <div className="col-span-2">
+                                                    <div className="sm:col-span-2">
                                                         <label className="block text-xs text-gray-500 mb-1">Nombre</label>
                                                         <input
                                                             type="text"
@@ -779,13 +789,44 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                                             />
                                             <span className="text-xs text-amber-700 font-medium">COP</span>
                                         </div>
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    await putReserva({ precioTotal: quotePrice, precioBase: quotePrice });
+                                                } catch { alert('Error al guardar el precio'); }
+                                            }}
+                                            className="mt-3 w-full flex items-center justify-center gap-2 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition-colors"
+                                        >
+                                            <FiSave size={13} /> Guardar precio
+                                        </button>
                                     </div>
                                 ) : (
                                     <div className="space-y-2.5">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-gray-500">Precio Base</span>
-                                            <span className="font-medium">${Number(reserva.precioBase).toLocaleString('es-CO')}</span>
-                                        </div>
+                                        {reserva.metodoPago === 'EFECTIVO' && (
+                                            <div className="bg-green-50 rounded-lg p-4 border border-green-200 mb-3">
+                                                <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-2">Editar precio (Efectivo)</p>
+                                                <div className="flex items-center gap-3">
+                                                    <input
+                                                        type="number"
+                                                        value={quotePrice}
+                                                        onChange={(e) => setQuotePrice(Number(e.target.value))}
+                                                        className="flex-1 px-3 py-2 text-sm border border-green-200 rounded-lg focus:ring-2 focus:ring-green-300 outline-none bg-white"
+                                                    />
+                                                    <span className="text-xs text-green-700 font-medium">COP</span>
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                await putReserva({ precioTotal: quotePrice, precioBase: quotePrice });
+                                                            } catch { alert('Error al guardar el precio'); }
+                                                        }}
+                                                        disabled={Number(quotePrice) === Number(reserva.precioTotal)}
+                                                        className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
+                                                    >
+                                                        <FiSave size={12} /> Guardar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                         {reserva.precioAdicionales > 0 && (
                                             <>
                                                 <div className="flex justify-between text-sm font-medium text-gray-700 border-t border-gray-100 pt-2">

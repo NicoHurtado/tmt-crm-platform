@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Search, Phone } from 'lucide-react'
+import { Plus, Trash2, Search, Phone, Link2, Copy, Check } from 'lucide-react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,6 +46,7 @@ interface Conductor {
   disponible: boolean
   activo: boolean
   fotosVehiculo: string[]
+  selfRegistered?: boolean
 }
 
 const EMPTY_FORM = {
@@ -69,6 +70,38 @@ export default function ConductoresPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const handleGenerateInvite = async () => {
+    setInviteLoading(true)
+    setInviteUrl(null)
+    setCopied(false)
+    setInviteOpen(true)
+    try {
+      const res = await fetch('/api/admin/conductores/invites', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) setInviteUrl(data.data.url)
+      else alert(data.error || 'Error al generar link')
+    } catch {
+      alert('Error de conexión')
+    } finally {
+      setInviteLoading(false)
+    }
+  }
+
+  const copyInvite = async () => {
+    if (!inviteUrl) return
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      alert('No se pudo copiar')
+    }
+  }
 
   const filteredConductores = conductores.filter(
     (c) =>
@@ -183,10 +216,16 @@ export default function ConductoresPage() {
             {conductores.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button size="sm" className="gap-1.5 text-sm" onClick={openCreate}>
-          <Plus size={14} />
-          Nuevo conductor
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5 text-sm" onClick={handleGenerateInvite}>
+            <Link2 size={14} />
+            Generar link de registro
+          </Button>
+          <Button size="sm" className="gap-1.5 text-sm" onClick={openCreate}>
+            <Plus size={14} />
+            Nuevo conductor
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -251,7 +290,14 @@ export default function ConductoresPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm font-semibold text-neutral-900">{c.nombre}</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="text-sm font-semibold text-neutral-900 truncate">{c.nombre}</p>
+                        {c.selfRegistered && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                            Auto-registrado
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="py-3">
@@ -467,6 +513,41 @@ export default function ConductoresPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Invite Dialog */}
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold">Link de registro de conductor</DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            <p className="text-sm text-neutral-600">
+              Envía este link al conductor por WhatsApp. Es de un solo uso y expira en 7 días.
+            </p>
+            {inviteLoading ? (
+              <div className="h-10 rounded bg-neutral-100 animate-pulse" />
+            ) : inviteUrl ? (
+              <div className="flex items-center gap-2 p-2 bg-neutral-50 border border-neutral-200 rounded-lg">
+                <input
+                  readOnly
+                  value={inviteUrl}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                  className="flex-1 bg-transparent text-xs font-mono text-neutral-700 outline-none min-w-0"
+                />
+                <Button size="sm" variant="ghost" className="gap-1.5 flex-shrink-0" onClick={copyInvite}>
+                  {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+                  {copied ? 'Copiado' : 'Copiar'}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setInviteOpen(false)}>
+              Cerrar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

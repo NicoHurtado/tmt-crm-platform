@@ -97,19 +97,31 @@ model ServicioVehiculo {
 }
 
 model Conductor {
-  id            String    @id @default(cuid())
-  nombre        String
-  whatsapp      String
-  disponible    Boolean   @default(true)
-  activo        Boolean   @default(true)
-  fotosVehiculo String[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  telefono      String
-  documento     String
-  placa         String
-  foto          String?
-  reservas      Reserva[]
+  id             String    @id @default(cuid())
+  nombre         String
+  whatsapp       String
+  disponible     Boolean   @default(true)
+  activo         Boolean   @default(true)
+  fotosVehiculo  String[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  telefono       String
+  documento      String
+  placa          String
+  foto           String?
+  selfRegistered Boolean   @default(false)
+  reservas       Reserva[]
+}
+
+model ConductorInvite {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdBy String?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
 }
 
 model Reserva {

@@ -129,12 +129,23 @@ export async function PUT(
             updateData.datos = merged;
         }
 
-        // Pricing updates (for quotes)
-        if (body.precioTotal !== undefined) {
-            updateData.precioTotal = parseFloat(body.precioTotal);
-        }
-        if (body.precioBase !== undefined) {
-            updateData.precioBase = parseFloat(body.precioBase);
+        // Pricing updates: allowed for PENDING_PAYMENT (cotización) o reservas EFECTIVO
+        if (body.precioTotal !== undefined || body.precioBase !== undefined) {
+            const current = await prisma.reserva.findUnique({
+                where: { id: params.id },
+                select: { estado: true, metodoPago: true },
+            });
+            const allowed =
+                current &&
+                (current.estado === 'PENDING_PAYMENT' || current.metodoPago === 'EFECTIVO');
+            if (!allowed) {
+                return NextResponse.json(
+                    { error: 'El precio solo puede editarse en reservas EFECTIVO o cotizaciones pendientes' },
+                    { status: 403 }
+                );
+            }
+            if (body.precioTotal !== undefined) updateData.precioTotal = parseFloat(body.precioTotal);
+            if (body.precioBase !== undefined) updateData.precioBase = parseFloat(body.precioBase);
         }
 
         // Update asistentes (passengers) if provided

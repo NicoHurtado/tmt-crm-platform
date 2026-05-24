@@ -703,10 +703,6 @@ export default function TrackingPage({ params }: { params: { codigo: string } })
                                                     <div className="bg-[#D6A75D]/5 rounded-xl p-4 ring-1 ring-[#D6A75D]/20">
                                                         <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-3">{t.desglosePrecio}</p>
                                                         <div className="space-y-2">
-                                                            <div className="flex justify-between text-sm">
-                                                                <span className="text-gray-600">{t.precioBase}</span>
-                                                                <span className="font-medium">${Number(reserva.precioBase).toLocaleString('es-CO')}</span>
-                                                            </div>
                                                             {reserva.precioAdicionales > 0 && (
                                                                 <div className="flex justify-between text-sm">
                                                                     <span className="text-gray-600">{t.adicionales}</span>
@@ -1128,10 +1124,6 @@ export default function TrackingPage({ params }: { params: { codigo: string } })
                             <div className="bg-white rounded-2xl ring-1 ring-black/10 p-6">
                                 <SectionHeader icon={FiDollarSign} title={t.resumenPrecio} />
                                 <div className="space-y-3">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">{t.precioBase}</span>
-                                        <span className="font-semibold">${Number(reserva.precioBase).toLocaleString('es-CO')}</span>
-                                    </div>
                                     {Number(reserva.precioAdicionales) > 0 && (
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-600">{t.serviciosAdicionales}</span>
