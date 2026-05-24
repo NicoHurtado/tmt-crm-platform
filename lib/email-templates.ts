@@ -605,8 +605,6 @@ export const tplCancelacion = (r: ReservaTemplate, lang: 'ES' | 'EN'): string =>
 
 export const tplServicioCompletado = (r: ReservaTemplate, lang: 'ES' | 'EN'): string => {
   const section = (isES: boolean): string => {
-    const l: 'ES' | 'EN' = isES ? 'ES' : 'EN';
-    const ratingUrl = `${getTrackingUrl(r.codigo, l)}#calificacion`;
     return `
       ${badgeHtml(isES ? 'Servicio Completado' : 'Service Completed', '#166534', '#dcfce7')}
       <p style="margin:0 0 6px;font-size:16px;color:#374151;">${isES ? `Hola, <strong>${r.nombreCliente}</strong>` : `Hello, <strong>${r.nombreCliente}</strong>`}</p>
@@ -620,28 +618,16 @@ export const tplServicioCompletado = (r: ReservaTemplate, lang: 'ES' | 'EN'): st
         { label: isES ? 'Pasajeros' : 'Passengers', value: `${r.numeroPasajeros}` },
         { label: isES ? 'Código' : 'Code', value: r.codigo },
       ])}
+      ${process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL ? `
       <table width="100%" cellpadding="0" cellspacing="0" border="0"
         style="background-color:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin:20px 0;">
         <tr><td style="padding:24px;text-align:center;">
           <p style="margin:0 0 8px;font-size:20px;">⭐⭐⭐⭐⭐</p>
           <p style="margin:0 0 4px;font-size:16px;font-weight:700;color:#92400e;">${isES ? '¿Cómo fue tu experiencia?' : 'How was your experience?'}</p>
           <p style="margin:0 0 16px;font-size:13px;color:#78350f;">
-            ${isES ? 'Tu opinión nos ayuda a mejorar y a otros viajeros a elegir con confianza.' : 'Your feedback helps us improve and helps other travelers choose with confidence.'}
+            ${isES ? 'Tu opinión en Google nos ayuda muchísimo a llegar a más viajeros y a seguir mejorando.' : 'Your Google review helps us reach more travelers and keep improving.'}
           </p>
-          ${ctaBtn(isES ? 'Calificar mi Experiencia' : 'Rate my Experience', ratingUrl)}
-        </td></tr>
-      </table>
-      ${process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL ? `
-      <table width="100%" cellpadding="0" cellspacing="0" border="0"
-        style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin:0 0 20px;">
-        <tr><td style="padding:20px;text-align:center;">
-          <p style="margin:0 0 6px;font-size:15px;font-weight:700;color:#1e40af;">
-            ${isES ? '⭐ Ayúdanos también en Google' : '⭐ Help us on Google too'}
-          </p>
-          <p style="margin:0 0 14px;font-size:13px;color:#1e3a8a;">
-            ${isES ? 'Una reseña en Google nos ayuda muchísimo a llegar a más viajeros.' : 'A Google review helps us reach more travelers.'}
-          </p>
-          ${ctaBtn(isES ? 'Reseñar en Google' : 'Review on Google', process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL)}
+          ${ctaBtn(isES ? 'Calificarnos en Google' : 'Rate us on Google', process.env.NEXT_PUBLIC_GOOGLE_REVIEW_URL)}
         </td></tr>
       </table>` : ''}
       <p style="text-align:center;margin:0 0 28px;font-size:14px;color:#374151;">
