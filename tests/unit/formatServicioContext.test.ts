@@ -13,7 +13,6 @@ const svcBase: ServicioContextData = {
     descripcion: { es: 'Tour de día completo al embalse Guatapé.', en: 'Full day tour to Guatapé lake.' },
     incluye: { es: 'Transporte, guía local', en: 'Transport, local guide' },
     duracion: '10 horas',
-    precioBase: 150_000,
     aplicaRecargoNocturno: false,
     recargoNocturnoInicio: null,
     recargoNocturnoFin: null,
@@ -24,11 +23,11 @@ const svcBase: ServicioContextData = {
     vehiculosPermitidos: [
         {
             precio: 150_000,
-            vehiculo: { nombre: 'Sedan', capacidadMinima: 1, capacidadMaxima: 3, precioBase: 140_000 },
+            vehiculo: { nombre: 'Sedan', capacidadMinima: 1, capacidadMaxima: 3 },
         },
         {
             precio: 220_000,
-            vehiculo: { nombre: 'Van', capacidadMinima: 1, capacidadMaxima: 7, precioBase: 200_000 },
+            vehiculo: { nombre: 'Van', capacidadMinima: 1, capacidadMaxima: 7 },
         },
     ],
     tarifasMunicipios: [],

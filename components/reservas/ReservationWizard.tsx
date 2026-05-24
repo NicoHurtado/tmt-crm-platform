@@ -25,7 +25,6 @@ interface Service {
     imagen: string;
     duracion: string | null;
     incluye: string[];
-    precioBase: number;
     aplicaRecargoNocturno: boolean;
     recargoNocturnoInicio: string | null;
     recargoNocturnoFin: string | null;
@@ -79,12 +78,12 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
         whatsappCliente: '',
         emailCliente: emailPredeterminadoAliado,
         asistentes: [{ nombre: '', tipoDocumento: TipoDocumento.PASAPORTE, numeroDocumento: '', email: emailPredeterminadoAliado, telefono: '' }],
-        precioBase: Number(service.precioBase),
+        precioBase: 0,
         precioAdicionales: 0,
         recargoNocturno: 0,
         tarifaMunicipio: 0,
         descuentoAliado: 0,
-        precioTotal: Number(service.precioBase),
+        precioTotal: 0,
         datosDinamicos: {},
         aeropuertoNombre: 'JOSE_MARIA_CORDOVA' as const,
         cantidadHoras: service.esPorHoras ? 4 : undefined, // Default 4 hours for hourly services

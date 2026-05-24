@@ -59,7 +59,6 @@ interface Servicio {
   descripcion: string
   imagen: string
   activo: boolean
-  precioBase: number
   esAeropuerto: boolean
   esPorHoras: boolean
   esCompartido: boolean
@@ -488,12 +487,20 @@ export default function ServiciosPage() {
                         {getLocalizedText(s.descripcion, 'ES')}
                       </p>
                       <div className="flex items-center gap-4 mt-1.5 text-xs text-neutral-500">
-                        <span>
-                          Precio base:{' '}
-                          <span className="font-semibold text-neutral-700">
-                            ${Number(s.precioBase).toLocaleString('es-CO')}
-                          </span>
-                        </span>
+                        {(() => {
+                          const precios = (s.vehiculosPermitidos || [])
+                            .map((v: any) => Number(v.precio ?? 0))
+                            .filter((p: number) => p > 0);
+                          if (precios.length === 0) return null;
+                          return (
+                            <span>
+                              Desde:{' '}
+                              <span className="font-semibold text-neutral-700">
+                                ${Math.min(...precios).toLocaleString('es-CO')}
+                              </span>
+                            </span>
+                          );
+                        })()}
                         <span>
                           Vehículos:{' '}
                           <span className="font-semibold text-neutral-700">

@@ -42,7 +42,6 @@ model Servicio {
   imagen                String
   activo                Boolean            @default(true)
   duracion              String?
-  precioBase            Decimal            @db.Decimal(10, 2)
   aplicaRecargoNocturno Boolean            @default(false)
   recargoNocturnoInicio String?
   recargoNocturnoFin    String?
@@ -81,7 +80,6 @@ model Vehiculo {
   capacidadMaxima Int
   imagen          String
   activo          Boolean                @default(true)
-  precioBase      Decimal                @default(0) @db.Decimal(10, 2)
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
   preciosAliados  PrecioVehiculoAliado[]
@@ -197,17 +195,13 @@ model Asistente {
 }
 
 model TarifaAliado {
-  id                 String       @id @default(cuid())
-  aliadoId           String
-  servicioId         String
-  precioEspecial     Decimal?     @db.Decimal(10, 2)
-  comisionPorcentaje Decimal      @db.Decimal(10, 2)
-  descuentoEspecial  Decimal      @default(0) @db.Decimal(10, 2)
-  tipoComision       TipoComision @default(PORCENTAJE)
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
-  aliado             Aliado       @relation(fields: [aliadoId], references: [id], onDelete: Cascade)
-  servicio           Servicio     @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  aliadoId   String
+  servicioId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  aliado     Aliado   @relation(fields: [aliadoId], references: [id], onDelete: Cascade)
+  servicio   Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
 
   @@unique([aliadoId, servicioId])
 }
@@ -284,6 +278,8 @@ model PrecioVehiculoAliado {
   servicioAliadoId String
   vehiculoId       String
   activo           Boolean        @default(true)
+  comisionValor    Decimal        @default(0) @db.Decimal(10, 2)
+  tipoComision     TipoComision   @default(PORCENTAJE)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   servicioAliado   ServicioAliado @relation(fields: [servicioAliadoId], references: [id], onDelete: Cascade)

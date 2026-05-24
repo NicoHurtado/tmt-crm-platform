@@ -64,7 +64,6 @@ export async function PUT(
         if (body.capacidadMaxima !== undefined) updateData.capacidadMaxima = body.capacidadMaxima;
         if (body.imagen !== undefined) updateData.imagen = body.imagen;
         if (body.activo !== undefined) updateData.activo = body.activo;
-        if (body.precioBase !== undefined) updateData.precioBase = body.precioBase;
 
         const vehiculo = await prisma.vehiculo.update({
             where: { id },

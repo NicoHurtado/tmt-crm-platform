@@ -141,10 +141,11 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData.trasladoTipo]); // Only run when trasladoTipo changes
 
-    // Get available vehicles
+    // Get available vehicles — precio viene de ServicioVehiculo.precio
+    // En modo aliado se incluye también la comisión por vehículo
     const availableVehicles = (() => {
-        // 1. Try aliado-specific vehicles first (new architecture: sa.vehiculos[].precioBase)
         let vehicles: any[] = [];
+        // 1. Aliado-specific: aliado endpoint expone vehiculos[].precioServicio + comisión
         const aliadoVehiculos = preciosPersonalizados?.[service.id]?.vehiculos;
         if (aliadoVehiculos?.length > 0) {
             vehicles = aliadoVehiculos
@@ -154,20 +155,26 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                     nombre: v.nombre,
                     capacidadMinima: v.capacidadMinima,
                     capacidadMaxima: v.capacidadMaxima,
-                    precioBase: Number(v.precioBase ?? 0),
+                    precio: Number(v.precioServicio ?? 0),
                     imagen: v.imagen ?? null,
+                    tipoComision: v.tipoComision ?? 'PORCENTAJE',
+                    comisionValor: Number(v.comisionValor ?? 0),
                 }));
         }
-        // 2. Fallback to service allowed vehicles (public API: vehiculosPermitidos[].vehiculo.precioBase)
+        // 2. Public service: vehiculosPermitidos[].precio + .vehiculo
         else if (service.vehiculosPermitidos?.length > 0) {
             vehicles = service.vehiculosPermitidos.map((sv: any) => ({
-                ...(sv.vehiculo ?? sv),
-                id: sv.vehiculo?.id ?? sv.id,
-                precioBase: Number(sv.vehiculo?.precioBase ?? sv.precioBase ?? 0),
+                id: sv.vehiculo?.id ?? sv.vehiculoId ?? sv.id,
+                nombre: sv.vehiculo?.nombre ?? sv.nombre,
+                capacidadMinima: sv.vehiculo?.capacidadMinima ?? sv.capacidadMinima,
+                capacidadMaxima: sv.vehiculo?.capacidadMaxima ?? sv.capacidadMaxima,
+                imagen: sv.vehiculo?.imagen ?? sv.imagen ?? null,
+                precio: Number(sv.precio ?? 0),
+                tipoComision: 'PORCENTAJE',
+                comisionValor: 0,
             }));
         }
 
-        // Sort by capacity (ascending)
         return vehicles.sort((a: any, b: any) => (a.capacidadMaxima || 0) - (b.capacidadMaxima || 0));
     })();
 
@@ -181,24 +188,14 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
             .sort((a: any, b: any) => a.capacidadMaxima - b.capacidadMaxima)[0]
         : null;
 
-    // Auto-select recommended vehicle only when:
-    // 1. No vehicle is selected yet, OR
-    // 2. Currently selected vehicle is incompatible with passenger count
+    // Auto-select the smallest fitting vehicle whenever passenger count changes
     useEffect(() => {
         if (recommendedVehicle && formData.numeroPasajeros > 0) {
-            // Only auto-select if no vehicle is selected yet
-            if (!formData.vehiculoId) {
-                updateFormData({ vehiculoId: recommendedVehicle.id });
-                return;
-            }
-
-            // Or if current vehicle is incompatible
-            const currentVehicle = availableVehicles.find((v: any) => v.id === formData.vehiculoId);
-            if (currentVehicle && currentVehicle.capacidadMaxima < formData.numeroPasajeros) {
+            if (formData.vehiculoId !== recommendedVehicle.id) {
                 updateFormData({ vehiculoId: recommendedVehicle.id });
             }
         }
-    }, [formData.numeroPasajeros, recommendedVehicle, formData.vehiculoId, updateFormData, availableVehicles]);
+    }, [formData.numeroPasajeros, recommendedVehicle?.id]);
 
 
 
@@ -215,7 +212,7 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         // ─── SHARED TOUR PRICING + FIXED VALUES FROM ADMIN CONFIG ───
         const isSharedTourPricing = service.esCompartido;
         if (isSharedTourPricing) {
-            const pricePerPerson = Number(service.precioBase);
+            const pricePerPerson = availableVehicles[0]?.precio ?? 0;
             const totalShared = pricePerPerson * formData.numeroPasajeros;
 
             // Read meeting point and departure time from admin config — no hardcoding
@@ -267,7 +264,7 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
 
         // ─── SHARED TOUR: precio base × pasajeros ───
         if (service.esCompartido) {
-            const precioPorPersona = Number(service.precioBase);
+            const precioPorPersona = availableVehicles[0]?.precio ?? 0;
             const pasajeros = formData.numeroPasajeros || 0;
             const totalCompartido = precioPorPersona * pasajeros;
             updateFormData({
@@ -280,20 +277,14 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
             return;
         }
 
-        // Base price comes from service (global Servicio.precioBase)
-        const basePrice = Number(service.precioBase);
-
-        // Vehicle price comes from Vehiculo.precioBase (new architecture)
+        // Base price = ServicioVehiculo.precio para el vehículo seleccionado
         const selectedVehicle = availableVehicles.find((v: any) => v.id === formData.vehiculoId);
-        let vehiclePrice = selectedVehicle ? Number(selectedVehicle.precioBase ?? 0) : 0;
+        let basePrice = selectedVehicle ? Number(selectedVehicle.precio ?? 0) : 0;
 
         // For hourly services, multiply by number of hours
         if (service.esPorHoras && formData.cantidadHoras) {
-            vehiclePrice = vehiclePrice * formData.cantidadHoras;
+            basePrice = basePrice * formData.cantidadHoras;
         }
-
-        // Total = service price + vehicle price (additive, not override)
-        // vehiclePrice=0 means no vehicle selected or vehicle has no price
 
         // Recargo de municipio — viene exclusivamente de MunicipioConfig
         const selectedMunicipioConfig = formData.municipioConfigId
@@ -301,17 +292,26 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
             : null;
         const tarifaMunicipioConfigValue = selectedMunicipioConfig ? Number(selectedMunicipioConfig.recargo) : 0;
 
-        // Price = service.precioBase + vehiculo.precioBase + surcharges
         const pricing = calculateTotalPrice({
-            basePrice: basePrice + vehiclePrice,
+            basePrice,
             vehiclePrice: 0,
-            municipality: Municipio.OTRO, // Siempre OTRO — el recargo real viene de MunicipioConfig
+            municipality: Municipio.OTRO,
             nightSurcharge,
             additionals: 0,
         });
 
-        // Sumar precio dinámico y recargo municipioConfig al total
-        const totalConDinamico = pricing.total + dynamicPrice + tarifaMunicipioConfigValue;
+        // Subtotal antes de comisión aliado
+        const subtotalConDinamico = pricing.total + dynamicPrice + tarifaMunicipioConfigValue;
+
+        // Comisión del aliado por vehículo (si aplica)
+        let comisionAliado = 0;
+        if (selectedVehicle && (selectedVehicle.comisionValor ?? 0) > 0) {
+            comisionAliado = selectedVehicle.tipoComision === 'FIJO'
+                ? Number(selectedVehicle.comisionValor)
+                : Math.round(subtotalConDinamico * (Number(selectedVehicle.comisionValor) / 100));
+        }
+
+        const totalFinal = subtotalConDinamico + comisionAliado;
 
         // Si es "Otro municipio" sin config dinámica, no hay precio calculable
         if (formData.municipio === Municipio.OTRO && !formData.municipioConfigId) {
@@ -320,18 +320,20 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                 recargoNocturno: 0,
                 tarifaMunicipio: 0,
                 precioAdicionales: dynamicPrice,
+                comisionAliado: 0,
                 precioTotal: 0,
             });
             return;
         }
 
         updateFormData({
-            precioBase: Number(service.precioBase) + vehiclePrice,
+            precioBase: basePrice,
             recargoNocturno: nightSurcharge,
             tarifaMunicipio: pricing.municipalityFee,
-            precioAdicionales: dynamicPrice, // Solo guardar el precio dinámico
+            precioAdicionales: dynamicPrice,
             tarifaMunicipioConfig: tarifaMunicipioConfigValue,
-            precioTotal: totalConDinamico,
+            comisionAliado,
+            precioTotal: totalFinal,
         });
     }, [
         formData.hora,
@@ -349,7 +351,6 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         service.montoRecargoNocturno,
         service.recargoNocturnoInicio,
         service.recargoNocturnoFin,
-        service.precioBase,
         service.id,
         service.nombre,
         service.esPorHoras,
@@ -486,13 +487,13 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                         </div>
 
                         {/* Price-per-person summary for shared tours */}
-                        {service.esCompartido && formData.numeroPasajeros > 0 && (
+                        {service.esCompartido && formData.numeroPasajeros > 0 && availableVehicles[0] && (
                             <div className="mt-2 flex items-center justify-between px-1">
                                 <span className="text-xs text-gray-400">
-                                    {formData.numeroPasajeros} × {formatPrice(Number(service.precioBase))}
+                                    {formData.numeroPasajeros} × {formatPrice(availableVehicles[0].precio)}
                                 </span>
                                 <span className="text-sm font-bold text-gray-900">
-                                    = {formatPrice(Number(service.precioBase) * formData.numeroPasajeros)}
+                                    = {formatPrice(availableVehicles[0].precio * formData.numeroPasajeros)}
                                 </span>
                             </div>
                         )}

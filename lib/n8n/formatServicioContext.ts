@@ -7,7 +7,6 @@ export interface VehiculoData {
     nombre: string;
     capacidadMinima: number;
     capacidadMaxima: number;
-    precioBase: number;
 }
 
 export interface ServicioVehiculoData {
@@ -23,7 +22,6 @@ export interface ServicioContextData {
     descripcion: unknown;
     incluye: unknown;
     duracion: string | null;
-    precioBase: number;
     aplicaRecargoNocturno: boolean;
     recargoNocturnoInicio: string | null;
     recargoNocturnoFin: string | null;
@@ -190,7 +188,7 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string,
             (a, b) => a.vehiculo.capacidadMaxima - b.vehiculo.capacidadMaxima
         );
         for (const sv of sorted) {
-            const precio = Number(sv.precio ?? sv.vehiculo.precioBase);
+            const precio = Number(sv.precio ?? 0);
             const capMin = sv.vehiculo.capacidadMinima;
             const capMax = sv.vehiculo.capacidadMaxima;
             const cap = capMin === capMax ? `${capMax} pax` : `${capMin}-${capMax} pax`;

@@ -10,7 +10,6 @@ interface Servicio {
     descripcion: string;
     imagen: string;
     activo: boolean;
-    precioBase: number;
     esAeropuerto: boolean;
     destinoAutoFill: string | null;
     camposPersonalizados: any[];
@@ -115,9 +114,17 @@ export default function MunicipalServicesGroup({
                                                             {servicio.destinoAutoFill}
                                                         </span>
                                                     )}
-                                                    <span className="text-xs text-gray-500">
-                                                        ${Number(servicio.precioBase).toLocaleString('es-CO')}
-                                                    </span>
+                                                    {(() => {
+                                                        const precios = (servicio.vehiculosPermitidos || [])
+                                                            .map((v) => Number(v.precio ?? 0))
+                                                            .filter((p) => p > 0);
+                                                        if (precios.length === 0) return null;
+                                                        return (
+                                                            <span className="text-xs text-gray-500">
+                                                                desde ${Math.min(...precios).toLocaleString('es-CO')}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
 

@@ -30,11 +30,10 @@ export interface PriceBreakdown {
 }
 
 export interface AliadoConfig {
-    precioVehiculo?: number;
     tarifaMunicipio?: number;
-    comisionPorcentaje?: number;     // valor genérico: monto fijo (COP) o porcentaje según tipoComision
-    tipoComision?: 'FIJO' | 'PORCENTAJE';  // NEW
-    descuentoEspecial?: number;
+    // Comisión calculada para el vehículo seleccionado en PrecioVehiculoAliado
+    comisionPorcentaje?: number;
+    tipoComision?: 'FIJO' | 'PORCENTAJE';
     sobrescribirRecargoNocturno?: boolean;
     aplicaRecargoNocturno?: boolean;
     recargoNocturnoInicio?: string;
@@ -74,21 +73,16 @@ export async function calculateReservationPrice(
     aliadoConfig?: AliadoConfig,
     cantidadHoras?: number
 ): Promise<PriceBreakdown> {
-    // 1. Get base price from vehicle
-    let precioBase = 0;
-
-    if (aliadoConfig?.precioVehiculo) {
-        // Use ally custom pricing
-        precioBase = aliadoConfig.precioVehiculo;
-    } else {
-        // Use standard service-vehicle pricing
-        const vehiculoConfig = servicio.vehiculosPermitidos.find(
-            (v) => v.vehiculoId === vehiculoId
-        );
-        if (!vehiculoConfig) {
-            throw new Error('Vehículo no disponible para este servicio');
-        }
-        precioBase = Number(vehiculoConfig.precio);
+    // 1. Get base price from ServicioVehiculo.precio (única fuente)
+    const vehiculoConfig = servicio.vehiculosPermitidos.find(
+        (v) => v.vehiculoId === vehiculoId
+    );
+    if (!vehiculoConfig) {
+        throw new Error('Vehículo no disponible para este servicio');
+    }
+    let precioBase = Number(vehiculoConfig.precio);
+    if (!Number.isFinite(precioBase) || precioBase <= 0) {
+        throw new Error('Este servicio no tiene precio configurado para el vehículo seleccionado');
     }
 
     // 1b. If service has esPorHoras module, multiply base price by hours
@@ -213,9 +207,6 @@ export async function calculateReservationPrice(
     let comisionAliado = 0;
 
     if (aliadoConfig) {
-        if (aliadoConfig.descuentoEspecial) {
-            descuentoAliado = aliadoConfig.descuentoEspecial;
-        }
         if (aliadoConfig.comisionPorcentaje) {
             if (aliadoConfig.tipoComision === 'FIJO') {
                 comisionAliado = aliadoConfig.comisionPorcentaje; // fixed COP amount

@@ -75,7 +75,6 @@ export async function POST(request: Request) {
                 capacidadMaxima: parseInt(body.capacidadMaxima),
                 imagen: body.imagen || '',
                 activo: body.activo !== undefined ? body.activo : true,
-                precioBase: body.precioBase ?? 0,
             },
         });
 

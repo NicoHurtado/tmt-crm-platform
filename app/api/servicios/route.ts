@@ -88,7 +88,7 @@ export async function POST(request: Request) {
         const body = await request.json();
 
         // Validar campos requeridos
-        const requiredFields = ['nombre', 'precioBase'];
+        const requiredFields = ['nombre'];
 
         for (const field of requiredFields) {
             if (!body[field]) {
@@ -107,7 +107,6 @@ export async function POST(request: Request) {
                 imagen: body.imagen || '',
                 duracion: body.duracion || (body.duracionHoras ? `${body.duracionHoras} horas` : null),
                 incluye: body.incluye || [],
-                precioBase: parseFloat(body.precioBase),
 
                 // Recargo Nocturno
                 aplicaRecargoNocturno: body.aplicaRecargoNocturno || false,

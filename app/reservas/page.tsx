@@ -318,14 +318,20 @@ export default function ReservasPage() {
                                             </div>
 
                                             <div className="flex items-center justify-between">
-                                                {!aliado && (
-                                                    <div>
-                                                        <p className="text-sm text-gray-500">{t('reservas.desde', language)}</p>
-                                                        <p className="text-2xl font-bold text-[#D6A75D]">
-                                                            ${Number(service.precioBase).toLocaleString('es-CO')}
-                                                        </p>
-                                                    </div>
-                                                )}
+                                                {!aliado && (() => {
+                                                    const precios = (service.vehiculosPermitidos || [])
+                                                        .map((sv: any) => Number(sv.precio ?? 0))
+                                                        .filter((p: number) => p > 0);
+                                                    if (precios.length === 0) return <div />;
+                                                    return (
+                                                        <div>
+                                                            <p className="text-sm text-gray-500">{t('reservas.desde', language)}</p>
+                                                            <p className="text-2xl font-bold text-[#D6A75D]">
+                                                                ${Math.min(...precios).toLocaleString('es-CO')}
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                })()}
                                                 <button className={`${aliado ? 'w-full' : ''} bg-gray-100 hover:bg-[#D6A75D] text-gray-800 hover:text-black font-bold py-2 px-4 rounded-lg transition-colors`}>
                                                     {t('header.reservar', language)}
                                                 </button>

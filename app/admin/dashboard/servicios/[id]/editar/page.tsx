@@ -44,7 +44,6 @@ export default function EditarServicioPage() {
     const [duracion, setDuracion] = useState('');
     const [incluyeES, setIncluyeES] = useState<string[]>(['']);
     const [incluyeEN, setIncluyeEN] = useState<string[]>(['']);
-    const [precioBase, setPrecioBase] = useState(0);
 
     // Night Surcharge
     const [aplicaRecargoNocturno, setAplicaRecargoNocturno] = useState(false);
@@ -75,9 +74,9 @@ export default function EditarServicioPage() {
     const [guiaInglesDisponible, setGuiaInglesDisponible] = useState(false);
     const [precioGuiaIngles, setPrecioGuiaIngles] = useState<number | null>(null);
 
-    // Vehicles
+    // Vehicles — each selected vehicle has its own service price
     const [vehiculosSeleccionados, setVehiculosSeleccionados] = useState<
-        { vehiculoId: string }[]
+        { vehiculoId: string; precio: number }[]
     >([]);
 
     useEffect(() => {
@@ -114,8 +113,6 @@ export default function EditarServicioPage() {
                     setIncluyeES(incluyeArrayES.length > 0 ? incluyeArrayES : ['']);
                     setIncluyeEN(incluyeArrayEN.length > 0 ? incluyeArrayEN : ['']);
 
-                    setPrecioBase(Number(servicio.precioBase));
-
                     setAplicaRecargoNocturno(servicio.aplicaRecargoNocturno);
                     setRecargoNocturnoInicio(servicio.recargoNocturnoInicio || '22:00');
                     setRecargoNocturnoFin(servicio.recargoNocturnoFin || '06:00');
@@ -143,6 +140,7 @@ export default function EditarServicioPage() {
                     setVehiculosSeleccionados(
                         servicio.vehiculosPermitidos.map((v: any) => ({
                             vehiculoId: v.vehiculoId,
+                            precio: Number(v.precio ?? 0),
                         }))
                     );
                 } else {
@@ -183,8 +181,14 @@ export default function EditarServicioPage() {
         if (exists) {
             setVehiculosSeleccionados(vehiculosSeleccionados.filter((v) => v.vehiculoId !== vehiculoId));
         } else {
-            setVehiculosSeleccionados([...vehiculosSeleccionados, { vehiculoId }]);
+            setVehiculosSeleccionados([...vehiculosSeleccionados, { vehiculoId, precio: 0 }]);
         }
+    };
+
+    const handleVehiculoPrecioChange = (vehiculoId: string, precio: number) => {
+        setVehiculosSeleccionados(vehiculosSeleccionados.map((v) =>
+            v.vehiculoId === vehiculoId ? { ...v, precio } : v
+        ));
     };
 
     const sortedVehiculos = [...vehiculos].sort((a, b) => a.capacidadMinima - b.capacidadMinima);
@@ -207,6 +211,12 @@ export default function EditarServicioPage() {
             return;
         }
 
+        const sinPrecio = vehiculosSeleccionados.find((v) => !v.precio || v.precio <= 0);
+        if (sinPrecio) {
+            alert('Cada vehículo seleccionado debe tener un precio mayor a 0');
+            return;
+        }
+
         setSaving(true);
 
         try {
@@ -222,7 +232,6 @@ export default function EditarServicioPage() {
                         es: incluyeES.filter((i) => i.trim() !== ''),
                         en: incluyeEN.filter((i) => i.trim() !== '')
                     },
-                    precioBase,
                     aplicaRecargoNocturno,
                     recargoNocturnoInicio: aplicaRecargoNocturno ? recargoNocturnoInicio : null,
                     recargoNocturnoFin: aplicaRecargoNocturno ? recargoNocturnoFin : null,
@@ -240,7 +249,7 @@ export default function EditarServicioPage() {
                     precioGuiaIngles: guiaInglesDisponible ? precioGuiaIngles : null,
                     orden,
                     camposPersonalizados,
-                    vehiculos: vehiculosSeleccionados.map((v) => ({ vehiculoId: v.vehiculoId, precio: null })),
+                    vehiculos: vehiculosSeleccionados.map((v) => ({ vehiculoId: v.vehiculoId, precio: v.precio })),
                 }),
             });
 
@@ -387,23 +396,6 @@ export default function EditarServicioPage() {
                                         className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
                                         placeholder="ej: 8 horas"
                                     />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                        {esCompartido ? 'Precio por Persona (COP)' : 'Precio Base (COP)'}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={precioBase}
-                                        onChange={(e) => setPrecioBase(Number(e.target.value))}
-                                        min="0"
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
-                                    />
-                                    {esCompartido && (
-                                        <p className="text-xs text-amber-600 mt-1">
-                                            Este precio se multiplica por el número de pasajeros al reservar.
-                                        </p>
-                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -800,6 +792,20 @@ export default function EditarServicioPage() {
                                                     </p>
                                                 </div>
 
+                                                {isSelected && (
+                                                    <div className="w-44">
+                                                        <label className="block text-xs text-gray-500 mb-1">Precio (COP)</label>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            value={isSelected.precio || ''}
+                                                            onChange={(e) => handleVehiculoPrecioChange(vehiculo.id, Number(e.target.value) || 0)}
+                                                            placeholder="0"
+                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                                            required
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     );

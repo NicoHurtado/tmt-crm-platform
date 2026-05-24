@@ -38,7 +38,6 @@ export default function CrearServicioPage() {
     const [duracion, setDuracion] = useState('');
     const [incluyeES, setIncluyeES] = useState<string[]>(['']);
     const [incluyeEN, setIncluyeEN] = useState<string[]>(['']);
-    const [precioBase, setPrecioBase] = useState(0);
 
     // Night Surcharge
     const [aplicaRecargoNocturno, setAplicaRecargoNocturno] = useState(false);
@@ -113,7 +112,7 @@ export default function CrearServicioPage() {
         if (exists) {
             setVehiculosSeleccionados(vehiculosSeleccionados.filter((v) => v.vehiculoId !== vehiculoId));
         } else {
-            setVehiculosSeleccionados([...vehiculosSeleccionados, { vehiculoId, precio: precioBase }]);
+            setVehiculosSeleccionados([...vehiculosSeleccionados, { vehiculoId, precio: 0 }]);
         }
     };
 
@@ -148,6 +147,12 @@ export default function CrearServicioPage() {
             return;
         }
 
+        const sinPrecio = vehiculosSeleccionados.find((v) => !v.precio || v.precio <= 0);
+        if (sinPrecio) {
+            alert('Cada vehículo seleccionado debe tener un precio mayor a 0');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -163,7 +168,6 @@ export default function CrearServicioPage() {
                         es: incluyeES.filter((i) => i.trim() !== ''),
                         en: incluyeEN.filter((i) => i.trim() !== '')
                     },
-                    precioBase,
                     aplicaRecargoNocturno,
                     recargoNocturnoInicio: aplicaRecargoNocturno ? recargoNocturnoInicio : null,
                     recargoNocturnoFin: aplicaRecargoNocturno ? recargoNocturnoFin : null,
@@ -320,23 +324,6 @@ export default function CrearServicioPage() {
                                         className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
                                         placeholder="ej: 8 horas"
                                     />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                        {esCompartido ? 'Precio por Persona (COP)' : 'Precio Base (COP)'}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={precioBase}
-                                        onChange={(e) => setPrecioBase(Number(e.target.value))}
-                                        min="0"
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
-                                    />
-                                    {esCompartido && (
-                                        <p className="text-xs text-amber-600 mt-1">
-                                            Este precio se multiplica por el número de pasajeros al reservar.
-                                        </p>
-                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1.5">

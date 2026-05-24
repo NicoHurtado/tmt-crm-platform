@@ -42,7 +42,7 @@ export default function Step4Summary({
             const av = (preciosPersonalizados[service.id]?.vehiculos ?? []).find(
                 (v: any) => v.vehiculoId === formData.vehiculoId
             );
-            if (av) return { id: av.vehiculoId, nombre: av.nombre, capacidadMinima: av.capacidadMinima, capacidadMaxima: av.capacidadMaxima, imagen: av.imagen ?? null, precioBase: Number(av.precioBase ?? 0) };
+            if (av) return { id: av.vehiculoId, nombre: av.nombre, capacidadMinima: av.capacidadMinima, capacidadMaxima: av.capacidadMaxima, imagen: av.imagen ?? null, precio: Number(av.precioServicio ?? 0) };
         }
         return null;
     })();
@@ -333,7 +333,7 @@ export default function Step4Summary({
                                     const vehicleName = resolvedVehicle ? resolvedVehicle.nombre : t('reservas.paso4_precio_base', language);
 
                                     if (service.esPorHoras && formData.cantidadHoras) {
-                                        const precioHora = resolvedVehicle ? Number(resolvedVehicle.precioBase ?? 0) : 0;
+                                        const precioHora = resolvedVehicle ? Number(resolvedVehicle.precio ?? resolvedVehicle.precioBase ?? 0) : 0;
                                         return `${vehicleName} (${formatPrice(precioHora)} × ${formData.cantidadHoras} ${language === 'es' ? 'horas' : 'hours'})`;
                                     }
 
@@ -403,6 +403,13 @@ export default function Step4Summary({
                             <div className="flex justify-between text-green-600">
                                 <span>{t('reservas.paso4_descuento', language)}</span>
                                 <span className="font-medium">-{formatPrice(formData.descuentoAliado)}</span>
+                            </div>
+                        )}
+
+                        {(formData.comisionAliado ?? 0) > 0 && (
+                            <div className="flex justify-between text-gray-700">
+                                <span>{language === 'es' ? 'Comisión aliado' : 'Ally commission'}</span>
+                                <span className="font-medium">{formatPrice(formData.comisionAliado ?? 0)}</span>
                             </div>
                         )}
 

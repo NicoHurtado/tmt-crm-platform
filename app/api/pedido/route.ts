@@ -44,20 +44,26 @@ export async function POST(request: Request) {
             const itemSubtotal = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio - descuentoAliado;
 
             let comisionAliado = 0;
-            if (item.esReservaAliado && item.aliadoId) {
+            if (item.esReservaAliado && item.aliadoId && item.vehiculoId) {
                 try {
-                    const tarifa = await prisma.tarifaAliado.findUnique({
+                    const sa = await prisma.servicioAliado.findUnique({
                         where: {
                             aliadoId_servicioId: {
                                 aliadoId: item.aliadoId,
                                 servicioId: item.servicioId,
                             },
                         },
+                        include: {
+                            preciosVehiculos: {
+                                where: { vehiculoId: item.vehiculoId },
+                            },
+                        },
                     });
-                    if (tarifa) {
-                        comisionAliado = tarifa.tipoComision === 'PORCENTAJE'
-                            ? itemSubtotal * (Number(tarifa.comisionPorcentaje) / 100)
-                            : Number(tarifa.comisionPorcentaje);
+                    const pv = sa?.preciosVehiculos?.[0];
+                    if (pv) {
+                        comisionAliado = pv.tipoComision === 'PORCENTAJE'
+                            ? itemSubtotal * (Number(pv.comisionValor) / 100)
+                            : Number(pv.comisionValor);
                     }
                 } catch (e) {
                     console.error('Error calculating ally commission:', e);

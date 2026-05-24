@@ -55,6 +55,7 @@ export interface ReservationFormData {
     recargoNocturno: number;
     tarifaMunicipio: number;
     descuentoAliado: number;
+    comisionAliado?: number;
     precioTotal: number;
 
     // Campos dinámicos del formulario

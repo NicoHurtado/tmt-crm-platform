@@ -15,12 +15,12 @@ export async function GET(
     try {
         const { id } = params;
 
-        // 1. Fetch all active services (with their globally-permitted vehicles) and ALL active vehicles
+        // 1. Servicios activos con sus ServicioVehiculo (precio incluido) + vehículos
         const [allServicios, allVehiculos] = await Promise.all([
             prisma.servicio.findMany({
                 where: { activo: true },
                 include: {
-                    vehiculosPermitidos: { select: { vehiculoId: true } }
+                    vehiculosPermitidos: { select: { vehiculoId: true, precio: true } }
                 }
             }),
             prisma.vehiculo.findMany({
@@ -31,67 +31,57 @@ export async function GET(
 
         const sortedServicios = sortServicesByPriority(allServicios);
 
-        // 2. Fetch ServicioAliado records for this aliado
+        // 2. ServicioAliado + comisiones por vehículo
         const serviciosAliado = await prisma.servicioAliado.findMany({
             where: { aliadoId: id },
             include: { preciosVehiculos: true }
         });
         const servicioAliadoMap = new Map(serviciosAliado.map(sa => [sa.servicioId, sa]));
 
-        // 3. Fetch TarifaAliado for this aliado
-        const tarifasAliado = await prisma.tarifaAliado.findMany({
-            where: { aliadoId: id }
-        });
-        const tarifasMap = new Map(tarifasAliado.map(t => [t.servicioId, t]));
-
-        // 4. Build response — every service gets ALL platform vehicles
+        // 3. Construir respuesta — cada servicio expone sus ServicioVehiculo con precio + comisión opcional del aliado
         const data = sortedServicios.map((servicio: any) => {
             const sa = servicioAliadoMap.get(servicio.id);
-            const tarifa = tarifasMap.get(servicio.id);
 
-            // Map vehiculoId → saved PrecioVehiculoAliado record
             const preciosVehiculosMap = new Map(
                 (sa?.preciosVehiculos ?? []).map((pv: any) => [pv.vehiculoId, pv])
             );
 
-            // Set of vehicles globally permitted for this service (ServicioVehiculo)
-            const globallyPermitted = new Set(
-                servicio.vehiculosPermitidos.map((sv: any) => sv.vehiculoId)
-            );
-
-            // All platform vehicles:
-            // - If saved record exists → use pv.activo
-            // - Else if vehicle is globally permitted for this service → default true
-            // - Else → default false
-            const vehiculos = allVehiculos.map((v: any) => {
-                const pv = preciosVehiculosMap.get(v.id);
-                const defaultActivo = pv !== undefined ? pv.activo : globallyPermitted.has(v.id);
+            // Vehículos permitidos para este servicio (con precio del servicio)
+            const vehiculos = servicio.vehiculosPermitidos.map((sv: any) => {
+                const veh = allVehiculos.find((v: any) => v.id === sv.vehiculoId);
+                const pv = preciosVehiculosMap.get(sv.vehiculoId);
+                const precioServicio = Number(sv.precio ?? 0);
+                const tipoComision = (pv?.tipoComision ?? 'PORCENTAJE') as 'PORCENTAJE' | 'FIJO';
+                const comisionValor = pv ? Number(pv.comisionValor) : 0;
+                const comisionMonto = tipoComision === 'FIJO'
+                    ? comisionValor
+                    : precioServicio * (comisionValor / 100);
+                const precioFinalAliado = precioServicio + comisionMonto;
                 return {
-                    vehiculoId: v.id,
-                    nombre: v.nombre,
-                    capacidadMinima: v.capacidadMinima,
-                    capacidadMaxima: v.capacidadMaxima,
-                    precioBase: Number(v.precioBase ?? 0),
-                    imagen: v.imagen ?? null,
-                    activo: defaultActivo
+                    vehiculoId: sv.vehiculoId,
+                    nombre: veh?.nombre ?? '',
+                    capacidadMinima: veh?.capacidadMinima ?? 0,
+                    capacidadMaxima: veh?.capacidadMaxima ?? 0,
+                    imagen: veh?.imagen ?? null,
+                    precioServicio,
+                    activo: pv ? pv.activo : true,
+                    tipoComision,
+                    comisionValor,
+                    precioFinalAliado,
                 };
             });
 
             return {
-                // Aliado-specific fields
                 servicioId: servicio.id,
                 activo: sa ? sa.activo : false,
-                tipoComision: tarifa?.tipoComision ?? 'PORCENTAJE',
-                comisionValor: tarifa ? Number(tarifa.comisionPorcentaje) : 0,
                 vehiculos,
-                // Full service fields (needed by wizard)
+                // Service fields
                 id: servicio.id,
                 nombre: servicio.nombre,
                 descripcion: servicio.descripcion,
                 imagen: servicio.imagen,
                 duracion: servicio.duracion,
                 incluye: servicio.incluye,
-                precioBase: Number(servicio.precioBase ?? 0),
                 aplicaRecargoNocturno: servicio.aplicaRecargoNocturno,
                 recargoNocturnoInicio: servicio.recargoNocturnoInicio,
                 recargoNocturnoFin: servicio.recargoNocturnoFin,
@@ -123,7 +113,7 @@ export async function GET(
     }
 }
 
-// POST - Crear/Actualizar configuración de servicio para aliado
+// POST - Crear/Actualizar configuración de servicio + comisiones por vehículo
 export async function POST(
     request: NextRequest,
     { params }: { params: { id: string } }
@@ -136,66 +126,50 @@ export async function POST(
     try {
         const { id: aliadoId } = params;
         const body = await request.json();
-        const { servicioId, activo, tipoComision, comisionValor, vehiculos } = body;
+        const { servicioId, activo, vehiculos } = body;
 
-        // Upsert ServicioAliado
+        // Upsert ServicioAliado (flag de activación)
         const servicioAliado = await prisma.servicioAliado.upsert({
             where: {
-                aliadoId_servicioId: {
-                    aliadoId,
-                    servicioId
-                }
+                aliadoId_servicioId: { aliadoId, servicioId }
             },
-            update: {
-                activo
-            },
-            create: {
-                aliadoId,
-                servicioId,
-                activo
-            }
+            update: { activo },
+            create: { aliadoId, servicioId, activo }
         });
 
-        // Upsert TarifaAliado
+        // Asegurar TarifaAliado existe (solo como flag de servicio activo)
         await prisma.tarifaAliado.upsert({
-            where: {
-                aliadoId_servicioId: {
-                    aliadoId,
-                    servicioId
-                }
-            },
-            update: {
-                tipoComision: tipoComision || 'PORCENTAJE',
-                comisionPorcentaje: parseFloat(comisionValor) || 0
-            },
-            create: {
-                aliadoId,
-                servicioId,
-                tipoComision: tipoComision || 'PORCENTAJE',
-                comisionPorcentaje: parseFloat(comisionValor) || 0,
-                descuentoEspecial: 0,
-                precioEspecial: null
-            }
+            where: { aliadoId_servicioId: { aliadoId, servicioId } },
+            update: {},
+            create: { aliadoId, servicioId }
         });
 
-        // Upsert PrecioVehiculoAliado with only activo boolean (in parallel)
+        // Upsert PrecioVehiculoAliado con comisión por vehículo
         if (vehiculos && Array.isArray(vehiculos)) {
-            await Promise.all(vehiculos.map((v: any) =>
-                prisma.precioVehiculoAliado.upsert({
+            await Promise.all(vehiculos.map((v: any) => {
+                const tipoComision = (v.tipoComision === 'FIJO' ? 'FIJO' : 'PORCENTAJE') as 'FIJO' | 'PORCENTAJE';
+                const comisionValor = Number(v.comisionValor) || 0;
+                return prisma.precioVehiculoAliado.upsert({
                     where: {
                         servicioAliadoId_vehiculoId: {
                             servicioAliadoId: servicioAliado.id,
                             vehiculoId: v.vehiculoId
                         }
                     },
-                    update: { activo: v.activo },
+                    update: {
+                        activo: v.activo ?? true,
+                        tipoComision,
+                        comisionValor,
+                    },
                     create: {
                         servicioAliadoId: servicioAliado.id,
                         vehiculoId: v.vehiculoId,
-                        activo: v.activo
+                        activo: v.activo ?? true,
+                        tipoComision,
+                        comisionValor,
                     }
-                })
-            ));
+                });
+            }));
         }
 
         return NextResponse.json({ success: true });
@@ -232,10 +206,7 @@ export async function DELETE(
 
         await prisma.servicioAliado.delete({
             where: {
-                aliadoId_servicioId: {
-                    aliadoId,
-                    servicioId
-                }
+                aliadoId_servicioId: { aliadoId, servicioId }
             }
         });
 

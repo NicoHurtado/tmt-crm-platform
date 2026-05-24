@@ -20,13 +20,15 @@ export async function GET(request: NextRequest) {
             orderBy: { orden: 'asc' },
         });
 
-        const data = servicios.map(s => ({
+        const data = servicios.map(s => {
+            const precios = s.vehiculosPermitidos.map(sv => Number(sv.precio ?? 0)).filter(p => p > 0);
+            return {
             id: s.id,
             tipo: s.tipoServicio,
             nombre: getLocalizedText(s.nombre, 'ES'),
             nombreEN: getLocalizedText(s.nombre, 'EN'),
             descripcion: getLocalizedText(s.descripcion, 'ES'),
-            precioBase: Number(s.precioBase),
+            precioDesde: precios.length > 0 ? Math.min(...precios) : 0,
             duracion: s.duracion,
             esAeropuerto: s.esAeropuerto,
             esPorHoras: s.esPorHoras,
@@ -38,7 +40,8 @@ export async function GET(request: NextRequest) {
                 capacidadMax: sv.vehiculo.capacidadMaxima,
                 precio: Number(sv.precio),
             })),
-        }));
+        };
+        });
 
         return NextResponse.json({ success: true, count: data.length, data });
     } catch (error) {

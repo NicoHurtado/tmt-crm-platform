@@ -138,22 +138,26 @@ export async function POST(request: Request) {
 
         const subtotal = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio - descuentoAliado;
 
-        // Calcular comisión de aliado si aplica (TarifaAliado) — debe calcularse ANTES del total
+        // Calcular comisión de aliado si aplica — ahora por (aliado, servicio, vehículo)
         let comisionAliado = 0;
-        if (body.esReservaAliado && body.aliadoId) {
+        if (body.esReservaAliado && body.aliadoId && body.vehiculoId) {
             try {
-                const tarifa = await prisma.tarifaAliado.findUnique({
+                const sa = await prisma.servicioAliado.findUnique({
                     where: {
                         aliadoId_servicioId: {
                             aliadoId: body.aliadoId,
                             servicioId: body.servicioId
                         }
+                    },
+                    include: {
+                        preciosVehiculos: { where: { vehiculoId: body.vehiculoId } }
                     }
                 });
-                if (tarifa) {
-                    comisionAliado = tarifa.tipoComision === 'PORCENTAJE'
-                        ? subtotal * (Number(tarifa.comisionPorcentaje) / 100)
-                        : Number(tarifa.comisionPorcentaje);
+                const pv = sa?.preciosVehiculos?.[0];
+                if (pv) {
+                    comisionAliado = pv.tipoComision === 'PORCENTAJE'
+                        ? subtotal * (Number(pv.comisionValor) / 100)
+                        : Number(pv.comisionValor);
                 }
             } catch (e) {
                 console.error('Error calculating ally commission:', e);

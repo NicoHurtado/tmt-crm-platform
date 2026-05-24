@@ -78,7 +78,6 @@ export async function PUT(
             'imagen',
             'activo',
             'duracion',
-            'precioBase',
             'aplicaRecargoNocturno',
             'recargoNocturnoInicio',
             'recargoNocturnoFin',

@@ -116,7 +116,6 @@ export async function POST(req: NextRequest) {
             imagen,
             duracion,
             incluye,
-            precioBase,
             aplicaRecargoNocturno,
             recargoNocturnoInicio,
             recargoNocturnoFin,
@@ -165,7 +164,6 @@ export async function POST(req: NextRequest) {
                 imagen,
                 duracion,
                 incluye: incluye || [],
-                precioBase: precioBase || 0,
                 aplicaRecargoNocturno: aplicaRecargoNocturno || false,
                 recargoNocturnoInicio: aplicaRecargoNocturno ? recargoNocturnoInicio : null,
                 recargoNocturnoFin: aplicaRecargoNocturno ? recargoNocturnoFin : null,
@@ -185,10 +183,16 @@ export async function POST(req: NextRequest) {
                 activo: true,
                 vehiculosPermitidos: vehiculos
                     ? {
-                        create: vehiculos.map((v: any) => ({
-                            vehiculoId: v.vehiculoId,
-                            precio: v.precio,
-                        })),
+                        create: vehiculos.map((v: any) => {
+                            const precio = Number(v.precio);
+                            if (!Number.isFinite(precio) || precio <= 0) {
+                                throw new Error('Cada vehículo del servicio requiere un precio mayor a 0');
+                            }
+                            return {
+                                vehiculoId: v.vehiculoId,
+                                precio,
+                            };
+                        }),
                     }
                     : undefined,
             },

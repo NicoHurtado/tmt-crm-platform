@@ -37,7 +37,6 @@ const mockServicio = {
     tipoServicio: 'AEROPUERTO',
     esMunicipal: false,
     activo: true,
-    precioBase: 100_000,
     vehiculosPermitidos: [{ vehiculoId: 'vehiculo-id-1', precio: 100_000 }],
     aplicaRecargoNocturno: false,
     configuracion: { camposCustom: [] },

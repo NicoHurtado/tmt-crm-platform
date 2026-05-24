@@ -114,36 +114,40 @@ export async function GET(request: NextRequest) {
         let payload: Record<string, unknown>;
 
         if (formato === 'json') {
-            const data = rawServicios.map((s) => ({
-                id: s.id,
-                tipo: s.tipoServicio,
-                nombre: getLocalizedText(s.nombre, lang),
-                nombreES: getLocalizedText(s.nombre, 'ES'),
-                nombreEN: getLocalizedText(s.nombre, 'EN'),
-                descripcion: getLocalizedText(s.descripcion, lang),
-                descripcionES: getLocalizedText(s.descripcion, 'ES'),
-                descripcionEN: getLocalizedText(s.descripcion, 'EN'),
-                precioBase: Number(s.precioBase),
-                duracion: s.duracion,
-                esAeropuerto: s.esAeropuerto,
-                esPorHoras: s.esPorHoras,
-                esMunicipal: s.esMunicipal,
-                recargoNocturno: s.aplicaRecargoNocturno
-                    ? {
-                          aplica: true,
-                          inicio: s.recargoNocturnoInicio,
-                          fin: s.recargoNocturnoFin,
-                          monto: s.montoRecargoNocturno ? Number(s.montoRecargoNocturno) : null,
-                      }
-                    : { aplica: false },
-                linkReserva: `${appUrl.replace(/\/$/, '')}/reservas?serviceId=${s.id}&form=1`,
-                vehiculos: s.vehiculosPermitidos.map((sv) => ({
-                    nombre: sv.vehiculo.nombre,
-                    capacidadMinima: sv.vehiculo.capacidadMinima,
-                    capacidadMaxima: sv.vehiculo.capacidadMaxima,
-                    precio: Number(sv.precio ?? sv.vehiculo.precioBase),
-                })),
-            }));
+            const data = rawServicios.map((s) => {
+                const precios = s.vehiculosPermitidos.map((sv) => Number(sv.precio ?? 0)).filter((p) => p > 0);
+                const precioDesde = precios.length > 0 ? Math.min(...precios) : 0;
+                return {
+                    id: s.id,
+                    tipo: s.tipoServicio,
+                    nombre: getLocalizedText(s.nombre, lang),
+                    nombreES: getLocalizedText(s.nombre, 'ES'),
+                    nombreEN: getLocalizedText(s.nombre, 'EN'),
+                    descripcion: getLocalizedText(s.descripcion, lang),
+                    descripcionES: getLocalizedText(s.descripcion, 'ES'),
+                    descripcionEN: getLocalizedText(s.descripcion, 'EN'),
+                    precioDesde,
+                    duracion: s.duracion,
+                    esAeropuerto: s.esAeropuerto,
+                    esPorHoras: s.esPorHoras,
+                    esMunicipal: s.esMunicipal,
+                    recargoNocturno: s.aplicaRecargoNocturno
+                        ? {
+                              aplica: true,
+                              inicio: s.recargoNocturnoInicio,
+                              fin: s.recargoNocturnoFin,
+                              monto: s.montoRecargoNocturno ? Number(s.montoRecargoNocturno) : null,
+                          }
+                        : { aplica: false },
+                    linkReserva: `${appUrl.replace(/\/$/, '')}/reservas?serviceId=${s.id}&form=1`,
+                    vehiculos: s.vehiculosPermitidos.map((sv) => ({
+                        nombre: sv.vehiculo.nombre,
+                        capacidadMinima: sv.vehiculo.capacidadMinima,
+                        capacidadMaxima: sv.vehiculo.capacidadMaxima,
+                        precio: Number(sv.precio ?? 0),
+                    })),
+                };
+            });
 
             payload = {
                 empresa: 'TMT Travel — Transportes Medellín',
@@ -162,7 +166,6 @@ export async function GET(request: NextRequest) {
                 descripcion: s.descripcion,
                 incluye: s.incluye,
                 duracion: s.duracion,
-                precioBase: Number(s.precioBase),
                 aplicaRecargoNocturno: s.aplicaRecargoNocturno,
                 recargoNocturnoInicio: s.recargoNocturnoInicio ?? null,
                 recargoNocturnoFin: s.recargoNocturnoFin ?? null,
@@ -176,7 +179,6 @@ export async function GET(request: NextRequest) {
                         nombre: sv.vehiculo.nombre,
                         capacidadMinima: sv.vehiculo.capacidadMinima,
                         capacidadMaxima: sv.vehiculo.capacidadMaxima,
-                        precioBase: Number(sv.vehiculo.precioBase),
                     },
                 })),
             }));

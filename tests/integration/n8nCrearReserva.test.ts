@@ -25,7 +25,6 @@ const mockServicio = {
     tipoServicio: 'TOUR_GUATAPE',
     nombre: { es: 'Tour Guatapé', en: 'Guatapé Tour' },
     activo: true,
-    precioBase: 150_000,
     esPorHoras: false,
     aplicaRecargoNocturno: false,
     configuracion: { camposCustom: [] },

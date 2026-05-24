@@ -33,7 +33,6 @@ interface Vehiculo {
   capacidadMinima: number
   capacidadMaxima: number
   activo: boolean
-  precioBase: number
 }
 
 const EMPTY_FORM = {
@@ -41,7 +40,6 @@ const EMPTY_FORM = {
   capacidadMinima: 1,
   capacidadMaxima: 4,
   activo: true,
-  precioBase: 0,
 }
 
 export default function VehiculosPage() {
@@ -110,7 +108,6 @@ export default function VehiculosPage() {
       capacidadMinima: v.capacidadMinima,
       capacidadMaxima: v.capacidadMaxima,
       activo: v.activo,
-      precioBase: Number(v.precioBase || 0),
     })
     setDialogOpen(true)
   }
@@ -166,11 +163,10 @@ export default function VehiculosPage() {
       ) : (
         <div className="border border-neutral-200 rounded-xl bg-white overflow-hidden shadow-sm">
           {/* Table header */}
-          <div className="grid grid-cols-[64px_1fr_160px_140px_80px_88px] items-center px-4 py-2.5 bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+          <div className="grid grid-cols-[64px_1fr_160px_80px_88px] items-center px-4 py-2.5 bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
             <span></span>
             <span>Vehículo</span>
             <span>Capacidad</span>
-            <span>Precio base</span>
             <span>Estado</span>
             <span></span>
           </div>
@@ -178,7 +174,7 @@ export default function VehiculosPage() {
           {vehiculos.map((v, idx) => (
             <div
               key={v.id}
-              className={`grid grid-cols-[64px_1fr_160px_140px_80px_88px] items-center px-4 py-3 gap-3 hover:bg-neutral-50 transition-colors
+              className={`grid grid-cols-[64px_1fr_160px_80px_88px] items-center px-4 py-3 gap-3 hover:bg-neutral-50 transition-colors
                 ${idx < vehiculos.length - 1 ? 'border-b border-neutral-100' : ''}`}
             >
               {/* Thumbnail */}
@@ -194,11 +190,6 @@ export default function VehiculosPage() {
                 <Users size={13} />
                 <span>{v.capacidadMinima}–{v.capacidadMaxima} pasajeros</span>
               </div>
-
-              {/* Precio base */}
-              <span className="text-sm font-medium text-neutral-700">
-                ${Number(v.precioBase || 0).toLocaleString('es-CO')}
-              </span>
 
               {/* Estado */}
               <Badge
@@ -254,21 +245,6 @@ export default function VehiculosPage() {
                     placeholder="Ej: Van 7 pasajeros, Sedan"
                     required
                     className="h-9 text-sm border-neutral-200"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-neutral-700">Precio Base (COP)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={formData.precioBase === 0 ? '' : formData.precioBase}
-                    onChange={(e) =>
-                      setFormData({ ...formData, precioBase: parseFloat(e.target.value) || 0 })
-                    }
-                    onFocus={(e) => e.target.select()}
-                    placeholder="0"
-                    className="h-9 text-sm border-neutral-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
 

@@ -153,11 +153,8 @@ export default function CrearViajeMunicipalPage() {
                 imagen: 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368600/tmt/servicios/epyidj9zt9icdjxwi3ed.jpg',
                 duracion,
                 
-                // Precio base (usamos el menor precio de vehículo)
-                precioBase: Math.min(...vehiculosSeleccionados.map((v) => v.precio)),
-                
-                // Vehículos
-                vehiculosPermitidos: vehiculosSeleccionados,
+                // Vehículos (cada uno con su propio precio)
+                vehiculos: vehiculosSeleccionados,
                 
                 // Campos dinámicos opcionales
                 camposPersonalizados,

@@ -27,7 +27,6 @@ export async function GET(request: NextRequest) {
             descripcion: s.descripcion,
             incluye: s.incluye,
             duracion: s.duracion,
-            precioBase: Number(s.precioBase),
             aplicaRecargoNocturno: s.aplicaRecargoNocturno,
             recargoNocturnoInicio: s.recargoNocturnoInicio ?? null,
             recargoNocturnoFin: s.recargoNocturnoFin ?? null,
@@ -41,7 +40,6 @@ export async function GET(request: NextRequest) {
                     nombre: sv.vehiculo.nombre,
                     capacidadMinima: sv.vehiculo.capacidadMinima,
                     capacidadMaxima: sv.vehiculo.capacidadMaxima,
-                    precioBase: Number(sv.vehiculo.precioBase),
                 },
             })),
         }));

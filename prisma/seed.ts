@@ -56,7 +56,6 @@ async function main() {
                 es: ['Transporte', 'Guía turístico', 'Seguro'],
                 en: ['Transport', 'Tour guide', 'Insurance']
             },
-            precioBase: 150000,
             aplicaRecargoNocturno: false,
             esAeropuerto: false,
             destinoAutoFill: 'Guatapé',
