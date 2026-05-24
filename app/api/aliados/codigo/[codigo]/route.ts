@@ -17,9 +17,6 @@ export async function GET(
         const aliado = await prisma.aliado.findFirst({
             where: { codigo, activo: true },
             include: {
-                tarifas: {
-                    include: { servicio: true },
-                },
                 serviciosAliado: {
                     where: { activo: true },
                     include: { servicio: true },
@@ -40,7 +37,6 @@ export async function GET(
             tipo: aliado.tipo,
             email: aliado.email,
             codigo: aliado.codigo,
-            tarifas: aliado.tarifas,
             serviciosHabilitados: aliado.serviciosAliado,
         });
     } catch (error) {

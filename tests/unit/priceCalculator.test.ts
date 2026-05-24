@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
     calculatePriceClientSide,
     getPriceBreakdownClientSide,
+    calculateReservationPrice,
+    type AliadoConfig,
 } from '@/lib/priceCalculator';
+import { Municipio } from '@prisma/client';
 
 // Sample campo configurations for testing
 const camposVacios = [];
@@ -257,5 +260,153 @@ describe('getPriceBreakdownClientSide', () => {
         );
         const sumItems = breakdown.items.reduce((s, i) => s + i.amount, 0);
         expect(breakdown.total).toBe(breakdown.base + sumItems);
+    });
+});
+
+// ============================================================================
+// Server-side: separación precio independiente vs precio aliado
+// ============================================================================
+
+function makeServicio(overrides: Partial<any> = {}) {
+    return {
+        id: 'svc-1',
+        nombre: { es: 'Test', en: 'Test' },
+        aplicaRecargoNocturno: false,
+        montoRecargoNocturno: null,
+        recargoNocturnoInicio: null,
+        recargoNocturnoFin: null,
+        esPorHoras: false,
+        configuracion: { camposCustom: [] },
+        vehiculosPermitidos: [
+            { vehiculoId: 'veh-1', precio: 100_000 },
+        ],
+        ...overrides,
+    } as any;
+}
+
+const fecha = new Date('2026-06-01T12:00:00Z');
+
+describe('calculateReservationPrice — separación precio independiente vs aliado', () => {
+    it('cliente independiente (sin aliadoConfig): usa ServicioVehiculo.precio', async () => {
+        const result = await calculateReservationPrice(
+            makeServicio(),
+            'veh-1',
+            {},
+            fecha,
+            '14:00',
+            Municipio.MEDELLIN,
+            undefined
+        );
+        expect(result.precioBase).toBe(100_000);
+        expect(result.comisionAliado).toBe(0);
+        expect(result.total).toBe(100_000);
+    });
+
+    it('cliente bajo aliado con precioBaseAliado: ignora ServicioVehiculo.precio', async () => {
+        const aliadoConfig: AliadoConfig = {
+            precioBaseAliado: 200_000,
+            comisionPorcentaje: 10,
+            tipoComision: 'PORCENTAJE',
+        };
+        const result = await calculateReservationPrice(
+            makeServicio(), // precio servicio = 100_000, debe ignorarse
+            'veh-1',
+            {},
+            fecha,
+            '14:00',
+            Municipio.MEDELLIN,
+            aliadoConfig
+        );
+        expect(result.precioBase).toBe(200_000);
+        // comisión 10% sobre subtotal 200_000
+        expect(result.comisionAliado).toBe(20_000);
+        expect(result.total).toBe(220_000);
+    });
+
+    it('cliente bajo aliado con comisión FIJA', async () => {
+        const aliadoConfig: AliadoConfig = {
+            precioBaseAliado: 150_000,
+            comisionPorcentaje: 30_000,
+            tipoComision: 'FIJO',
+        };
+        const result = await calculateReservationPrice(
+            makeServicio(),
+            'veh-1',
+            {},
+            fecha,
+            '14:00',
+            Municipio.MEDELLIN,
+            aliadoConfig
+        );
+        expect(result.precioBase).toBe(150_000);
+        expect(result.comisionAliado).toBe(30_000);
+        expect(result.total).toBe(180_000);
+    });
+
+    it('aliado con precioBaseAliado=0: lanza error específico', async () => {
+        const aliadoConfig: AliadoConfig = {
+            precioBaseAliado: 0,
+            comisionPorcentaje: 10,
+            tipoComision: 'PORCENTAJE',
+        };
+        await expect(
+            calculateReservationPrice(
+                makeServicio(),
+                'veh-1',
+                {},
+                fecha,
+                '14:00',
+                Municipio.MEDELLIN,
+                aliadoConfig
+            )
+        ).rejects.toThrow(/aliado/i);
+    });
+
+    it('cliente independiente con ServicioVehiculo.precio=0: lanza error', async () => {
+        const servicio = makeServicio({
+            vehiculosPermitidos: [{ vehiculoId: 'veh-1', precio: 0 }],
+        });
+        await expect(
+            calculateReservationPrice(
+                servicio,
+                'veh-1',
+                {},
+                fecha,
+                '14:00',
+                Municipio.MEDELLIN,
+                undefined
+            )
+        ).rejects.toThrow(/servicio/i);
+    });
+
+    it('cambiar ServicioVehiculo.precio NO afecta el cálculo del aliado', async () => {
+        const aliadoConfig: AliadoConfig = {
+            precioBaseAliado: 250_000,
+            comisionPorcentaje: 0,
+            tipoComision: 'PORCENTAJE',
+        };
+        // Servicio con precio público alto
+        const r1 = await calculateReservationPrice(
+            makeServicio({ vehiculosPermitidos: [{ vehiculoId: 'veh-1', precio: 999_999 }] }),
+            'veh-1',
+            {},
+            fecha,
+            '14:00',
+            Municipio.MEDELLIN,
+            aliadoConfig
+        );
+        // Servicio con precio público bajo
+        const r2 = await calculateReservationPrice(
+            makeServicio({ vehiculosPermitidos: [{ vehiculoId: 'veh-1', precio: 1 }] }),
+            'veh-1',
+            {},
+            fecha,
+            '14:00',
+            Municipio.MEDELLIN,
+            aliadoConfig
+        );
+        expect(r1.precioBase).toBe(250_000);
+        expect(r2.precioBase).toBe(250_000);
+        expect(r1.total).toBe(r2.total);
     });
 });

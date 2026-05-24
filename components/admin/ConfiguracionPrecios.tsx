@@ -15,7 +15,7 @@ interface VehiculoConfig {
   nombre: string;
   capacidadMinima: number;
   capacidadMaxima: number;
-  precioServicio: number;        // ServicioVehiculo.precio
+  precioServicio: number;        // PrecioVehiculoAliado.precioBase (precio base configurable por aliado)
   activo: boolean;
   tipoComision: TipoComision;
   comisionValor: number;
@@ -53,6 +53,7 @@ function snapshotOf(s: ServicioConfig): string {
     vehiculos: s.vehiculos.map(v => ({
       vehiculoId: v.vehiculoId,
       activo: v.activo,
+      precioServicio: v.precioServicio,
       tipoComision: v.tipoComision,
       comisionValor: v.comisionValor,
     })),
@@ -197,6 +198,7 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
             vehiculos: s.vehiculos.map(v => ({
               vehiculoId: v.vehiculoId,
               activo: v.activo,
+              precioBase: v.precioServicio,
               tipoComision: v.tipoComision,
               comisionValor: v.comisionValor,
             })),
@@ -378,11 +380,25 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
                     </div>
                   </td>
 
-                  {/* Precio servicio (read-only) */}
+                  {/* Precio servicio (editable — precio base por aliado) */}
                   <td className="px-4 py-3 text-right">
-                    <span className={`text-xs font-mono ${showTotals ? 'text-neutral-700 font-semibold' : 'text-neutral-400'}`}>
-                      {fmt(v.precioServicio)}
-                    </span>
+                    <div className={`flex items-center gap-1.5 border rounded-lg px-2 py-1 bg-white
+                      ${svcOff || vehOff ? 'opacity-50' : ''}
+                      ${isGreen ? 'border-green-200 focus-within:ring-1 focus-within:ring-green-400' : 'border-neutral-200 focus-within:ring-1 focus-within:ring-amber-400'}`}>
+                      <span className={`text-xs font-semibold shrink-0 ${isGreen ? 'text-green-600' : 'text-neutral-500'}`}>
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={v.precioServicio === 0 ? '' : v.precioServicio}
+                        placeholder="0"
+                        onChange={e => updateVehiculo(s.servicioId, v.vehiculoId, { precioServicio: parseFloat(e.target.value) || 0 })}
+                        onFocus={e => e.target.select()}
+                        disabled={svcOff || vehOff}
+                        className="w-full text-xs bg-transparent outline-none text-neutral-800 placeholder-neutral-300 disabled:cursor-not-allowed text-right font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
                   </td>
 
                   {/* Comisión calculada */}
@@ -431,8 +447,9 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
       <div>
         <h3 className="text-sm font-semibold text-neutral-900 mb-1">Servicios y vehículos</h3>
         <p className="text-xs text-neutral-400 mb-4">
-          Activa servicios y configura la comisión de cada vehículo para este aliado.
-          El precio final que ve el cliente = precio del servicio + comisión.
+          Activa servicios y configura el <strong>precio</strong> y la <strong>comisión</strong> de cada vehículo para este aliado.
+          Estos precios aplican <strong>solo</strong> a reservas que lleguen por código o link de este aliado — son independientes del precio público del servicio.
+          El precio final que ve el cliente = precio + comisión.
         </p>
 
         <div className="border border-neutral-200 rounded-xl overflow-hidden shadow-sm">

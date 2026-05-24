@@ -34,11 +34,6 @@ export async function GET(request: Request) {
         const servicios = await prisma.servicio.findMany({
             where,
             include: {
-                tarifasAliados: {
-                    include: {
-                        aliado: true,
-                    },
-                },
                 vehiculosPermitidos: {
                     include: {
                         vehiculo: true

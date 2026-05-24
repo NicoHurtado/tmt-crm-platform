@@ -31,6 +31,10 @@ export interface PriceBreakdown {
 
 export interface AliadoConfig {
     tarifaMunicipio?: number;
+    // Precio base del vehículo configurado por el admin para este aliado
+    // (PrecioVehiculoAliado.precioBase). Reemplaza a ServicioVehiculo.precio en
+    // reservas que vienen por código o link de aliado.
+    precioBaseAliado?: number;
     // Comisión calculada para el vehículo seleccionado en PrecioVehiculoAliado
     comisionPorcentaje?: number;
     tipoComision?: 'FIJO' | 'PORCENTAJE';
@@ -73,16 +77,28 @@ export async function calculateReservationPrice(
     aliadoConfig?: AliadoConfig,
     cantidadHoras?: number
 ): Promise<PriceBreakdown> {
-    // 1. Get base price from ServicioVehiculo.precio (única fuente)
+    // 1. Get base price.
+    //    - Cliente independiente (sin aliadoConfig): usa ServicioVehiculo.precio (precio público).
+    //    - Cliente bajo aliado (con aliadoConfig.precioBaseAliado): usa el precio base configurado
+    //      por el admin en PrecioVehiculoAliado.precioBase para ese (aliado, servicio, vehículo).
+    //    Las dos rutas son independientes — cambiar una NO afecta a la otra.
     const vehiculoConfig = servicio.vehiculosPermitidos.find(
         (v) => v.vehiculoId === vehiculoId
     );
     if (!vehiculoConfig) {
         throw new Error('Vehículo no disponible para este servicio');
     }
-    let precioBase = Number(vehiculoConfig.precio);
-    if (!Number.isFinite(precioBase) || precioBase <= 0) {
-        throw new Error('Este servicio no tiene precio configurado para el vehículo seleccionado');
+    let precioBase: number;
+    if (aliadoConfig && aliadoConfig.precioBaseAliado !== undefined) {
+        precioBase = Number(aliadoConfig.precioBaseAliado);
+        if (!Number.isFinite(precioBase) || precioBase <= 0) {
+            throw new Error('Este aliado no tiene precio configurado para el vehículo seleccionado');
+        }
+    } else {
+        precioBase = Number(vehiculoConfig.precio);
+        if (!Number.isFinite(precioBase) || precioBase <= 0) {
+            throw new Error('Este servicio no tiene precio configurado para el vehículo seleccionado');
+        }
     }
 
     // 1b. If service has esPorHoras module, multiply base price by hours

@@ -9,8 +9,8 @@ export interface AliadoCommissionInfo {
 }
 
 /**
- * Fetches the TarifaAliado for a given aliado+service and returns the
- * commission amount calculated against the provided subtotal.
+ * Fetches the aliado commission config for a given aliado+service and
+ * returns the commission amount calculated against the provided subtotal.
  */
 export function useAliadoCommission(
     aliadoId: string | null | undefined,

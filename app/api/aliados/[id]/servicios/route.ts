@@ -46,11 +46,13 @@ export async function GET(
                 (sa?.preciosVehiculos ?? []).map((pv: any) => [pv.vehiculoId, pv])
             );
 
-            // Vehículos permitidos para este servicio (con precio del servicio)
+            // Vehículos permitidos para este servicio.
+            // precioServicio aquí = precio base del aliado (PrecioVehiculoAliado.precioBase).
+            // El precio público del servicio (ServicioVehiculo.precio) NO se usa en el contexto aliado.
             const vehiculos = servicio.vehiculosPermitidos.map((sv: any) => {
                 const veh = allVehiculos.find((v: any) => v.id === sv.vehiculoId);
-                const pv = preciosVehiculosMap.get(sv.vehiculoId);
-                const precioServicio = Number(sv.precio ?? 0);
+                const pv: any = preciosVehiculosMap.get(sv.vehiculoId);
+                const precioServicio = pv ? Number(pv.precioBase ?? 0) : 0;
                 const tipoComision = (pv?.tipoComision ?? 'PORCENTAJE') as 'PORCENTAJE' | 'FIJO';
                 const comisionValor = pv ? Number(pv.comisionValor) : 0;
                 const comisionMonto = tipoComision === 'FIJO'
@@ -137,18 +139,12 @@ export async function POST(
             create: { aliadoId, servicioId, activo }
         });
 
-        // Asegurar TarifaAliado existe (solo como flag de servicio activo)
-        await prisma.tarifaAliado.upsert({
-            where: { aliadoId_servicioId: { aliadoId, servicioId } },
-            update: {},
-            create: { aliadoId, servicioId }
-        });
-
         // Upsert PrecioVehiculoAliado con comisión por vehículo
         if (vehiculos && Array.isArray(vehiculos)) {
             await Promise.all(vehiculos.map((v: any) => {
                 const tipoComision = (v.tipoComision === 'FIJO' ? 'FIJO' : 'PORCENTAJE') as 'FIJO' | 'PORCENTAJE';
                 const comisionValor = Number(v.comisionValor) || 0;
+                const precioBase = Number(v.precioBase) || 0;
                 return prisma.precioVehiculoAliado.upsert({
                     where: {
                         servicioAliadoId_vehiculoId: {
@@ -158,6 +154,7 @@ export async function POST(
                     },
                     update: {
                         activo: v.activo ?? true,
+                        precioBase,
                         tipoComision,
                         comisionValor,
                     },
@@ -165,6 +162,7 @@ export async function POST(
                         servicioAliadoId: servicioAliado.id,
                         vehiculoId: v.vehiculoId,
                         activo: v.activo ?? true,
+                        precioBase,
                         tipoComision,
                         comisionValor,
                     }

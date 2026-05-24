@@ -745,6 +745,9 @@ export default function EditarServicioPage() {
                         <p className="text-xs text-gray-500 mt-0.5">
                             Selecciona los vehiculos disponibles para este servicio
                         </p>
+                        <p className="text-xs text-amber-700 mt-2 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                            <strong>Nota:</strong> Este precio aplica <strong>solo</strong> a reservas directas (clientes independientes que llegan a la web sin código ni link de aliado). Para configurar los precios de aliados, ve a <strong>Aliados → Configuración de precios y servicios</strong>. Los precios de aliados son independientes y no se sincronizan con este.
+                        </p>
                     </div>
 
                     <div className="p-6">

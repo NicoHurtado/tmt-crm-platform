@@ -30,7 +30,6 @@ model Aliado {
   pedidos         Pedido[]
   reservas        Reserva[]
   serviciosAliado ServicioAliado[]
-  tarifas         TarifaAliado[]
 
   @@index([codigo])
 }
@@ -67,7 +66,6 @@ model Servicio {
   reservas              Reserva[]
   serviciosAliado       ServicioAliado[]
   vehiculosPermitidos   ServicioVehiculo[]
-  tarifasAliados        TarifaAliado[]
 
   @@index([activo])
   @@index([orden])
@@ -194,18 +192,6 @@ model Asistente {
   reserva         Reserva       @relation(fields: [reservaId], references: [id], onDelete: Cascade)
 }
 
-model TarifaAliado {
-  id         String   @id @default(cuid())
-  aliadoId   String
-  servicioId String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  aliado     Aliado   @relation(fields: [aliadoId], references: [id], onDelete: Cascade)
-  servicio   Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
-
-  @@unique([aliadoId, servicioId])
-}
-
 model Pedido {
   id              String      @id @default(cuid())
   codigo          String      @unique
@@ -278,6 +264,7 @@ model PrecioVehiculoAliado {
   servicioAliadoId String
   vehiculoId       String
   activo           Boolean        @default(true)
+  precioBase       Decimal        @default(0) @db.Decimal(10, 2)
   comisionValor    Decimal        @default(0) @db.Decimal(10, 2)
   tipoComision     TipoComision   @default(PORCENTAJE)
   createdAt        DateTime       @default(now())

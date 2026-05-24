@@ -20,11 +20,6 @@ export async function GET(
         const aliado = await prisma.aliado.findUnique({
             where: { id },
             include: {
-                tarifas: {
-                    include: {
-                        servicio: true,
-                    },
-                },
                 _count: {
                     select: { reservas: true },
                 },
@@ -135,7 +130,6 @@ export async function DELETE(
 
         // Limpiar configuraciones relacionadas y borrar aliado
         await prisma.$transaction([
-            prisma.tarifaAliado.deleteMany({ where: { aliadoId: id } }),
             prisma.servicioAliado.deleteMany({ where: { aliadoId: id } }),
             prisma.aliado.delete({ where: { id } }),
         ]);

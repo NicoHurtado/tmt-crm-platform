@@ -21,7 +21,6 @@ async function main() {
     await prisma.precioVehiculoAliado.deleteMany();
     await prisma.tarifaMunicipioAliado.deleteMany();
     await prisma.servicioAliado.deleteMany();
-    await prisma.tarifaAliado.deleteMany();
     await prisma.aliado.deleteMany();
     await prisma.tarifaMunicipioServicio.deleteMany();
     await prisma.servicioAdicional.deleteMany();

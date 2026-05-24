@@ -33,11 +33,6 @@ export async function GET(request: Request) {
         const aliados = await prisma.aliado.findMany({
             where,
             include: {
-                tarifas: {
-                    include: {
-                        servicio: true,
-                    },
-                },
                 _count: {
                     select: { reservas: true },
                 },
