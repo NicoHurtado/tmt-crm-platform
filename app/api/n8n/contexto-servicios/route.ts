@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { checkApiKey, unauthorized } from '../_auth';
-import { buildFullSystemPrompt, type ServicioContextData } from '@/lib/n8n/formatServicioContext';
+import { buildCatalogText, PRICE_SOURCE, PRICE_TYPE } from '@/lib/api/service-catalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,48 +8,16 @@ export async function GET(request: NextRequest) {
     if (!checkApiKey(request)) return unauthorized();
 
     try {
-        const rawServicios = await prisma.servicio.findMany({
-            where: { activo: true },
-            include: {
-                vehiculosPermitidos: {
-                    where: { vehiculo: { activo: true } },
-                    include: { vehiculo: true },
-                },
-            },
-            orderBy: { orden: 'asc' },
-        });
-
-        const servicios: ServicioContextData[] = rawServicios.map((s) => ({
-            id: s.id,
-            tipoServicio: s.tipoServicio,
-            nombre: s.nombre,
-            descripcion: s.descripcion,
-            incluye: s.incluye,
-            duracion: s.duracion,
-            aplicaRecargoNocturno: s.aplicaRecargoNocturno,
-            recargoNocturnoInicio: s.recargoNocturnoInicio ?? null,
-            recargoNocturnoFin: s.recargoNocturnoFin ?? null,
-            montoRecargoNocturno: s.montoRecargoNocturno ? Number(s.montoRecargoNocturno) : null,
-            esPorHoras: s.esPorHoras,
-            esMunicipal: s.esMunicipal,
-            configuracion: s.configuracion,
-            vehiculosPermitidos: s.vehiculosPermitidos.map((sv) => ({
-                precio: sv.precio ? Number(sv.precio) : null,
-                vehiculo: {
-                    nombre: sv.vehiculo.nombre,
-                    capacidadMinima: sv.vehiculo.capacidadMinima,
-                    capacidadMaxima: sv.vehiculo.capacidadMaxima,
-                },
-            })),
-        }));
-
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.medellintransportes.com';
-        const systemPrompt = buildFullSystemPrompt(servicios, appUrl);
+        const payload = await buildCatalogText('contexto', appUrl);
 
         return NextResponse.json({
-            systemPrompt,
-            updatedAt: new Date().toISOString(),
-            serviciosCount: servicios.length,
+            systemPrompt: payload.systemPrompt,
+            servicios: payload.servicios,
+            updatedAt: payload.actualizadoEn,
+            serviciosCount: payload.totalServicios,
+            precioOrigen: PRICE_SOURCE,
+            tipoPrecio: PRICE_TYPE,
         });
     } catch (error) {
         console.error('[contexto-servicios]', error);

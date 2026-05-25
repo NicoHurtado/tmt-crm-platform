@@ -1,16 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
-import { buildFullSystemPrompt, formatServicioContext, type ServicioContextData } from '@/lib/n8n/formatServicioContext';
-import { getLocalizedText } from '@/types/multi-language';
-
-type ServicioWithVehiculos = Prisma.ServicioGetPayload<{
-    include: {
-        vehiculosPermitidos: {
-            include: { vehiculo: true };
-        };
-    };
-}>;
+import { buildCatalogJson, buildCatalogText } from '@/lib/api/service-catalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,27 +54,20 @@ export async function GET(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.medellintransportes.com';
     const cacheKey = `${formato}-${lang}`;
 
-    // ── Try DB ────────────────────────────────────────────────────────────────
-    let rawServicios: ServicioWithVehiculos[] | null = null;
-
     try {
-        rawServicios = await prisma.servicio.findMany({
-            where: { activo: true },
-            include: {
-                vehiculosPermitidos: {
-                    where: { vehiculo: { activo: true } },
-                    include: { vehiculo: true },
-                    orderBy: { vehiculo: { capacidadMaxima: 'asc' } },
-                },
-            },
-            orderBy: { orden: 'asc' },
-        });
-    } catch (dbError) {
-        console.error('[public/servicios] DB error — falling back to cache:', dbError);
-    }
+        let payload: Record<string, unknown>;
 
-    // ── DB failed: return stale cache or hardcoded fallback ───────────────────
-    if (rawServicios === null) {
+        if (formato === 'json') {
+            payload = await buildCatalogJson(lang, appUrl);
+        } else {
+            payload = await buildCatalogText(formato === 'contexto' ? 'contexto' : 'texto', appUrl);
+        }
+
+        cache[cacheKey] = { payload, ts: Date.now() };
+
+        return NextResponse.json(payload, { headers: CORS });
+    } catch (dbError) {
+        console.error('[public/servicios] DB/build error — falling back to cache:', dbError);
         const cached = cache[cacheKey];
         if (cached) {
             console.warn('[public/servicios] Returning stale cache');
@@ -107,107 +89,5 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(fallback, {
             headers: { ...CORS, 'X-Cache': 'FALLBACK' },
         });
-    }
-
-    // ── DB ok — build response ─────────────────────────────────────────────────
-    try {
-        let payload: Record<string, unknown>;
-
-        if (formato === 'json') {
-            const data = rawServicios.map((s) => {
-                const precios = s.vehiculosPermitidos.map((sv) => Number(sv.precio ?? 0)).filter((p) => p > 0);
-                const precioDesde = precios.length > 0 ? Math.min(...precios) : 0;
-                return {
-                    id: s.id,
-                    tipo: s.tipoServicio,
-                    nombre: getLocalizedText(s.nombre, lang),
-                    nombreES: getLocalizedText(s.nombre, 'ES'),
-                    nombreEN: getLocalizedText(s.nombre, 'EN'),
-                    descripcion: getLocalizedText(s.descripcion, lang),
-                    descripcionES: getLocalizedText(s.descripcion, 'ES'),
-                    descripcionEN: getLocalizedText(s.descripcion, 'EN'),
-                    precioDesde,
-                    duracion: s.duracion,
-                    esAeropuerto: s.esAeropuerto,
-                    esPorHoras: s.esPorHoras,
-                    esMunicipal: s.esMunicipal,
-                    recargoNocturno: s.aplicaRecargoNocturno
-                        ? {
-                              aplica: true,
-                              inicio: s.recargoNocturnoInicio,
-                              fin: s.recargoNocturnoFin,
-                              monto: s.montoRecargoNocturno ? Number(s.montoRecargoNocturno) : null,
-                          }
-                        : { aplica: false },
-                    linkReserva: `${appUrl.replace(/\/$/, '')}/reservas?serviceId=${s.id}&form=1`,
-                    vehiculos: s.vehiculosPermitidos.map((sv) => ({
-                        nombre: sv.vehiculo.nombre,
-                        capacidadMinima: sv.vehiculo.capacidadMinima,
-                        capacidadMaxima: sv.vehiculo.capacidadMaxima,
-                        precio: Number(sv.precio ?? 0),
-                    })),
-                };
-            });
-
-            payload = {
-                empresa: 'TMT Travel — Transportes Medellín',
-                sitioWeb: appUrl,
-                moneda: 'COP',
-                actualizadoEn: new Date().toISOString(),
-                totalServicios: data.length,
-                servicios: data,
-            };
-        } else {
-            // formato=contexto | formato=texto
-            const servicios: ServicioContextData[] = rawServicios.map((s) => ({
-                id: s.id,
-                tipoServicio: s.tipoServicio,
-                nombre: s.nombre,
-                descripcion: s.descripcion,
-                incluye: s.incluye,
-                duracion: s.duracion,
-                aplicaRecargoNocturno: s.aplicaRecargoNocturno,
-                recargoNocturnoInicio: s.recargoNocturnoInicio ?? null,
-                recargoNocturnoFin: s.recargoNocturnoFin ?? null,
-                montoRecargoNocturno: s.montoRecargoNocturno ? Number(s.montoRecargoNocturno) : null,
-                esPorHoras: s.esPorHoras,
-                esMunicipal: s.esMunicipal,
-                configuracion: s.configuracion,
-                vehiculosPermitidos: s.vehiculosPermitidos.map((sv) => ({
-                    precio: sv.precio ? Number(sv.precio) : null,
-                    vehiculo: {
-                        nombre: sv.vehiculo.nombre,
-                        capacidadMinima: sv.vehiculo.capacidadMinima,
-                        capacidadMaxima: sv.vehiculo.capacidadMaxima,
-                    },
-                })),
-            }));
-
-            const texto =
-                formato === 'contexto'
-                    ? buildFullSystemPrompt(servicios, appUrl)
-                    : formatServicioContext(servicios, appUrl);
-
-            payload = {
-                empresa: 'TMT Travel — Transportes Medellín',
-                sitioWeb: appUrl,
-                formato,
-                actualizadoEn: new Date().toISOString(),
-                totalServicios: servicios.length,
-                contenido: texto,
-                systemPrompt: texto, // alias para compatibilidad con integraciones existentes
-            };
-        }
-
-        // Store in cache
-        cache[cacheKey] = { payload, ts: Date.now() };
-
-        return NextResponse.json(payload, { headers: CORS });
-    } catch (error) {
-        console.error('[public/servicios] Build error:', error);
-        return NextResponse.json(
-            { error: 'Error al procesar servicios' },
-            { status: 500, headers: CORS }
-        );
     }
 }
