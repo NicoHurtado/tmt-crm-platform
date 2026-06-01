@@ -263,13 +263,6 @@ export function formatServicioContext(servicios: ServicioContextData[], appUrl?:
     // Render all municipal transfers as ONE grouped entry
     if (municipales.length > 0) {
         const rep = municipales[0]; // representative for vehicles/fields
-        const destinations = municipales
-            .map((s) => {
-                const n = asMultiLang(s.nombre);
-                return n.es || n.en || '';
-            })
-            .filter(Boolean)
-            .sort();
 
         lines.push('---');
         lines.push('## TRANSPORTE_MUNICIPAL');
@@ -295,16 +288,19 @@ export function formatServicioContext(servicios: ServicioContextData[], appUrl?:
             }
         }
 
-        lines.push(`\nDESTINOS DISPONIBLES (${municipales.length} municipios):`);
-        lines.push(destinations.join(', '));
-
         const base2 = (appUrl ?? 'https://www.medellintransportes.com').replace(/\/$/, '');
-        lines.push('\nLINKS DE RESERVA POR DESTINO:');
-        for (const s of municipales) {
-            const n = asMultiLang(s.nombre);
-            const dest = n.es || n.en || s.id;
-            lines.push(`• ${dest}: ${base2}/reservas?serviceId=${s.id}&form=1`);
-        }
+        lines.push(
+            `\nCÓMO ARMAR EL LINK DE RESERVA: usa el patrón ${base2}/reservas?serviceId=ID&form=1 reemplazando ID por el código del municipio de la lista de abajo. Ejemplo: para el municipio con ID abc123 el link es ${base2}/reservas?serviceId=abc123&form=1`
+        );
+        lines.push(`\nDESTINOS DISPONIBLES (${municipales.length} municipios) — formato "nombre: ID":`);
+        const destLines = municipales
+            .map((s) => {
+                const n = asMultiLang(s.nombre);
+                const dest = (n.es || n.en || s.id).trim();
+                return `${dest}: ${s.id}`;
+            })
+            .sort();
+        lines.push(destLines.join(' | '));
         lines.push('');
     }
 
@@ -314,6 +310,19 @@ export function formatServicioContext(servicios: ServicioContextData[], appUrl?:
 /** @deprecated Alias de compatibilidad — usa NICO_PERSONA. */
 export const MIA_PERSONA = NICO_PERSONA;
 
+const NICO_RECORDATORIO_FINAL = `---
+## RECORDATORIO FINAL (lo más importante)
+- Eres Nico, cálido y cercano. Responde en el idioma del cliente.
+- 💰 NUNCA des un precio sin preguntar PRIMERO cuántas personas viajan. Luego da el precio EXACTO del vehículo que cubre ese número de pasajeros para ese servicio (precio por vehículo completo, no por persona).
+- Solo ofrece servicios del catálogo de arriba. No inventes precios ni servicios.
+- Para reservar, envía el link del servicio tal como aparece.`;
+
 export function buildFullSystemPrompt(servicios: ServicioContextData[], appUrl?: string): string {
-    return NICO_PERSONA + '\n\n' + formatServicioContext(servicios, appUrl);
+    return (
+        NICO_PERSONA +
+        '\n\n' +
+        formatServicioContext(servicios, appUrl) +
+        '\n\n' +
+        NICO_RECORDATORIO_FINAL
+    );
 }
