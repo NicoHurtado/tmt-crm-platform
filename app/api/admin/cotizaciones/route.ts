@@ -179,7 +179,9 @@ export async function POST(req: NextRequest) {
 
                 // Detalles del servicio
                 servicioId: body.servicioId,
-                fecha: new Date(body.fecha),
+                // Almacenar al mediodía UTC para que el día calendario sea idéntico
+                // en UTC y en America/Bogota (UTC-5) y no se desplace.
+                fecha: new Date(String(body.fecha).slice(0, 10) + 'T12:00:00.000Z'),
                 hora: body.hora,
                 idioma: body.idioma || Idioma.ES,
                 municipio: body.municipio,

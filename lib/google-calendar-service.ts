@@ -15,6 +15,38 @@ type ReservaConRelaciones = Reserva & {
     }>;
 };
 
+const COLOMBIA_TZ = 'America/Bogota';
+
+/**
+ * Devuelve el día calendario (YYYY-MM-DD) de la fecha almacenada, interpretado en
+ * la zona horaria de Colombia — la MISMA que usa la fecha legible que ve el cliente
+ * en los detalles de la reserva y en los correos.
+ *
+ * Antes el evento usaba getUTCDate(), que para fechas guardadas a medianoche UTC
+ * mostraba un día distinto al de la plataforma (desfase de 1 día en el calendario).
+ * Usar siempre Bogota garantiza que el evento coincida con la fecha de la reserva.
+ */
+function getColombiaYMD(fecha: Date): string {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: COLOMBIA_TZ,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(fecha); // "YYYY-MM-DD"
+}
+
+/**
+ * Construye el dateTime ISO (sin offset) para un evento de Google Calendar a partir
+ * de la fecha almacenada y la hora "HH:mm" de la reserva, anclado al día de Colombia.
+ * El timeZone del evento ('America/Bogota') le da el offset correcto a Google.
+ */
+function buildColombiaDateTime(fecha: Date, hora: string): string {
+    const [horas, minutos] = hora.split(':').map(Number);
+    const hh = String(horas).padStart(2, '0');
+    const mm = String(minutos).padStart(2, '0');
+    return `${getColombiaYMD(fecha)}T${hh}:${mm}:00`;
+}
+
 /**
  * Google Calendar Service
  * Maneja la creación, actualización y eliminación de eventos en Google Calendar
@@ -266,43 +298,20 @@ function formatEventDetails(reserva: ReservaConRelaciones): {
 
     const description = descripcionParts.join('\n');
 
-    // Construir fecha y hora correctamente en zona horaria de Colombia
-    const fechaReserva = new Date(reserva.fecha);
-    const [horas, minutos] = reserva.hora.split(':').map(Number);
-
-    // Obtener año, mes, día de la fecha de reserva
-    const year = fechaReserva.getUTCFullYear();
-    const month = fechaReserva.getUTCMonth();
-    const day = fechaReserva.getUTCDate();
-
-    // Crear fecha en formato ISO para Colombia (America/Bogota es UTC-5)
-    // Construir la fecha y hora en formato ISO sin conversión de zona horaria
-    const fechaInicio = new Date(year, month, day, horas, minutos, 0, 0);
-    // El usuario quiere que sea a la misma hora (sin rango), así que fechaFin = fechaInicio
-    const fechaFin = new Date(year, month, day, horas, minutos, 0, 0);
-
-    // Formatear en ISO pero manteniendo la zona horaria de Colombia
-    const formatDateForColombia = (date: Date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
-
-        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-    };
+    // Fecha y hora del evento, ancladas al día de Colombia (misma zona que la fecha
+    // legible que ve el cliente). Sin rango: inicio = fin a la misma hora.
+    const dateTime = buildColombiaDateTime(reserva.fecha, reserva.hora);
 
     return {
         summary,
         description,
         start: {
-            dateTime: formatDateForColombia(fechaInicio),
-            timeZone: 'America/Bogota',
+            dateTime,
+            timeZone: COLOMBIA_TZ,
         },
         end: {
-            dateTime: formatDateForColombia(fechaFin),
-            timeZone: 'America/Bogota',
+            dateTime,
+            timeZone: COLOMBIA_TZ,
         },
         reminders: {
             useDefault: false,
@@ -525,37 +534,20 @@ function formatTourCompartidoEventDetails(
 
     const description = descripcionParts.join('\n');
 
-    // Usar la hora de la primera reserva o 8:00 AM por defecto
-    const fechaReserva = new Date(primeraReserva.fecha);
-    const [horas, minutos] = primeraReserva.hora.split(':').map(Number);
-
-    const year = fechaReserva.getUTCFullYear();
-    const month = fechaReserva.getUTCMonth();
-    const day = fechaReserva.getUTCDate();
-
-    const fechaInicio = new Date(year, month, day, horas, minutos, 0, 0);
-    const fechaFin = new Date(year, month, day, horas, minutos, 0, 0);
-
-    const formatDateForColombia = (date: Date) => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        const h = String(date.getHours()).padStart(2, '0');
-        const min = String(date.getMinutes()).padStart(2, '0');
-        const s = String(date.getSeconds()).padStart(2, '0');
-        return `${y}-${m}-${d}T${h}:${min}:${s}`;
-    };
+    // Fecha y hora del evento, ancladas al día de Colombia (misma zona que la fecha
+    // legible). Usa la hora de la primera reserva del pedido.
+    const dateTime = buildColombiaDateTime(primeraReserva.fecha, primeraReserva.hora);
 
     return {
         summary,
         description,
         start: {
-            dateTime: formatDateForColombia(fechaInicio),
-            timeZone: 'America/Bogota',
+            dateTime,
+            timeZone: COLOMBIA_TZ,
         },
         end: {
-            dateTime: formatDateForColombia(fechaFin),
-            timeZone: 'America/Bogota',
+            dateTime,
+            timeZone: COLOMBIA_TZ,
         },
         reminders: {
             useDefault: false,

@@ -60,7 +60,17 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const fechaDate = new Date(fecha);
+        // La fecha debe llegar como YYYY-MM-DD. Se almacena al mediodía UTC
+        // (T12:00:00.000Z) para que el día calendario sea idéntico en UTC y en
+        // America/Bogota (UTC-5) y no se desplace en el calendario ni en los correos.
+        const fechaSolo = typeof fecha === 'string' ? fecha.slice(0, 10) : '';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaSolo)) {
+            return NextResponse.json(
+                { success: false, error: 'Fecha inválida. Use formato YYYY-MM-DD' },
+                { status: 400 }
+            );
+        }
+        const fechaDate = new Date(fechaSolo + 'T12:00:00.000Z');
         if (isNaN(fechaDate.getTime())) {
             return NextResponse.json(
                 { success: false, error: 'Fecha inválida. Use formato YYYY-MM-DD' },
