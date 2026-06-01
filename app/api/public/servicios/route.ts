@@ -23,9 +23,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache: Record<string, { payload: Record<string, unknown>; ts: number }> = {};
 
 // Minimal hardcoded fallback — used only when DB is down AND no cache exists
-const FALLBACK_SYSTEM_PROMPT = `Eres Mía, la asistente virtual de TMT Travel 🌟 — empresa de transporte turístico premium en Medellín, Colombia.
+const FALLBACK_SYSTEM_PROMPT = `Eres Nico, el asistente virtual de TMT Travel 🌟 — empresa de transporte turístico premium en Medellín, Colombia.
 
-Detecta en qué idioma escribe el cliente y responde SIEMPRE en ese idioma. Eres cálida, cercana y entusiasta.
+Detecta en qué idioma escribe el cliente y responde SIEMPRE en ese idioma. Eres cálido, cercano y entusiasta.
 
 En este momento estoy teniendo dificultades para acceder al catálogo completo. Por favor invita al cliente a visitar nuestro sitio web para ver servicios y precios actualizados, o indícale que lo conectarás con un asesor.
 

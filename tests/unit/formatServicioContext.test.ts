@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     formatServicioContext,
     buildFullSystemPrompt,
-    MIA_PERSONA,
+    NICO_PERSONA,
     type ServicioContextData,
 } from '@/lib/n8n/formatServicioContext';
 
@@ -165,9 +165,9 @@ describe('formatServicioContext', () => {
 });
 
 describe('buildFullSystemPrompt', () => {
-    it('incluye la persona de Mía', () => {
+    it('incluye la persona de Nico', () => {
         const out = buildFullSystemPrompt([svcBase]);
-        expect(out).toContain('Mía');
+        expect(out).toContain('Nico');
         expect(out).toContain('TMT Travel');
     });
 
@@ -177,8 +177,8 @@ describe('buildFullSystemPrompt', () => {
         expect(out).toContain('CATÁLOGO');
     });
 
-    it('MIA_PERSONA es el mismo texto que aparece al inicio del prompt completo', () => {
+    it('NICO_PERSONA es el mismo texto que aparece al inicio del prompt completo', () => {
         const out = buildFullSystemPrompt([svcBase]);
-        expect(out.startsWith(MIA_PERSONA)).toBe(true);
+        expect(out.startsWith(NICO_PERSONA)).toBe(true);
     });
 });

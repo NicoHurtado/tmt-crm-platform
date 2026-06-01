@@ -90,13 +90,13 @@ describe('GET /api/n8n/contexto-servicios', () => {
         expect(res.status).toBe(200);
     });
 
-    it('systemPrompt contiene la persona de Mía', async () => {
+    it('systemPrompt contiene la persona de Nico', async () => {
         const req = new Request('http://localhost/api/n8n/contexto-servicios', {
             headers: { 'x-api-key': 'test-key' },
         });
         const res = await GET(req);
         const data = await res.json();
-        expect(data.systemPrompt).toContain('Mía');
+        expect(data.systemPrompt).toContain('Nico');
         expect(data.systemPrompt).toContain('TMT Travel');
     });
 
