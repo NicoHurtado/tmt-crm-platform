@@ -77,3 +77,6 @@ lerna-debug.log*
 # ─── Cache ────────────────────────────────────────────────────
 .eslintcache
 .npm
+
+# Backups transitorios de scripts de mantenimiento
+prisma/backup-*.json

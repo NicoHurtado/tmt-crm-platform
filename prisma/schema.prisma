@@ -276,11 +276,11 @@ model PrecioVehiculoAliado {
   servicioAliadoId String
   vehiculoId       String
   activo           Boolean        @default(true)
-  precioBase       Decimal        @default(0) @db.Decimal(10, 2)
-  comisionValor    Decimal        @default(0) @db.Decimal(10, 2)
-  tipoComision     TipoComision   @default(PORCENTAJE)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  comisionValor    Decimal        @default(0) @db.Decimal(10, 2)
+  tipoComision     TipoComision   @default(PORCENTAJE)
+  precioBase       Decimal        @default(0) @db.Decimal(10, 2)
   servicioAliado   ServicioAliado @relation(fields: [servicioAliadoId], references: [id], onDelete: Cascade)
   vehiculo         Vehiculo       @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
 
