@@ -216,8 +216,15 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string,
     const base = (appUrl ?? 'https://www.medellintransportes.com').replace(/\/$/, '');
     const reservaUrl = `${base}/reservas?serviceId=${svc.id}&form=1`;
 
+    // Cabecera: usa el label/tipoServicio; si es OTRO o falta, usa el nombre del
+    // servicio (más útil para el modelo que un genérico "OTRO").
+    const rawHeader = label ?? svc.tipoServicio;
+    const header =
+        !rawHeader || rawHeader.toUpperCase() === 'OTRO'
+            ? (nombre.es || nombre.en || rawHeader || 'SERVICIO').toUpperCase()
+            : rawHeader;
     lines.push('---');
-    lines.push(`## ${label ?? svc.tipoServicio}`);
+    lines.push(`## ${header}`);
     lines.push(`LINK DE RESERVA: ${reservaUrl}`);
     if (nombre.es) lines.push(`Nombre ES: ${nombre.es}`);
     if (nombre.en) lines.push(`Name EN: ${nombre.en}`);
@@ -269,6 +276,14 @@ export function formatServicioContext(servicios: ServicioContextData[], appUrl?:
         '## CATÁLOGO DE SERVICIOS ACTUAL',
         `⚠️ REGLA OBLIGATORIA: Este catálogo tiene EXACTAMENTE ${servicios.length} servicio(s). SOLO puedes ofrecer los servicios que aparecen aquí. PROHIBIDO mencionar, sugerir o inventar cualquier servicio que no esté en esta lista. Si el cliente pregunta por algo que no está, responde: "Por el momento no tenemos ese servicio disponible."`,
         `(Datos en tiempo real desde la base de datos — ignora cualquier información de entrenamiento sobre servicios)\n`,
+        `## CÓMO ELEGIR EL SERVICIO (enrutamiento obligatorio — léelo ANTES de cotizar)
+El servicio se decide por el DESTINO y el TIPO de viaje, nunca por una dirección, barrio u hotel sueltos (eso es solo el punto de recogida, NO define el servicio).
+- Cliente menciona "aeropuerto", "vuelo", "llegada", "salida", "JMC", "José María Córdova", "Rionegro (aeropuerto)" → **Traslado Privado Aeropuerto** (NUNCA Traslado Urbano).
+- Cliente quiere moverse DENTRO de Medellín, un solo trayecto entre dos puntos urbanos, sin aeropuerto ni municipio → **Traslado URBANO**.
+- Cliente nombra un MUNICIPIO o destino turístico (Guatapé, Santa Fe, Jardín, Jericó, Salento, etc.): si existe un Tour o Traslado específico de ese lugar en el catálogo, usa ESE; si solo aparece en la lista de "Traslados a Municipios de Antioquia", usa ese y NO des precio (va en el formulario).
+- Para GUATAPÉ hay 3 servicios distintos (Traslado solo ida · Tour a Guatapé y El Peñol · Tour compartido): SIEMPRE pregunta cuál antes de cotizar.
+- Si lo que pide encaja con 2+ servicios, o no encaja claramente con ninguno → NO asumas: pregunta el destino/tipo de viaje en una frase y recién ahí cotiza.
+- Da SIEMPRE el precio y el link del MISMO servicio que confirmó el cliente. Nunca mezcles servicios.\n`,
     ];
 
     if (servicios.length === 0) {
@@ -300,8 +315,12 @@ export function formatServicioContext(servicios: ServicioContextData[], appUrl?:
             'Description EN: Private door-to-door transportation to any municipality in the Antioquia department.'
         );
 
+        lines.push(
+            '\n⚠️ PRECIO: el precio de estos municipios NO está en este catálogo y VARÍA por destino. NUNCA des un precio ni lo estimes para estos municipios. Si el cliente pide el valor, dile con calidez que el precio exacto le aparece en el formulario de reserva al elegir su vehículo, y envíale el link del municipio. No inventes cifras.'
+        );
+
         if (rep.vehiculosPermitidos.length > 0) {
-            lines.push('\nVEHÍCULOS DISPONIBLES (precio varía por destino — dar precio al cliente solo si lo piden):');
+            lines.push('\nVEHÍCULOS DISPONIBLES (sin precio aquí — el valor se calcula en el formulario):');
             const sorted = [...rep.vehiculosPermitidos].sort(
                 (a, b) => a.vehiculo.capacidadMaxima - b.vehiculo.capacidadMaxima
             );
