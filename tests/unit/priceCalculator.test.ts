@@ -410,3 +410,86 @@ describe('calculateReservationPrice — separación precio independiente vs alia
         expect(r1.total).toBe(r2.total);
     });
 });
+
+// ============================================================================
+// Server-side: precios duales de aeropuerto (José María Córdova vs Olaya Herrera)
+// ============================================================================
+
+describe('calculateReservationPrice — precios duales de aeropuerto', () => {
+    function makeAeropuerto(overrides: Partial<any> = {}) {
+        return makeServicio({
+            esAeropuerto: true,
+            vehiculosPermitidos: [{ vehiculoId: 'veh-1', precio: 120_000, precioOlaya: 90_000 }],
+            ...overrides,
+        });
+    }
+
+    it('independiente JMC usa precio base (120k)', async () => {
+        const r = await calculateReservationPrice(
+            makeAeropuerto(), 'veh-1', {}, fecha, '14:00', Municipio.MEDELLIN,
+            undefined, undefined, 'JOSE_MARIA_CORDOVA'
+        );
+        expect(r.precioBase).toBe(120_000);
+    });
+
+    it('independiente Olaya usa precioOlaya (90k)', async () => {
+        const r = await calculateReservationPrice(
+            makeAeropuerto(), 'veh-1', {}, fecha, '14:00', Municipio.MEDELLIN,
+            undefined, undefined, 'OLAYA_HERRERA'
+        );
+        expect(r.precioBase).toBe(90_000);
+    });
+
+    it('Olaya sin precioOlaya configurado cae al precio JMC (fallback)', async () => {
+        const r = await calculateReservationPrice(
+            makeAeropuerto({ vehiculosPermitidos: [{ vehiculoId: 'veh-1', precio: 120_000, precioOlaya: null }] }),
+            'veh-1', {}, fecha, '14:00', Municipio.MEDELLIN,
+            undefined, undefined, 'OLAYA_HERRERA'
+        );
+        expect(r.precioBase).toBe(120_000);
+    });
+
+    it('servicio NO aeropuerto ignora aeropuertoNombre', async () => {
+        const r = await calculateReservationPrice(
+            makeServicio({ vehiculosPermitidos: [{ vehiculoId: 'veh-1', precio: 100_000, precioOlaya: 50_000 }] }),
+            'veh-1', {}, fecha, '14:00', Municipio.MEDELLIN,
+            undefined, undefined, 'OLAYA_HERRERA'
+        );
+        expect(r.precioBase).toBe(100_000);
+    });
+
+    it('aliado Olaya usa precioBaseAliadoOlaya + comisión Olaya', async () => {
+        const aliadoConfig: AliadoConfig = {
+            precioBaseAliado: 200_000,
+            comisionPorcentaje: 10,
+            tipoComision: 'PORCENTAJE',
+            precioBaseAliadoOlaya: 150_000,
+            comisionPorcentajeOlaya: 20,
+            tipoComisionOlaya: 'PORCENTAJE',
+        };
+        const r = await calculateReservationPrice(
+            makeAeropuerto(), 'veh-1', {}, fecha, '14:00', Municipio.MEDELLIN,
+            aliadoConfig, undefined, 'OLAYA_HERRERA'
+        );
+        expect(r.precioBase).toBe(150_000);
+        expect(r.comisionAliado).toBe(30_000); // 20% de 150k
+        expect(r.total).toBe(180_000);
+    });
+
+    it('aliado Olaya sin overrides cae a la config JMC', async () => {
+        const aliadoConfig: AliadoConfig = {
+            precioBaseAliado: 200_000,
+            comisionPorcentaje: 10,
+            tipoComision: 'PORCENTAJE',
+            precioBaseAliadoOlaya: null,
+            comisionPorcentajeOlaya: null,
+            tipoComisionOlaya: null,
+        };
+        const r = await calculateReservationPrice(
+            makeAeropuerto(), 'veh-1', {}, fecha, '14:00', Municipio.MEDELLIN,
+            aliadoConfig, undefined, 'OLAYA_HERRERA'
+        );
+        expect(r.precioBase).toBe(200_000);
+        expect(r.comisionAliado).toBe(20_000); // 10% de 200k
+    });
+});

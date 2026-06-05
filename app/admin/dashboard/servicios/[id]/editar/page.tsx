@@ -74,9 +74,10 @@ export default function EditarServicioPage() {
     const [guiaInglesDisponible, setGuiaInglesDisponible] = useState(false);
     const [precioGuiaIngles, setPrecioGuiaIngles] = useState<number | null>(null);
 
-    // Vehicles — each selected vehicle has its own service price
+    // Vehicles — each selected vehicle has its own service price.
+    // precioOlaya solo aplica a servicios de aeropuerto (precio = José María Córdova / por defecto).
     const [vehiculosSeleccionados, setVehiculosSeleccionados] = useState<
-        { vehiculoId: string; precio: number }[]
+        { vehiculoId: string; precio: number; precioOlaya: number | null }[]
     >([]);
 
     useEffect(() => {
@@ -141,6 +142,7 @@ export default function EditarServicioPage() {
                         servicio.vehiculosPermitidos.map((v: any) => ({
                             vehiculoId: v.vehiculoId,
                             precio: Number(v.precio ?? 0),
+                            precioOlaya: v.precioOlaya != null ? Number(v.precioOlaya) : null,
                         }))
                     );
                 } else {
@@ -181,13 +183,19 @@ export default function EditarServicioPage() {
         if (exists) {
             setVehiculosSeleccionados(vehiculosSeleccionados.filter((v) => v.vehiculoId !== vehiculoId));
         } else {
-            setVehiculosSeleccionados([...vehiculosSeleccionados, { vehiculoId, precio: 0 }]);
+            setVehiculosSeleccionados([...vehiculosSeleccionados, { vehiculoId, precio: 0, precioOlaya: null }]);
         }
     };
 
     const handleVehiculoPrecioChange = (vehiculoId: string, precio: number) => {
         setVehiculosSeleccionados(vehiculosSeleccionados.map((v) =>
             v.vehiculoId === vehiculoId ? { ...v, precio } : v
+        ));
+    };
+
+    const handleVehiculoPrecioOlayaChange = (vehiculoId: string, precioOlaya: number | null) => {
+        setVehiculosSeleccionados(vehiculosSeleccionados.map((v) =>
+            v.vehiculoId === vehiculoId ? { ...v, precioOlaya } : v
         ));
     };
 
@@ -249,7 +257,11 @@ export default function EditarServicioPage() {
                     precioGuiaIngles: guiaInglesDisponible ? precioGuiaIngles : null,
                     orden,
                     camposPersonalizados,
-                    vehiculos: vehiculosSeleccionados.map((v) => ({ vehiculoId: v.vehiculoId, precio: v.precio })),
+                    vehiculos: vehiculosSeleccionados.map((v) => ({
+                        vehiculoId: v.vehiculoId,
+                        precio: v.precio,
+                        precioOlaya: esAeropuerto && v.precioOlaya ? v.precioOlaya : null,
+                    })),
                 }),
             });
 
@@ -796,17 +808,34 @@ export default function EditarServicioPage() {
                                                 </div>
 
                                                 {isSelected && (
-                                                    <div className="w-44">
-                                                        <label className="block text-xs text-gray-500 mb-1">Precio (COP)</label>
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            value={isSelected.precio || ''}
-                                                            onChange={(e) => handleVehiculoPrecioChange(vehiculo.id, Number(e.target.value) || 0)}
-                                                            placeholder="0"
-                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
-                                                            required
-                                                        />
+                                                    <div className={esAeropuerto ? 'flex gap-3' : 'w-44'}>
+                                                        <div className="w-44">
+                                                            <label className="block text-xs text-gray-500 mb-1">
+                                                                {esAeropuerto ? 'Precio José María Córdova (COP)' : 'Precio (COP)'}
+                                                            </label>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                value={isSelected.precio || ''}
+                                                                onChange={(e) => handleVehiculoPrecioChange(vehiculo.id, Number(e.target.value) || 0)}
+                                                                placeholder="0"
+                                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                                                required
+                                                            />
+                                                        </div>
+                                                        {esAeropuerto && (
+                                                            <div className="w-44">
+                                                                <label className="block text-xs text-gray-500 mb-1">Precio Olaya Herrera (COP)</label>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    value={isSelected.precioOlaya ?? ''}
+                                                                    onChange={(e) => handleVehiculoPrecioOlayaChange(vehiculo.id, e.target.value ? Number(e.target.value) : null)}
+                                                                    placeholder="Igual a JMC si vacío"
+                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                                                />
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

@@ -90,6 +90,9 @@ model ServicioVehiculo {
   servicioId String
   vehiculoId String
   precio     Decimal? @db.Decimal(10, 2)
+  // Precio alterno para aeropuerto Olaya Herrera (solo servicios esAeropuerto).
+  // El campo `precio` representa José María Córdova / por defecto. Si está vacío, se usa `precio`.
+  precioOlaya Decimal? @db.Decimal(10, 2)
   servicio   Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
   vehiculo   Vehiculo @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
 
@@ -136,6 +139,7 @@ model Reserva {
   idioma                Idioma
   municipio             Municipio?
   otroMunicipio         String?
+  aeropuertoNombre      AeropuertoNombre?
   numeroPasajeros       Int
   vehiculoId            String?
   datos                 Json             @default("{}")
@@ -281,6 +285,12 @@ model PrecioVehiculoAliado {
   comisionValor    Decimal        @default(0) @db.Decimal(10, 2)
   tipoComision     TipoComision   @default(PORCENTAJE)
   precioBase       Decimal        @default(0) @db.Decimal(10, 2)
+  // Config alterna para aeropuerto Olaya Herrera (solo servicios esAeropuerto).
+  // precioBase/comisionValor/tipoComision representan José María Córdova / por defecto.
+  // Si los campos Olaya están vacíos, se usa la config JMC.
+  precioBaseOlaya    Decimal?      @db.Decimal(10, 2)
+  comisionValorOlaya Decimal?      @db.Decimal(10, 2)
+  tipoComisionOlaya  TipoComision?
   servicioAliado   ServicioAliado @relation(fields: [servicioAliadoId], references: [id], onDelete: Cascade)
   vehiculo         Vehiculo       @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
 

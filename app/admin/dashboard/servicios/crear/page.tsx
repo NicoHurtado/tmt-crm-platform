@@ -73,7 +73,7 @@ export default function CrearServicioPage() {
 
     // Vehicles
     const [vehiculosSeleccionados, setVehiculosSeleccionados] = useState<
-        { vehiculoId: string; precio: number }[]
+        { vehiculoId: string; precio: number; precioOlaya: number | null }[]
     >([]);
 
     useEffect(() => {
@@ -112,13 +112,19 @@ export default function CrearServicioPage() {
         if (exists) {
             setVehiculosSeleccionados(vehiculosSeleccionados.filter((v) => v.vehiculoId !== vehiculoId));
         } else {
-            setVehiculosSeleccionados([...vehiculosSeleccionados, { vehiculoId, precio: 0 }]);
+            setVehiculosSeleccionados([...vehiculosSeleccionados, { vehiculoId, precio: 0, precioOlaya: null }]);
         }
     };
 
     const handleVehiculoPrecioChange = (vehiculoId: string, precio: number) => {
         setVehiculosSeleccionados(
             vehiculosSeleccionados.map((v) => v.vehiculoId === vehiculoId ? { ...v, precio } : v)
+        );
+    };
+
+    const handleVehiculoPrecioOlayaChange = (vehiculoId: string, precioOlaya: number | null) => {
+        setVehiculosSeleccionados(
+            vehiculosSeleccionados.map((v) => v.vehiculoId === vehiculoId ? { ...v, precioOlaya } : v)
         );
     };
 
@@ -185,7 +191,11 @@ export default function CrearServicioPage() {
                     precioGuiaIngles: guiaInglesDisponible ? precioGuiaIngles : null,
                     orden,
                     camposPersonalizados,
-                    vehiculos: vehiculosSeleccionados,
+                    vehiculos: vehiculosSeleccionados.map((v) => ({
+                        vehiculoId: v.vehiculoId,
+                        precio: v.precio,
+                        precioOlaya: esAeropuerto && v.precioOlaya ? v.precioOlaya : null,
+                    })),
                 }),
             });
 
@@ -718,19 +728,36 @@ export default function CrearServicioPage() {
                                                 </div>
 
                                                 {isSelected && (
-                                                    <div className="w-40 flex-shrink-0">
-                                                        <label className="block text-xs text-gray-500 mb-1">
-                                                            Precio (COP)
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            value={isSelected.precio}
-                                                            onChange={(e) =>
-                                                                handleVehiculoPrecioChange(vehiculo.id, Number(e.target.value))
-                                                            }
-                                                            min="0"
-                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
-                                                        />
+                                                    <div className={esAeropuerto ? 'flex gap-3 flex-shrink-0' : 'w-40 flex-shrink-0'}>
+                                                        <div className="w-40 flex-shrink-0">
+                                                            <label className="block text-xs text-gray-500 mb-1">
+                                                                {esAeropuerto ? 'Precio José María Córdova (COP)' : 'Precio (COP)'}
+                                                            </label>
+                                                            <input
+                                                                type="number"
+                                                                value={isSelected.precio}
+                                                                onChange={(e) =>
+                                                                    handleVehiculoPrecioChange(vehiculo.id, Number(e.target.value))
+                                                                }
+                                                                min="0"
+                                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                                            />
+                                                        </div>
+                                                        {esAeropuerto && (
+                                                            <div className="w-40 flex-shrink-0">
+                                                                <label className="block text-xs text-gray-500 mb-1">Precio Olaya Herrera (COP)</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={isSelected.precioOlaya ?? ''}
+                                                                    onChange={(e) =>
+                                                                        handleVehiculoPrecioOlayaChange(vehiculo.id, e.target.value ? Number(e.target.value) : null)
+                                                                    }
+                                                                    min="0"
+                                                                    placeholder="Igual a JMC si vacío"
+                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                                                />
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

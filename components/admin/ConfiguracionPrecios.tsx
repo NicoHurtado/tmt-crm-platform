@@ -19,6 +19,11 @@ interface VehiculoConfig {
   activo: boolean;
   tipoComision: TipoComision;
   comisionValor: number;
+  // Config alterna para aeropuerto Olaya Herrera (solo servicios esAeropuerto).
+  // null = usa la config de José María Córdova (los campos de arriba).
+  precioServicioOlaya: number | null;
+  tipoComisionOlaya: TipoComision | null;
+  comisionValorOlaya: number | null;
 }
 
 interface ServicioConfig {
@@ -26,6 +31,7 @@ interface ServicioConfig {
   nombre: any;
   esCompartido: boolean;
   esMunicipal: boolean;
+  esAeropuerto: boolean;
   activo: boolean;
   vehiculos: VehiculoConfig[];
 }
@@ -56,6 +62,9 @@ function snapshotOf(s: ServicioConfig): string {
       precioServicio: v.precioServicio,
       tipoComision: v.tipoComision,
       comisionValor: v.comisionValor,
+      precioServicioOlaya: v.precioServicioOlaya,
+      tipoComisionOlaya: v.tipoComisionOlaya,
+      comisionValorOlaya: v.comisionValorOlaya,
     })),
   });
 }
@@ -132,6 +141,7 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
         nombre: s.nombre,
         esCompartido: s.esCompartido ?? false,
         esMunicipal: s.esMunicipal ?? false,
+        esAeropuerto: s.esAeropuerto ?? false,
         activo: s.activo ?? false,
         vehiculos: [...(s.vehiculos || [])].sort(
           (a: any, b: any) => (a.capacidadMinima ?? 0) - (b.capacidadMinima ?? 0)
@@ -144,6 +154,9 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
           activo: v.activo ?? false,
           tipoComision: (v.tipoComision as TipoComision) || 'PORCENTAJE',
           comisionValor: Number(v.comisionValor ?? 0),
+          precioServicioOlaya: v.precioServicioOlaya != null ? Number(v.precioServicioOlaya) : null,
+          tipoComisionOlaya: (v.tipoComisionOlaya as TipoComision) || null,
+          comisionValorOlaya: v.comisionValorOlaya != null ? Number(v.comisionValorOlaya) : null,
         })),
       }));
       setServicios(mapped);
@@ -178,6 +191,171 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
       return next;
     });
 
+  // Renderiza la fila de precios/comisión de un vehículo. variant 'jmc' usa los campos base;
+  // 'olaya' usa los campos *Olaya (con fallback visual a JMC cuando están vacíos).
+  const renderVehicleRow = (
+    s: ServicioConfig,
+    v: VehiculoConfig,
+    variant: 'jmc' | 'olaya',
+    isGreen: boolean,
+  ) => {
+    const isOlaya = variant === 'olaya';
+    const svcOff = !s.activo;
+    const vehOff = !v.activo;
+    const showTotals = !svcOff && !vehOff;
+
+    // Valores efectivos según variante (Olaya cae a JMC si está vacío).
+    const tipoComision = isOlaya ? (v.tipoComisionOlaya ?? v.tipoComision) : v.tipoComision;
+    const comisionValor = isOlaya ? (v.comisionValorOlaya ?? v.comisionValor) : v.comisionValor;
+    const precioServicio = isOlaya ? (v.precioServicioOlaya ?? v.precioServicio) : v.precioServicio;
+    // Para los inputs Olaya mostramos vacío cuando es null (placeholder "= JMC").
+    const comisionValorInput = isOlaya
+      ? (v.comisionValorOlaya == null ? '' : v.comisionValorOlaya)
+      : (v.comisionValor === 0 ? '' : v.comisionValor);
+    const precioInput = isOlaya
+      ? (v.precioServicioOlaya == null ? '' : v.precioServicioOlaya)
+      : (v.precioServicio === 0 ? '' : v.precioServicio);
+
+    const setTipo = (tipo: TipoComision) =>
+      updateVehiculo(s.servicioId, v.vehiculoId, isOlaya ? { tipoComisionOlaya: tipo } : { tipoComision: tipo });
+    const setComision = (val: string) => {
+      const num = parseFloat(val);
+      updateVehiculo(s.servicioId, v.vehiculoId,
+        isOlaya ? { comisionValorOlaya: val === '' ? null : (num || 0) } : { comisionValor: num || 0 });
+    };
+    const setPrecio = (val: string) => {
+      const num = parseFloat(val);
+      updateVehiculo(s.servicioId, v.vehiculoId,
+        isOlaya ? { precioServicioOlaya: val === '' ? null : (num || 0) } : { precioServicio: num || 0 });
+    };
+
+    const comisionMonto = calcComisionMonto(precioServicio, tipoComision, comisionValor);
+    const precioFinal = precioServicio + comisionMonto;
+    const airportLabel = s.esAeropuerto ? (isOlaya ? ' · Olaya Herrera' : ' · José María Córdova') : '';
+
+    return (
+      <tr
+        key={`veh-${s.servicioId}-${v.vehiculoId}-${variant}`}
+        className={`border-b border-neutral-100 transition-colors
+          ${svcOff ? 'opacity-40 bg-neutral-50' : vehOff ? 'bg-white hover:bg-neutral-50/60' : 'bg-amber-50/20 hover:bg-amber-50/40'}
+        `}
+      >
+        <td className="px-4 py-3 pl-12">
+          <div className="flex items-center gap-2">
+            <span className="text-neutral-300 text-xs shrink-0">↳</span>
+            <span className={`text-xs font-semibold ${vehOff && !svcOff ? 'text-neutral-500' : 'text-neutral-800'}`}>
+              {v.nombre}
+              {airportLabel && (
+                <span className={`ml-1 text-[10px] font-medium ${isOlaya ? 'text-sky-600' : 'text-neutral-400'}`}>
+                  {airportLabel}
+                </span>
+              )}
+            </span>
+            <span className={`text-[11px] rounded-full px-2 py-0.5 font-medium
+              ${showTotals ? 'bg-amber-100 text-amber-700' : 'bg-neutral-100 text-neutral-500'}`}>
+              {v.capacidadMinima}–{v.capacidadMaxima} pax
+            </span>
+          </div>
+        </td>
+
+        <td className="px-4 py-3 text-center">
+          {isOlaya ? (
+            <span className="text-[11px] text-neutral-300">—</span>
+          ) : (
+            <div className="flex justify-center">
+              <VehicleCheckbox
+                checked={v.activo}
+                onChange={val => updateVehiculo(s.servicioId, v.vehiculoId, { activo: val })}
+                disabled={svcOff}
+              />
+            </div>
+          )}
+        </td>
+
+        {/* Tipo comisión */}
+        <td className="px-4 py-3">
+          <div className={`flex rounded-lg border overflow-hidden text-xs font-medium ${svcOff || vehOff ? 'opacity-50 pointer-events-none' : ''} ${isGreen ? 'border-green-200' : 'border-neutral-200'}`}>
+            {(['PORCENTAJE', 'FIJO'] as TipoComision[]).map(tipo => (
+              <button
+                key={tipo}
+                type="button"
+                onClick={() => setTipo(tipo)}
+                className={`flex-1 py-1 px-1.5 transition-colors whitespace-nowrap
+                  ${tipoComision === tipo
+                    ? 'bg-neutral-800 text-white'
+                    : 'bg-white text-neutral-500 hover:bg-neutral-50'
+                  }`}
+              >
+                {tipo === 'PORCENTAJE' ? '%' : '$'}
+              </button>
+            ))}
+          </div>
+        </td>
+
+        {/* Valor comisión */}
+        <td className="px-4 py-3">
+          <div className={`flex items-center gap-1.5 border rounded-lg px-2 py-1 bg-white
+            ${svcOff || vehOff ? 'opacity-50' : ''}
+            ${isGreen ? 'border-green-200 focus-within:ring-1 focus-within:ring-green-400' : 'border-neutral-200 focus-within:ring-1 focus-within:ring-amber-400'}`}>
+            <span className={`text-xs font-semibold shrink-0 ${isGreen ? 'text-green-600' : 'text-amber-500'}`}>
+              {tipoComision === 'PORCENTAJE' ? '%' : '$'}
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={tipoComision === 'PORCENTAJE' ? 100 : undefined}
+              value={comisionValorInput}
+              placeholder={isOlaya ? '= JMC' : '0'}
+              onChange={e => setComision(e.target.value)}
+              onFocus={e => e.target.select()}
+              disabled={svcOff || vehOff}
+              className="w-full text-xs bg-transparent outline-none text-neutral-800 placeholder-neutral-300 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+          </div>
+        </td>
+
+        {/* Precio servicio */}
+        <td className="px-4 py-3 text-right">
+          <div className={`flex items-center gap-1.5 border rounded-lg px-2 py-1 bg-white
+            ${svcOff || vehOff ? 'opacity-50' : ''}
+            ${isGreen ? 'border-green-200 focus-within:ring-1 focus-within:ring-green-400' : 'border-neutral-200 focus-within:ring-1 focus-within:ring-amber-400'}`}>
+            <span className={`text-xs font-semibold shrink-0 ${isGreen ? 'text-green-600' : 'text-neutral-500'}`}>
+              $
+            </span>
+            <input
+              type="number"
+              min={0}
+              value={precioInput}
+              placeholder={isOlaya ? '= JMC' : '0'}
+              onChange={e => setPrecio(e.target.value)}
+              onFocus={e => e.target.select()}
+              disabled={svcOff || vehOff}
+              className="w-full text-xs bg-transparent outline-none text-neutral-800 placeholder-neutral-300 disabled:cursor-not-allowed text-right font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+          </div>
+        </td>
+
+        {/* Comisión calculada */}
+        <td className="px-4 py-3 text-right">
+          {showTotals ? (
+            <span className="text-xs font-mono text-amber-600 font-semibold">{fmt(comisionMonto)}</span>
+          ) : (
+            <span className="text-xs text-neutral-300">—</span>
+          )}
+        </td>
+
+        {/* Precio final */}
+        <td className="px-4 py-3 text-right">
+          {showTotals ? (
+            <span className="text-sm font-bold text-neutral-900 font-mono">{fmt(precioFinal)}</span>
+          ) : (
+            <span className="text-xs text-neutral-400">—</span>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
   const handleSave = async () => {
     const changed = servicios.filter(s => initialRef.current.get(s.servicioId) !== snapshotOf(s));
 
@@ -201,6 +379,10 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
               precioBase: v.precioServicio,
               tipoComision: v.tipoComision,
               comisionValor: v.comisionValor,
+              // Solo se envían si es servicio de aeropuerto; null = usa config JMC.
+              precioBaseOlaya: s.esAeropuerto ? v.precioServicioOlaya : null,
+              tipoComisionOlaya: s.esAeropuerto ? v.tipoComisionOlaya : null,
+              comisionValorOlaya: s.esAeropuerto ? v.comisionValorOlaya : null,
             })),
           }),
         })
@@ -300,127 +482,11 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
 
         /* ── Vehicle sub-rows (collapsible) ───────────────────────────────── */
         ...(isExpanded
-          ? s.vehiculos.map(v => {
-              const svcOff = !s.activo;
-              const vehOff = !v.activo;
-              const showTotals = !svcOff && !vehOff;
-
-              const comisionMonto = calcComisionMonto(v.precioServicio, v.tipoComision, v.comisionValor);
-              const precioFinal = v.precioServicio + comisionMonto;
-
-              return (
-                <tr
-                  key={`veh-${s.servicioId}-${v.vehiculoId}`}
-                  className={`border-b border-neutral-100 transition-colors
-                    ${svcOff ? 'opacity-40 bg-neutral-50' : vehOff ? 'bg-white hover:bg-neutral-50/60' : 'bg-amber-50/20 hover:bg-amber-50/40'}
-                  `}
-                >
-                  <td className="px-4 py-3 pl-12">
-                    <div className="flex items-center gap-2">
-                      <span className="text-neutral-300 text-xs shrink-0">↳</span>
-                      <span className={`text-xs font-semibold ${vehOff && !svcOff ? 'text-neutral-500' : 'text-neutral-800'}`}>
-                        {v.nombre}
-                      </span>
-                      <span className={`text-[11px] rounded-full px-2 py-0.5 font-medium
-                        ${showTotals ? 'bg-amber-100 text-amber-700' : 'bg-neutral-100 text-neutral-500'}`}>
-                        {v.capacidadMinima}–{v.capacidadMaxima} pax
-                      </span>
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex justify-center">
-                      <VehicleCheckbox
-                        checked={v.activo}
-                        onChange={val => updateVehiculo(s.servicioId, v.vehiculoId, { activo: val })}
-                        disabled={svcOff}
-                      />
-                    </div>
-                  </td>
-
-                  {/* Tipo comisión por vehículo */}
-                  <td className="px-4 py-3">
-                    <div className={`flex rounded-lg border overflow-hidden text-xs font-medium ${svcOff || vehOff ? 'opacity-50 pointer-events-none' : ''} ${isGreen ? 'border-green-200' : 'border-neutral-200'}`}>
-                      {(['PORCENTAJE', 'FIJO'] as TipoComision[]).map(tipo => (
-                        <button
-                          key={tipo}
-                          type="button"
-                          onClick={() => updateVehiculo(s.servicioId, v.vehiculoId, { tipoComision: tipo })}
-                          className={`flex-1 py-1 px-1.5 transition-colors whitespace-nowrap
-                            ${v.tipoComision === tipo
-                              ? 'bg-neutral-800 text-white'
-                              : 'bg-white text-neutral-500 hover:bg-neutral-50'
-                            }`}
-                        >
-                          {tipo === 'PORCENTAJE' ? '%' : '$'}
-                        </button>
-                      ))}
-                    </div>
-                  </td>
-
-                  {/* Valor comisión por vehículo */}
-                  <td className="px-4 py-3">
-                    <div className={`flex items-center gap-1.5 border rounded-lg px-2 py-1 bg-white
-                      ${svcOff || vehOff ? 'opacity-50' : ''}
-                      ${isGreen ? 'border-green-200 focus-within:ring-1 focus-within:ring-green-400' : 'border-neutral-200 focus-within:ring-1 focus-within:ring-amber-400'}`}>
-                      <span className={`text-xs font-semibold shrink-0 ${isGreen ? 'text-green-600' : 'text-amber-500'}`}>
-                        {v.tipoComision === 'PORCENTAJE' ? '%' : '$'}
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={v.tipoComision === 'PORCENTAJE' ? 100 : undefined}
-                        value={v.comisionValor === 0 ? '' : v.comisionValor}
-                        placeholder="0"
-                        onChange={e => updateVehiculo(s.servicioId, v.vehiculoId, { comisionValor: parseFloat(e.target.value) || 0 })}
-                        onFocus={e => e.target.select()}
-                        disabled={svcOff || vehOff}
-                        className="w-full text-xs bg-transparent outline-none text-neutral-800 placeholder-neutral-300 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                  </td>
-
-                  {/* Precio servicio (editable — precio base por aliado) */}
-                  <td className="px-4 py-3 text-right">
-                    <div className={`flex items-center gap-1.5 border rounded-lg px-2 py-1 bg-white
-                      ${svcOff || vehOff ? 'opacity-50' : ''}
-                      ${isGreen ? 'border-green-200 focus-within:ring-1 focus-within:ring-green-400' : 'border-neutral-200 focus-within:ring-1 focus-within:ring-amber-400'}`}>
-                      <span className={`text-xs font-semibold shrink-0 ${isGreen ? 'text-green-600' : 'text-neutral-500'}`}>
-                        $
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={v.precioServicio === 0 ? '' : v.precioServicio}
-                        placeholder="0"
-                        onChange={e => updateVehiculo(s.servicioId, v.vehiculoId, { precioServicio: parseFloat(e.target.value) || 0 })}
-                        onFocus={e => e.target.select()}
-                        disabled={svcOff || vehOff}
-                        className="w-full text-xs bg-transparent outline-none text-neutral-800 placeholder-neutral-300 disabled:cursor-not-allowed text-right font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                  </td>
-
-                  {/* Comisión calculada */}
-                  <td className="px-4 py-3 text-right">
-                    {showTotals ? (
-                      <span className="text-xs font-mono text-amber-600 font-semibold">{fmt(comisionMonto)}</span>
-                    ) : (
-                      <span className="text-xs text-neutral-300">—</span>
-                    )}
-                  </td>
-
-                  {/* Precio final del servicio (lo que ve el cliente) */}
-                  <td className="px-4 py-3 text-right">
-                    {showTotals ? (
-                      <span className="text-sm font-bold text-neutral-900 font-mono">{fmt(precioFinal)}</span>
-                    ) : (
-                      <span className="text-xs text-neutral-400">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })
+          ? s.vehiculos.flatMap(v =>
+              s.esAeropuerto
+                ? [renderVehicleRow(s, v, 'jmc', isGreen), renderVehicleRow(s, v, 'olaya', isGreen)]
+                : [renderVehicleRow(s, v, 'jmc', isGreen)]
+            )
           : []),
       ];
     });

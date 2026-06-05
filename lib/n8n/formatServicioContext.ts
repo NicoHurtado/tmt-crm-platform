@@ -11,6 +11,8 @@ export interface VehiculoData {
 
 export interface ServicioVehiculoData {
     precio: number | null;
+    // Precio alterno para aeropuerto Olaya Herrera (null si no aplica/no configurado).
+    precioOlaya?: number | null;
     vehiculo: VehiculoData;
 }
 
@@ -28,6 +30,7 @@ export interface ServicioContextData {
     montoRecargoNocturno: number | null;
     esPorHoras: boolean;
     esMunicipal: boolean;
+    esAeropuerto?: boolean;
     configuracion: unknown;
     vehiculosPermitidos: ServicioVehiculoData[];
 }
@@ -67,7 +70,7 @@ El servicio se determina por el **DESTINO y el TIPO de viaje que pide el cliente
 - **NUNCA deduzcas el servicio por la dirección o el barrio.** Que el cliente escriba una dirección NO significa que sea un "Traslado Urbano". El Traslado Urbano SOLO aplica cuando el cliente pide explícitamente moverse DENTRO de la ciudad de Medellín entre dos puntos urbanos, sin aeropuerto ni municipio de por medio.
 - **Si la solicitud puede corresponder a 2+ servicios** (ej. mismo destino con modalidad "Traslado (sólo ida)" vs "Tour de día completo") → NO asumas. Pregunta cuál busca, mostrando SOLO las opciones reales del catálogo, con una frase corta que las diferencie:
   Cliente: "¿Cuánto vale ir a Guatapé?"
-  Nico: "¡Buenísimo! 😍 Para Guatapé tenemos dos opciones: el **Traslado (sólo ida)**, transporte directo puerta a puerta 🚐, o el **Tour de día completo** con guía, El Peñol y tiempo libre 🏞️. ¿Cuál te interesa? Así te doy el precio exacto."
+  Nico: "¡Buenísimo! 😍 Para Guatapé tenemos varias opciones (traslado o tours). ¿Cuál te interesa? Así te doy el precio exacto." (muestra las opciones reales que aparezcan en el catálogo, no inventes)
 - **Si NO estás seguro de a qué servicio se refiere** (destino ambiguo, no coincide claro con ninguno, o falta información clave) → NO cotices. Pregunta de forma directa: "¿A dónde sería el viaje exactamente?" o "¿Es traslado al aeropuerto, dentro de la ciudad, o a algún municipio?". Solo cotizas cuando tengas el servicio 100% claro.
 - Este criterio aplica a TODOS los destinos y servicios. Ante cualquier duda sobre CUÁL servicio es: pregunta, no asumas.
 
@@ -206,7 +209,7 @@ function formatCampo(campo: DynamicField): string[] {
 
 // ─── Single service formatter ─────────────────────────────────────────────────
 
-function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string, appUrl?: string): void {
+function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string, appUrl?: string, toolMode?: boolean): void {
     const nombre = asMultiLang(svc.nombre);
     const descripcion = asMultiLang(svc.descripcion);
     const incluye = asMultiLang(svc.incluye);
@@ -225,6 +228,7 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string,
             : rawHeader;
     lines.push('---');
     lines.push(`## ${header}`);
+    if (toolMode) lines.push(`ID del servicio (úsalo en la herramienta cotizar): ${svc.id}`);
     lines.push(`LINK DE RESERVA: ${reservaUrl}`);
     if (nombre.es) lines.push(`Nombre ES: ${nombre.es}`);
     if (nombre.en) lines.push(`Name EN: ${nombre.en}`);
@@ -235,16 +239,39 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string,
     if (svc.duracion) lines.push(`Duración: ${svc.duracion}`);
 
     if (svc.vehiculosPermitidos.length > 0) {
-        lines.push('\nVEHÍCULOS DISPONIBLES (precio base):');
         const sorted = [...svc.vehiculosPermitidos].sort(
             (a, b) => a.vehiculo.capacidadMaxima - b.vehiculo.capacidadMaxima
         );
-        for (const sv of sorted) {
-            const precio = Number(sv.precio ?? 0);
-            const capMin = sv.vehiculo.capacidadMinima;
-            const capMax = sv.vehiculo.capacidadMaxima;
-            const cap = capMin === capMax ? `${capMax} pax` : `${capMin}-${capMax} pax`;
-            lines.push(`• ${sv.vehiculo.nombre} | ${cap} | ${formatCOP(precio)}`);
+        // Aeropuerto: el precio depende del aeropuerto (José María Córdova vs Olaya Herrera).
+        // Si algún vehículo tiene precioOlaya distinto, mostramos ambas columnas.
+        const tienePreciosOlaya =
+            !!svc.esAeropuerto &&
+            sorted.some((sv) => sv.precioOlaya != null && Number(sv.precioOlaya) > 0);
+
+        if (tienePreciosOlaya) {
+            lines.push(
+                '\n⚠️ AEROPUERTO: el precio depende del aeropuerto. Antes de cotizar, pregunta SIEMPRE a qué aeropuerto es (José María Córdova / JMC, o Olaya Herrera). Usa la columna del aeropuerto que confirme el cliente; nunca des el más barato por defecto.'
+            );
+            lines.push('\nVEHÍCULOS DISPONIBLES (precio José María Córdova | precio Olaya Herrera):');
+            for (const sv of sorted) {
+                const precioJMC = Number(sv.precio ?? 0);
+                const precioOlaya = sv.precioOlaya != null && Number(sv.precioOlaya) > 0 ? Number(sv.precioOlaya) : precioJMC;
+                const capMin = sv.vehiculo.capacidadMinima;
+                const capMax = sv.vehiculo.capacidadMaxima;
+                const cap = capMin === capMax ? `${capMax} pax` : `${capMin}-${capMax} pax`;
+                lines.push(
+                    `• ${sv.vehiculo.nombre} | ${cap} | José María Córdova: ${formatCOP(precioJMC)} | Olaya Herrera: ${formatCOP(precioOlaya)}`
+                );
+            }
+        } else {
+            lines.push('\nVEHÍCULOS DISPONIBLES (precio base):');
+            for (const sv of sorted) {
+                const precio = Number(sv.precio ?? 0);
+                const capMin = sv.vehiculo.capacidadMinima;
+                const capMax = sv.vehiculo.capacidadMaxima;
+                const cap = capMin === capMax ? `${capMax} pax` : `${capMin}-${capMax} pax`;
+                lines.push(`• ${sv.vehiculo.nombre} | ${cap} | ${formatCOP(precio)}`);
+            }
         }
     }
 
@@ -271,8 +298,18 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string,
 
 // ─── Main formatter ───────────────────────────────────────────────────────────
 
-export function formatServicioContext(servicios: ServicioContextData[], appUrl?: string): string {
+export function formatServicioContext(servicios: ServicioContextData[], appUrl?: string, toolMode?: boolean): string {
     const lines: string[] = [
+        ...(toolMode
+            ? [
+                  `## 🛠️ HERRAMIENTA DE PRECIOS — cotizar (USO OBLIGATORIO)
+Tienes una herramienta llamada **cotizar** que devuelve el precio EXACTO desde la base de datos.
+- **NUNCA escribas un precio de tu memoria ni lo deduzcas del catálogo de abajo. El ÚNICO precio válido es el que devuelve la herramienta cotizar.** Los precios de abajo son solo referencia para ti; no se los des al cliente sin haber llamado a cotizar.
+- Para cotizar llama cotizar con: el ID del servicio (aparece como "ID del servicio" en cada servicio), el número de personas (pax) y, si es aeropuerto, el aeropuerto (JOSE_MARIA_CORDOVA u OLAYA_HERRERA).
+- La herramienta puede responder: ok (con el precio), ambiguo (varios servicios → pregunta cuál), falta_pax (pregunta cuántas personas), falta_aeropuerto (pregunta cuál aeropuerto), municipio (sin precio, va en el formulario) o fuera_de_rango (ofrece asesor). Sigue SIEMPRE lo que indique status; no inventes nada.
+- Da al cliente exactamente el precio (campo precioFormateado) que devuelva cotizar para el servicio y pax confirmados.\n`,
+              ]
+            : []),
         '## CATÁLOGO DE SERVICIOS ACTUAL',
         `⚠️ REGLA OBLIGATORIA: Este catálogo tiene EXACTAMENTE ${servicios.length} servicio(s). SOLO puedes ofrecer los servicios que aparecen aquí. PROHIBIDO mencionar, sugerir o inventar cualquier servicio que no esté en esta lista. Si el cliente pregunta por algo que no está, responde: "Por el momento no tenemos ese servicio disponible."`,
         `(Datos en tiempo real desde la base de datos — ignora cualquier información de entrenamiento sobre servicios)\n`,
@@ -281,7 +318,7 @@ El servicio se decide por el DESTINO y el TIPO de viaje, nunca por una direcció
 - Cliente menciona "aeropuerto", "vuelo", "llegada", "salida", "JMC", "José María Córdova", "Rionegro (aeropuerto)" → **Traslado Privado Aeropuerto** (NUNCA Traslado Urbano).
 - Cliente quiere moverse DENTRO de Medellín, un solo trayecto entre dos puntos urbanos, sin aeropuerto ni municipio → **Traslado URBANO**.
 - Cliente nombra un MUNICIPIO o destino turístico (Guatapé, Santa Fe, Jardín, Jericó, Salento, etc.): si existe un Tour o Traslado específico de ese lugar en el catálogo, usa ESE; si solo aparece en la lista de "Traslados a Municipios de Antioquia", usa ese y NO des precio (va en el formulario).
-- Para GUATAPÉ hay 3 servicios distintos (Traslado solo ida · Tour a Guatapé y El Peñol · Tour compartido): SIEMPRE pregunta cuál antes de cotizar.
+- Para GUATAPÉ hay VARIOS servicios distintos en el catálogo (p. ej. "Traslado Guatapé (sólo ida)", "Tour a Guatapé y El Peñol", "Tour compartido Guatapé"): NUNCA asumas cuál; SIEMPRE pregunta cuál quiere antes de cotizar, mostrando solo las opciones reales que aparezcan en el catálogo de abajo. Ofrece únicamente lo que exista realmente en el catálogo.
 - Si lo que pide encaja con 2+ servicios, o no encaja claramente con ninguno → NO asumas: pregunta el destino/tipo de viaje en una frase y recién ahí cotiza.
 - Da SIEMPRE el precio y el link del MISMO servicio que confirmó el cliente. Nunca mezcles servicios.\n`,
     ];
@@ -297,7 +334,7 @@ El servicio se decide por el DESTINO y el TIPO de viaje, nunca por una direcció
 
     // Render all non-municipal services individually
     for (const svc of otros) {
-        formatOneSvc(svc, lines, undefined, appUrl);
+        formatOneSvc(svc, lines, undefined, appUrl, toolMode);
     }
 
     // Render all municipal transfers as ONE grouped entry
@@ -365,12 +402,16 @@ const NICO_RECORDATORIO_FINAL = `---
 - 📋 Para cotizar pide SOLO la cantidad de personas. NUNCA pidas dirección, nombre ni datos personales — eso va en el formulario web. (Sí puedes preguntar el destino si no sabes cuál servicio es.)
 - Para reservar, envía el link del servicio tal como aparece.`;
 
-export function buildFullSystemPrompt(servicios: ServicioContextData[], appUrl?: string): string {
+export function buildFullSystemPrompt(servicios: ServicioContextData[], appUrl?: string, toolMode?: boolean): string {
+    const recordatorioTool = toolMode
+        ? '\n- 🛠️ PRECIOS SOLO con la herramienta cotizar. NUNCA des un precio sin haberla llamado; el precio que vale es el que ella devuelve. Si responde ambiguo/falta_pax/falta_aeropuerto, pregunta eso primero.'
+        : '';
     return (
         NICO_PERSONA +
         '\n\n' +
-        formatServicioContext(servicios, appUrl) +
+        formatServicioContext(servicios, appUrl, toolMode) +
         '\n\n' +
-        NICO_RECORDATORIO_FINAL
+        NICO_RECORDATORIO_FINAL +
+        recordatorioTool
     );
 }

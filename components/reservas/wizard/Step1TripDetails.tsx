@@ -143,6 +143,9 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
 
     // Get available vehicles — precio viene de ServicioVehiculo.precio
     // En modo aliado se incluye también la comisión por vehículo
+    // Para aeropuerto Olaya Herrera se usa el precio/comisión alterno si está
+    // configurado (con fallback al de José María Córdova / por defecto).
+    const usarPrecioOlaya = !!service.esAeropuerto && formData.aeropuertoNombre === 'OLAYA_HERRERA';
     const availableVehicles = (() => {
         let vehicles: any[] = [];
         // 1. Aliado-specific: aliado endpoint expone vehiculos[].precioServicio + comisión
@@ -150,16 +153,27 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         if (aliadoVehiculos?.length > 0) {
             vehicles = aliadoVehiculos
                 .filter((v: any) => v.activo !== false)
-                .map((v: any) => ({
-                    id: v.vehiculoId,
-                    nombre: v.nombre,
-                    capacidadMinima: v.capacidadMinima,
-                    capacidadMaxima: v.capacidadMaxima,
-                    precio: Number(v.precioServicio ?? 0),
-                    imagen: v.imagen ?? null,
-                    tipoComision: v.tipoComision ?? 'PORCENTAJE',
-                    comisionValor: Number(v.comisionValor ?? 0),
-                }));
+                .map((v: any) => {
+                    const precio = usarPrecioOlaya && v.precioServicioOlaya != null
+                        ? Number(v.precioServicioOlaya)
+                        : Number(v.precioServicio ?? 0);
+                    const tipoComision = usarPrecioOlaya && v.tipoComisionOlaya != null
+                        ? v.tipoComisionOlaya
+                        : (v.tipoComision ?? 'PORCENTAJE');
+                    const comisionValor = usarPrecioOlaya && v.comisionValorOlaya != null
+                        ? Number(v.comisionValorOlaya)
+                        : Number(v.comisionValor ?? 0);
+                    return {
+                        id: v.vehiculoId,
+                        nombre: v.nombre,
+                        capacidadMinima: v.capacidadMinima,
+                        capacidadMaxima: v.capacidadMaxima,
+                        precio,
+                        imagen: v.imagen ?? null,
+                        tipoComision,
+                        comisionValor,
+                    };
+                });
         }
         // 2. Public service: vehiculosPermitidos[].precio + .vehiculo
         else if (service.vehiculosPermitidos?.length > 0) {
@@ -169,7 +183,9 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                 capacidadMinima: sv.vehiculo?.capacidadMinima ?? sv.capacidadMinima,
                 capacidadMaxima: sv.vehiculo?.capacidadMaxima ?? sv.capacidadMaxima,
                 imagen: sv.vehiculo?.imagen ?? sv.imagen ?? null,
-                precio: Number(sv.precio ?? 0),
+                precio: usarPrecioOlaya && sv.precioOlaya != null
+                    ? Number(sv.precioOlaya)
+                    : Number(sv.precio ?? 0),
                 tipoComision: 'PORCENTAJE',
                 comisionValor: 0,
             }));
@@ -344,6 +360,7 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         formData.vehiculoId,
         formData.numeroPasajeros,
         formData.cantidadHoras,
+        formData.aeropuertoNombre,
         availableVehicles,
         preciosPersonalizados,
         municipiosConfig,

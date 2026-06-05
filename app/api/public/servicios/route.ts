@@ -51,8 +51,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const formato = searchParams.get('formato') ?? 'json';
     const lang = (searchParams.get('lang') ?? 'ES').toUpperCase() as 'ES' | 'EN';
+    // ?tools=1 → el systemPrompt incluye instrucciones para usar la herramienta `cotizar`
+    // (úsalo cuando el agente de n8n tenga conectada la tool y un modelo que la sepa usar).
+    const toolMode = ['1', 'true', 'yes'].includes((searchParams.get('tools') ?? '').toLowerCase());
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.medellintransportes.com';
-    const cacheKey = `${formato}-${lang}`;
+    const cacheKey = `${formato}-${lang}-${toolMode ? 'tools' : 'plain'}`;
 
     try {
         let payload: Record<string, unknown>;
@@ -60,7 +63,7 @@ export async function GET(request: NextRequest) {
         if (formato === 'json') {
             payload = await buildCatalogJson(lang, appUrl);
         } else {
-            payload = await buildCatalogText(formato === 'contexto' ? 'contexto' : 'texto', appUrl);
+            payload = await buildCatalogText(formato === 'contexto' ? 'contexto' : 'texto', appUrl, toolMode);
         }
 
         cache[cacheKey] = { payload, ts: Date.now() };

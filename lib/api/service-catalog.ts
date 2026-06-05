@@ -42,6 +42,8 @@ export type CatalogService = {
         capacidadMinima: number;
         capacidadMaxima: number;
         precio: number;
+        // Precio alterno para aeropuerto Olaya Herrera (null si no aplica/no configurado).
+        precioOlaya: number | null;
         precioOrigen: typeof PRICE_SOURCE;
         tipoPrecio: typeof PRICE_TYPE;
     }[];
@@ -90,8 +92,10 @@ export function toServicioContextData(rawServicios: ServicioWithVehiculos[]): Se
         esPorHoras: s.esPorHoras,
         esMunicipal: s.esMunicipal,
         configuracion: s.configuracion,
+        esAeropuerto: s.esAeropuerto,
         vehiculosPermitidos: s.vehiculosPermitidos.map((sv) => ({
             precio: sv.precio ? Number(sv.precio) : null,
+            precioOlaya: (sv as any).precioOlaya != null ? Number((sv as any).precioOlaya) : null,
             vehiculo: {
                 nombre: sv.vehiculo.nombre,
                 capacidadMinima: sv.vehiculo.capacidadMinima,
@@ -145,6 +149,7 @@ export function toCatalogServices(
                 capacidadMinima: sv.vehiculo.capacidadMinima,
                 capacidadMaxima: sv.vehiculo.capacidadMaxima,
                 precio: Number(sv.precio ?? 0),
+                precioOlaya: s.esAeropuerto && (sv as any).precioOlaya != null ? Number((sv as any).precioOlaya) : null,
                 precioOrigen: PRICE_SOURCE,
                 tipoPrecio: PRICE_TYPE,
             })),
@@ -172,14 +177,15 @@ export async function buildCatalogJson(lang: CatalogLanguage = 'ES', appUrl?: st
 
 export async function buildCatalogText(
     formato: 'contexto' | 'texto',
-    appUrl?: string
+    appUrl?: string,
+    toolMode?: boolean
 ) {
     const rawServicios = await fetchActiveCatalogServices();
     const servicios = toServicioContextData(rawServicios);
     const texto =
         formato === 'contexto'
-            ? buildFullSystemPrompt(servicios, appUrl)
-            : formatServicioContext(servicios, appUrl);
+            ? buildFullSystemPrompt(servicios, appUrl, toolMode)
+            : formatServicioContext(servicios, appUrl, toolMode);
 
     return {
         empresa: 'TMT Travel — Transportes Medellín',

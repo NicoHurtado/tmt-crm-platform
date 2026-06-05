@@ -155,9 +155,15 @@ export async function POST(request: Request) {
                 });
                 const pv = sa?.preciosVehiculos?.[0];
                 if (pv) {
-                    comisionAliado = pv.tipoComision === 'PORCENTAJE'
-                        ? subtotal * (Number(pv.comisionValor) / 100)
+                    // Para aeropuerto Olaya Herrera usa la comisión alterna si está configurada (fallback a JMC).
+                    const esOlaya = body.aeropuertoNombre === 'OLAYA_HERRERA';
+                    const tipoComision = esOlaya && pv.tipoComisionOlaya != null ? pv.tipoComisionOlaya : pv.tipoComision;
+                    const comisionValor = esOlaya && pv.comisionValorOlaya != null
+                        ? Number(pv.comisionValorOlaya)
                         : Number(pv.comisionValor);
+                    comisionAliado = tipoComision === 'PORCENTAJE'
+                        ? subtotal * (comisionValor / 100)
+                        : comisionValor;
                 }
             } catch (e) {
                 console.error('Error calculating ally commission:', e);
@@ -228,6 +234,10 @@ export async function POST(request: Request) {
                             idioma: body.idioma || 'ES',
                             municipio: body.municipio || null,
                             otroMunicipio: body.otroMunicipio || null,
+                            aeropuertoNombre:
+                                body.aeropuertoNombre === 'JOSE_MARIA_CORDOVA' || body.aeropuertoNombre === 'OLAYA_HERRERA'
+                                    ? body.aeropuertoNombre
+                                    : null,
                             numeroPasajeros: parseInt(body.numeroPasajeros),
                             vehiculoId: body.vehiculoId || null,
 

@@ -38,12 +38,19 @@ export interface AliadoConfig {
     // Comisión calculada para el vehículo seleccionado en PrecioVehiculoAliado
     comisionPorcentaje?: number;
     tipoComision?: 'FIJO' | 'PORCENTAJE';
+    // Config alterna para aeropuerto Olaya Herrera (PrecioVehiculoAliado.*Olaya).
+    // null/undefined = usa los campos JMC de arriba (fallback).
+    precioBaseAliadoOlaya?: number | null;
+    comisionPorcentajeOlaya?: number | null;
+    tipoComisionOlaya?: 'FIJO' | 'PORCENTAJE' | null;
     sobrescribirRecargoNocturno?: boolean;
     aplicaRecargoNocturno?: boolean;
     recargoNocturnoInicio?: string;
     recargoNocturnoFin?: string;
     montoRecargoNocturno?: number;
 }
+
+export type AeropuertoNombreInput = 'JOSE_MARIA_CORDOVA' | 'OLAYA_HERRERA';
 
 // ============================================
 // SERVER-SIDE PRICE CALCULATION
@@ -67,7 +74,7 @@ export interface AliadoConfig {
  */
 export async function calculateReservationPrice(
     servicio: Servicio & {
-        vehiculosPermitidos: { vehiculoId: string; precio: any }[];
+        vehiculosPermitidos: { vehiculoId: string; precio: any; precioOlaya?: any }[];
     },
     vehiculoId: string,
     datosDinamicos: DynamicFieldValues,
@@ -75,7 +82,8 @@ export async function calculateReservationPrice(
     hora: string,
     municipio: Municipio,
     aliadoConfig?: AliadoConfig,
-    cantidadHoras?: number
+    cantidadHoras?: number,
+    aeropuertoNombre?: AeropuertoNombreInput | null
 ): Promise<PriceBreakdown> {
     // 1. Get base price.
     //    - Cliente independiente (sin aliadoConfig): usa ServicioVehiculo.precio (precio público).
@@ -88,14 +96,23 @@ export async function calculateReservationPrice(
     if (!vehiculoConfig) {
         throw new Error('Vehículo no disponible para este servicio');
     }
+    // Para aeropuerto Olaya Herrera se usa el precio alterno si está configurado
+    // (con fallback al precio José María Córdova / por defecto).
+    const esOlaya = !!servicio.esAeropuerto && aeropuertoNombre === 'OLAYA_HERRERA';
     let precioBase: number;
     if (aliadoConfig && aliadoConfig.precioBaseAliado !== undefined) {
-        precioBase = Number(aliadoConfig.precioBaseAliado);
+        const baseOlaya = aliadoConfig.precioBaseAliadoOlaya;
+        precioBase = esOlaya && baseOlaya != null && Number(baseOlaya) > 0
+            ? Number(baseOlaya)
+            : Number(aliadoConfig.precioBaseAliado);
         if (!Number.isFinite(precioBase) || precioBase <= 0) {
             throw new Error('Este aliado no tiene precio configurado para el vehículo seleccionado');
         }
     } else {
-        precioBase = Number(vehiculoConfig.precio);
+        const precioOlaya = (vehiculoConfig as any).precioOlaya;
+        precioBase = esOlaya && precioOlaya != null && Number(precioOlaya) > 0
+            ? Number(precioOlaya)
+            : Number(vehiculoConfig.precio);
         if (!Number.isFinite(precioBase) || precioBase <= 0) {
             throw new Error('Este servicio no tiene precio configurado para el vehículo seleccionado');
         }
@@ -223,12 +240,19 @@ export async function calculateReservationPrice(
     let comisionAliado = 0;
 
     if (aliadoConfig) {
-        if (aliadoConfig.comisionPorcentaje) {
-            if (aliadoConfig.tipoComision === 'FIJO') {
-                comisionAliado = aliadoConfig.comisionPorcentaje; // fixed COP amount
+        // Comisión: para Olaya usa la config alterna si existe (fallback a JMC).
+        const comisionValor = esOlaya && aliadoConfig.comisionPorcentajeOlaya != null
+            ? aliadoConfig.comisionPorcentajeOlaya
+            : aliadoConfig.comisionPorcentaje;
+        const tipoComision = esOlaya && aliadoConfig.tipoComisionOlaya != null
+            ? aliadoConfig.tipoComisionOlaya
+            : aliadoConfig.tipoComision;
+        if (comisionValor) {
+            if (tipoComision === 'FIJO') {
+                comisionAliado = comisionValor; // fixed COP amount
             } else {
                 // PORCENTAJE (default)
-                comisionAliado = subtotal * (aliadoConfig.comisionPorcentaje / 100);
+                comisionAliado = subtotal * (comisionValor / 100);
             }
         }
     }

@@ -59,6 +59,10 @@ export async function GET(
                     ? comisionValor
                     : precioServicio * (comisionValor / 100);
                 const precioFinalAliado = precioServicio + comisionMonto;
+                // Config alterna Olaya Herrera (solo aeropuerto). null = usa config JMC.
+                const precioServicioOlaya = pv && pv.precioBaseOlaya != null ? Number(pv.precioBaseOlaya) : null;
+                const tipoComisionOlaya = (pv?.tipoComisionOlaya ?? null) as 'PORCENTAJE' | 'FIJO' | null;
+                const comisionValorOlaya = pv && pv.comisionValorOlaya != null ? Number(pv.comisionValorOlaya) : null;
                 return {
                     vehiculoId: sv.vehiculoId,
                     nombre: veh?.nombre ?? '',
@@ -70,6 +74,9 @@ export async function GET(
                     tipoComision,
                     comisionValor,
                     precioFinalAliado,
+                    precioServicioOlaya,
+                    tipoComisionOlaya,
+                    comisionValorOlaya,
                 };
             });
 
@@ -145,6 +152,19 @@ export async function POST(
                 const tipoComision = (v.tipoComision === 'FIJO' ? 'FIJO' : 'PORCENTAJE') as 'FIJO' | 'PORCENTAJE';
                 const comisionValor = Number(v.comisionValor) || 0;
                 const precioBase = Number(v.precioBase) || 0;
+                // Campos Olaya: null = usa config JMC (fallback en el cálculo).
+                const precioBaseOlaya = v.precioBaseOlaya != null ? Number(v.precioBaseOlaya) || 0 : null;
+                const comisionValorOlaya = v.comisionValorOlaya != null ? Number(v.comisionValorOlaya) || 0 : null;
+                const tipoComisionOlaya = v.tipoComisionOlaya === 'FIJO'
+                    ? 'FIJO'
+                    : v.tipoComisionOlaya === 'PORCENTAJE'
+                        ? 'PORCENTAJE'
+                        : null;
+                const olayaFields = {
+                    precioBaseOlaya,
+                    comisionValorOlaya,
+                    tipoComisionOlaya: tipoComisionOlaya as 'FIJO' | 'PORCENTAJE' | null,
+                };
                 return prisma.precioVehiculoAliado.upsert({
                     where: {
                         servicioAliadoId_vehiculoId: {
@@ -157,6 +177,7 @@ export async function POST(
                         precioBase,
                         tipoComision,
                         comisionValor,
+                        ...olayaFields,
                     },
                     create: {
                         servicioAliadoId: servicioAliado.id,
@@ -165,6 +186,7 @@ export async function POST(
                         precioBase,
                         tipoComision,
                         comisionValor,
+                        ...olayaFields,
                     }
                 });
             }));

@@ -182,9 +182,14 @@ export async function PUT(
                             if (!Number.isFinite(precio) || precio <= 0) {
                                 throw new Error('Cada vehículo del servicio requiere un precio mayor a 0');
                             }
+                            const precioOlaya =
+                                v.precioOlaya != null && Number.isFinite(Number(v.precioOlaya)) && Number(v.precioOlaya) > 0
+                                    ? Number(v.precioOlaya)
+                                    : null;
                             return {
                                 vehiculoId: v.vehiculoId,
                                 precio,
+                                precioOlaya,
                             };
                         }),
                     }
