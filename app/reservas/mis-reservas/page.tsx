@@ -642,7 +642,8 @@ function MisReservasContent() {
     const fetchReservas = useCallback(async () => {
         if (!aliadoId) return;
         try {
-            const res = await fetch(`/api/aliados/${aliadoId}/reservas`);
+            const qs = aliado?.codigo ? `?codigo=${encodeURIComponent(aliado.codigo)}` : '';
+            const res = await fetch(`/api/aliados/${aliadoId}/reservas${qs}`);
             const data = await res.json();
             setReservas(data.data || []);
         } catch (e) {
@@ -650,7 +651,7 @@ function MisReservasContent() {
         } finally {
             setLoading(false);
         }
-    }, [aliadoId]);
+    }, [aliadoId, aliado?.codigo]);
 
     useEffect(() => {
         if (ready && aliadoId) fetchReservas();

@@ -12,14 +12,29 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        // CR-04: require admin session — this endpoint exposes all reservations for an aliado
-        const session = await getServerSession(authOptions);
-        if (!session) {
-            return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-        }
+        // CR-04: este endpoint expone todas las reservas de un aliado.
+        // Acceso permitido si: (a) sesión admin de NextAuth, o
+        // (b) el aliado se identifica con su propio código (lo conoce solo el aliado).
+        // Esto mantiene la protección (un id sin el código correcto no autoriza)
+        // y permite que cada aliado vea sus reservas sin sesión admin.
         const { searchParams } = new URL(req.url);
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
+        const codigo = searchParams.get('codigo');
+
+        const session = await getServerSession(authOptions);
+        if (!session) {
+            if (!codigo) {
+                return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+            }
+            const aliado = await prisma.aliado.findUnique({
+                where: { id: params.id },
+                select: { codigo: true },
+            });
+            if (!aliado || aliado.codigo !== codigo) {
+                return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+            }
+        }
 
         const where: any = {
             aliadoId: params.id,
