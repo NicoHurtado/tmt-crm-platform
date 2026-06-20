@@ -219,8 +219,9 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                 return false;
             }
 
-            // Para servicios de aeropuerto O para aliados, solo el representante es obligatorio
-            if (service.esAeropuerto || !!aliadoId) {
+            // Solo el representante es obligatorio para: aeropuerto, aliados, tours
+            // compartidos y tours por persona. Los demás pasajeros son opcionales.
+            if (service.esAeropuerto || !!aliadoId || service.esCompartido || service.tipoTarifa === 'POR_PERSONA') {
                 return true;
             }
 
@@ -556,6 +557,7 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                             onBack={handleBack}
                             esAeropuerto={service.esAeropuerto}
                             isAlly={!!aliadoId}
+                            pasajerosOpcionales={service.esCompartido || service.tipoTarifa === 'POR_PERSONA'}
                         />
                     )}
                     {currentStep === 3 && (

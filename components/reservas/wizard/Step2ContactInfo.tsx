@@ -14,10 +14,14 @@ interface Step2Props {
     onBack: () => void;
     esAeropuerto?: boolean; // Cuando es true, los pasajeros adicionales son opcionales
     isAlly?: boolean; // Cuando es true, los pasajeros adicionales son opcionales
+    pasajerosOpcionales?: boolean; // Tours compartidos / por persona: solo el representante es obligatorio
 }
 
-export default function Step2ContactInfo({ formData, updateFormData, onNext, onBack, esAeropuerto = false, isAlly = false }: Step2Props) {
+export default function Step2ContactInfo({ formData, updateFormData, onNext, onBack, esAeropuerto = false, isAlly = false, pasajerosOpcionales = false }: Step2Props) {
     const { language } = useLanguage();
+
+    // Cuando solo el representante es obligatorio (aeropuerto, aliado, compartido, por persona).
+    const optionalPassengers = esAeropuerto || isAlly || pasajerosOpcionales;
 
     // Number of additional passengers (beyond the main contact)
     const additionalPassengersNeeded = Math.max(0, formData.numeroPasajeros - 1);
@@ -27,8 +31,8 @@ export default function Step2ContactInfo({ formData, updateFormData, onNext, onB
 
     // Ensure we have the correct number of attendees based on numeroPasajeros
     useEffect(() => {
-        // Para servicios de aeropuerto O aliados, solo crear el primer asistente (representante)
-        if (esAeropuerto || isAlly) {
+        // Cuando solo el representante es obligatorio, crear solo el primer asistente (representante)
+        if (optionalPassengers) {
             const currentAttendees = formData.asistentes.length;
             // Solo inicializar si no hay asistentes o si el representante no existe
             if (currentAttendees === 0) {
@@ -79,7 +83,7 @@ export default function Step2ContactInfo({ formData, updateFormData, onNext, onB
 
             updateFormData({ asistentes: newAsistentes });
         }
-    }, [formData.numeroPasajeros, esAeropuerto, isAlly]);
+    }, [formData.numeroPasajeros, esAeropuerto, isAlly, pasajerosOpcionales]);
 
     // Sync contact info to first attendee when contact fields change
     const updateContactAndFirstAttendee = (field: 'nombreCliente' | 'emailCliente' | 'whatsappCliente', value: string) => {
@@ -176,8 +180,8 @@ export default function Step2ContactInfo({ formData, updateFormData, onNext, onB
             formData.emailCliente.includes('@') &&
             (formData.numeroDocumentoCliente?.trim().length || 0) >= 4;
 
-        // Para servicios de aeropuerto O aliados, solo el representante es obligatorio
-        if (esAeropuerto || isAlly) {
+        // Cuando solo el representante es obligatorio, basta con sus datos.
+        if (optionalPassengers) {
             return contactValid;
         }
 
@@ -329,8 +333,8 @@ export default function Step2ContactInfo({ formData, updateFormData, onNext, onB
             {/* Additional Passengers - Different behavior for airport/ally vs other services */}
             {additionalPassengersNeeded > 0 && (
                 <div className="space-y-4">
-                    {/* Para servicios de aeropuerto O aliados: Botón para agregar pasajeros opcionales */}
-                    {esAeropuerto || isAlly ? (
+                    {/* Solo representante obligatorio: botón para agregar pasajeros opcionales */}
+                    {optionalPassengers ? (
                         <>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
