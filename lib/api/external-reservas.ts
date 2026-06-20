@@ -13,7 +13,7 @@ import { calculateReservationPrice } from '@/lib/priceCalculator';
 import { getLocalizedText } from '@/types/multi-language';
 import { buildDatosFromBody, getDatos } from '@/types/reserva-datos';
 import { validateFieldValues, validateDynamicFieldsSafe } from '@/types/dynamic-fields';
-import { getConfiguracion } from '@/types/servicio-config';
+import { getConfiguracion, totalPorPersona } from '@/types/servicio-config';
 
 const RESERVA_INCLUDE = {
     servicio: true,
@@ -274,52 +274,81 @@ export async function createExternalReserva(body: any): Promise<ReservaWithRelat
               ? null
               : assertEnum(body.estadoPago, ESTADOS_PAGO, 'estadoPago');
 
-    const vehiculoEntry = selectVehicle(servicio, numeroPasajeros, body.vehiculoId);
+    const cfg = getConfiguracion(servicio.configuracion);
+    const esPorPersona = cfg.tipoTarifa === 'POR_PERSONA';
     const datosReserva = buildDatosFromBody(body);
-    validateDynamicPayload(servicio, datosReserva);
 
-    const aeropuertoNombre: 'JOSE_MARIA_CORDOVA' | 'OLAYA_HERRERA' | null =
-        servicio.esAeropuerto &&
-        (body.aeropuertoNombre === 'JOSE_MARIA_CORDOVA' || body.aeropuertoNombre === 'OLAYA_HERRERA')
-            ? body.aeropuertoNombre
-            : null;
+    let vehiculoId: string | null = null;
+    let municipioFinal: Municipio | null = municipio;
+    let aeropuertoNombre: 'JOSE_MARIA_CORDOVA' | 'OLAYA_HERRERA' | null = null;
+    let precioBase = 0;
+    let precioAdicionales = 0;
+    let recargoNocturno = 0;
+    let tarifaMunicipio = 0;
+    let descuentoAliado = 0;
+    let precioTotal = 0;
 
-    const { breakdown, precioAdicionales } = await calculateExternalPrice({
-        servicio,
-        vehiculoId: vehiculoEntry.vehiculoId,
-        datosDinamicos: datosReserva,
-        fecha,
-        hora,
-        municipio,
-        aeropuertoNombre,
-    });
+    if (esPorPersona) {
+        // Tour por persona: total = precio del tramo (1/2/3+) × nº de personas.
+        // Sin vehículo, sin municipio, sin recargos ni adicionales.
+        precioBase = totalPorPersona(cfg.preciosPorPersona, numeroPasajeros);
+        if (precioBase <= 0) {
+            throw new Error('El servicio es por persona pero no tiene precios por persona configurados');
+        }
+        municipioFinal = null;
+        precioTotal = precioBase;
+    } else {
+        const vehiculoEntry = selectVehicle(servicio, numeroPasajeros, body.vehiculoId);
+        vehiculoId = vehiculoEntry.vehiculoId;
+        validateDynamicPayload(servicio, datosReserva);
+        aeropuertoNombre =
+            servicio.esAeropuerto &&
+            (body.aeropuertoNombre === 'JOSE_MARIA_CORDOVA' || body.aeropuertoNombre === 'OLAYA_HERRERA')
+                ? body.aeropuertoNombre
+                : null;
+        const calc = await calculateExternalPrice({
+            servicio,
+            vehiculoId: vehiculoEntry.vehiculoId,
+            datosDinamicos: datosReserva,
+            fecha,
+            hora,
+            municipio,
+            aeropuertoNombre,
+        });
+        precioBase = Number(calc.breakdown.precioBase);
+        precioAdicionales = calc.precioAdicionales;
+        recargoNocturno = Number(calc.breakdown.recargoNocturno);
+        tarifaMunicipio = Number(calc.breakdown.tarifaMunicipio);
+        descuentoAliado = Number(calc.breakdown.descuentoAliado);
+        precioTotal = Number(calc.breakdown.total) - Number(calc.breakdown.comisionAliado);
+    }
 
     const codigo = await generateUniqueCodigo();
     return prisma.reserva.create({
         data: {
             codigo,
             servicioId: servicio.id,
-            vehiculoId: vehiculoEntry.vehiculoId,
+            vehiculoId,
             fecha,
             hora,
             nombreCliente: body.nombreCliente,
             whatsappCliente: body.whatsappCliente,
             emailCliente: body.emailCliente,
             idioma,
-            municipio,
+            municipio: municipioFinal,
             otroMunicipio: body.otroMunicipio || null,
             municipioConfigId: body.municipioConfigId || null,
             numeroPasajeros,
             aeropuertoNombre,
             datos: datosReserva as any,
-            precioBase: breakdown.precioBase,
+            precioBase,
             precioAdicionales,
-            recargoNocturno: breakdown.recargoNocturno,
-            tarifaMunicipio: breakdown.tarifaMunicipio,
-            descuentoAliado: breakdown.descuentoAliado,
+            recargoNocturno,
+            tarifaMunicipio,
+            descuentoAliado,
             comisionAliado: 0,
             comisionBold: 0,
-            precioTotal: breakdown.total - breakdown.comisionAliado,
+            precioTotal,
             estado,
             estadoPago,
             metodoPago,
@@ -402,36 +431,62 @@ export async function updateExternalReserva(codigo: string, body: any): Promise<
         const servicio = await findServicio(mergedBody);
         if (!servicio) throw new Error('Servicio no disponible');
         const numeroPasajeros = parsePositiveInt(mergedBody.numeroPasajeros, 'numeroPasajeros');
-        const vehiculoEntry = selectVehicle(servicio, numeroPasajeros, mergedBody.vehiculoId);
         const fecha = parseDate(mergedBody.fecha);
         const hora = parseHora(mergedBody.hora);
-        const municipio = assertEnum(mergedBody.municipio, MUNICIPIOS, 'municipio');
-        validateDynamicPayload(servicio, mergedBody.datosDinamicos);
-        const { breakdown, precioAdicionales } = await calculateExternalPrice({
-            servicio,
-            vehiculoId: vehiculoEntry.vehiculoId,
-            datosDinamicos: mergedBody.datosDinamicos,
-            fecha,
-            hora,
-            municipio,
-        });
+        const cfg = getConfiguracion(servicio.configuracion);
 
-        updateData.servicio = { connect: { id: servicio.id } };
-        updateData.vehiculo = { connect: { id: vehiculoEntry.vehiculoId } };
-        updateData.fecha = fecha;
-        updateData.hora = hora;
-        updateData.numeroPasajeros = numeroPasajeros;
-        updateData.municipio = municipio;
-        updateData.datos = mergedBody.datosDinamicos as any;
-        updateData.esReservaAliado = false;
-        updateData.precioBase = breakdown.precioBase;
-        updateData.precioAdicionales = precioAdicionales;
-        updateData.recargoNocturno = breakdown.recargoNocturno;
-        updateData.tarifaMunicipio = breakdown.tarifaMunicipio;
-        updateData.descuentoAliado = breakdown.descuentoAliado;
-        updateData.comisionAliado = 0;
-        updateData.comisionBold = 0;
-        updateData.precioTotal = breakdown.total - breakdown.comisionAliado;
+        if (cfg.tipoTarifa === 'POR_PERSONA') {
+            // Tour por persona: total = precio del tramo × nº de personas. Sin vehículo ni municipio.
+            const precioBase = totalPorPersona(cfg.preciosPorPersona, numeroPasajeros);
+            if (precioBase <= 0) {
+                throw new Error('El servicio es por persona pero no tiene precios por persona configurados');
+            }
+            updateData.servicio = { connect: { id: servicio.id } };
+            updateData.vehiculo = { disconnect: true };
+            updateData.fecha = fecha;
+            updateData.hora = hora;
+            updateData.numeroPasajeros = numeroPasajeros;
+            updateData.municipio = null;
+            updateData.datos = mergedBody.datosDinamicos as any;
+            updateData.esReservaAliado = false;
+            updateData.precioBase = precioBase;
+            updateData.precioAdicionales = 0;
+            updateData.recargoNocturno = 0;
+            updateData.tarifaMunicipio = 0;
+            updateData.descuentoAliado = 0;
+            updateData.comisionAliado = 0;
+            updateData.comisionBold = 0;
+            updateData.precioTotal = precioBase;
+        } else {
+            const vehiculoEntry = selectVehicle(servicio, numeroPasajeros, mergedBody.vehiculoId);
+            const municipio = assertEnum(mergedBody.municipio, MUNICIPIOS, 'municipio');
+            validateDynamicPayload(servicio, mergedBody.datosDinamicos);
+            const { breakdown, precioAdicionales } = await calculateExternalPrice({
+                servicio,
+                vehiculoId: vehiculoEntry.vehiculoId,
+                datosDinamicos: mergedBody.datosDinamicos,
+                fecha,
+                hora,
+                municipio,
+            });
+
+            updateData.servicio = { connect: { id: servicio.id } };
+            updateData.vehiculo = { connect: { id: vehiculoEntry.vehiculoId } };
+            updateData.fecha = fecha;
+            updateData.hora = hora;
+            updateData.numeroPasajeros = numeroPasajeros;
+            updateData.municipio = municipio;
+            updateData.datos = mergedBody.datosDinamicos as any;
+            updateData.esReservaAliado = false;
+            updateData.precioBase = breakdown.precioBase;
+            updateData.precioAdicionales = precioAdicionales;
+            updateData.recargoNocturno = breakdown.recargoNocturno;
+            updateData.tarifaMunicipio = breakdown.tarifaMunicipio;
+            updateData.descuentoAliado = breakdown.descuentoAliado;
+            updateData.comisionAliado = 0;
+            updateData.comisionBold = 0;
+            updateData.precioTotal = breakdown.total - breakdown.comisionAliado;
+        }
     }
 
     if (Array.isArray(body.asistentes)) {
