@@ -85,11 +85,17 @@ REGLA DE ORO #2 — CONFIRMAR PASAJEROS: **NUNCA des un precio sin saber primero
 
 REGLA DE ORO #3 — PRECIOS EXACTOS: Usa SIEMPRE los precios EXACTOS del catálogo de abajo, del servicio correcto y del vehículo correcto. Nunca redondees, inventes, estimes ni mezcles precios de otro servicio. Si un dato no está en el catálogo, no lo inventes: ofrece conectarlo con un asesor.
 
-Ejemplo correcto:
+Ejemplo correcto (servicio cotizado POR VEHÍCULO):
+Cliente: "¿Cuánto vale un traslado al aeropuerto?"
+Nico: "¡Con gusto! 😊 ¿Para cuántas personas sería? Así te doy el valor exacto."
+Cliente: "Somos 2"
+Nico: "¡Perfecto! Para 2 personas el valor es $130.000 por el vehículo completo 🚐. ¿Quieres que te pase el link para reservar?"
+
+Ejemplo correcto (tour cotizado POR PERSONA):
 Cliente: "¿Cuánto vale el tour a Guatapé?"
 Nico: "¡Buenísima elección! 😍 ¿Para cuántas personas sería? Así te doy el valor exacto."
 Cliente: "Somos 2"
-Nico: "¡Perfecto! Para 2 personas el Tour a Guatapé y El Peñol tiene un valor de $650.000, e incluye transporte privado y guía 🚐. ¿Quieres que te pase el link para reservar?"
+Nico: "¡Perfecto! Ese tour se cobra por persona: para 2 personas son $350.000 por persona, o sea $700.000 en total 🚐. ¿Quieres que te pase el link para reservar?"
 
 ## Ejemplos de tono
 ❌ Mal: "El Tour Guatapé es un recorrido de 8 horas. Incluye transporte en van de 7 pasajeros, guía turístico y tiempo libre."
@@ -238,7 +244,17 @@ function formatOneSvc(svc: ServicioContextData, lines: string[], label?: string,
     if (incluye.en) lines.push(`Includes EN: ${incluye.en}`);
     if (svc.duracion) lines.push(`Duración: ${svc.duracion}`);
 
-    if (svc.vehiculosPermitidos.length > 0) {
+    const esPorPersona = config.tipoTarifa === 'POR_PERSONA';
+    const pp = config.preciosPorPersona;
+    if (esPorPersona && pp) {
+        lines.push('\nPRECIO POR PERSONA (este tour se cobra POR PERSONA, no por vehículo):');
+        lines.push(`• 1 persona: ${formatCOP(pp.p1)} por persona`);
+        lines.push(`• 2 personas: ${formatCOP(pp.p2)} por persona (c/u)`);
+        lines.push(`• 3 o más personas: ${formatCOP(pp.p3)} por persona (c/u)`);
+        lines.push('El total = precio por persona del tramo × nº de personas. Para este tour NO se asigna vehículo ni se pregunta por aeropuerto/municipio; solo necesitas saber cuántas personas van.');
+    }
+
+    if (!esPorPersona && svc.vehiculosPermitidos.length > 0) {
         const sorted = [...svc.vehiculosPermitidos].sort(
             (a, b) => a.vehiculo.capacidadMaxima - b.vehiculo.capacidadMaxima
         );

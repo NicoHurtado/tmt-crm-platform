@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getLocalizedText } from '@/types/multi-language';
+import { getConfiguracion } from '@/types/servicio-config';
 import {
     buildFullSystemPrompt,
     formatServicioContext,
@@ -23,6 +24,9 @@ export type CatalogService = {
     descripcionEN: string;
     incluye: unknown;
     precioDesde: number;
+    // Tarifa por persona: 'POR_PERSONA' => el precio es por persona (tramos 1/2/3+), no por vehículo.
+    tipoTarifa: 'POR_PERSONA' | null;
+    preciosPorPersona: { p1: number; p2: number; p3: number } | null;
     duracion: string | null;
     esAeropuerto: boolean;
     esPorHoras: boolean;
@@ -113,9 +117,19 @@ export function toCatalogServices(
     const base = appBaseUrl(appUrl);
 
     return rawServicios.map((s) => {
+        const cfg = getConfiguracion(s.configuracion);
+        const esPorPersona = cfg.tipoTarifa === 'POR_PERSONA';
+        const pp = esPorPersona ? cfg.preciosPorPersona ?? null : null;
+
         const precios = s.vehiculosPermitidos
             .map((sv) => Number(sv.precio ?? 0))
             .filter((p) => p > 0);
+
+        // Para tours por persona, el precio de referencia es el precio por persona (p1),
+        // igual que se muestra en la web. No se exponen vehículos (no aplican).
+        const precioDesde = esPorPersona
+            ? Number(pp?.p1 ?? 0)
+            : precios.length > 0 ? Math.min(...precios) : 0;
 
         return {
             id: s.id,
@@ -127,7 +141,9 @@ export function toCatalogServices(
             descripcionES: getLocalizedText(s.descripcion, 'ES'),
             descripcionEN: getLocalizedText(s.descripcion, 'EN'),
             incluye: s.incluye,
-            precioDesde: precios.length > 0 ? Math.min(...precios) : 0,
+            precioDesde,
+            tipoTarifa: esPorPersona ? 'POR_PERSONA' : null,
+            preciosPorPersona: pp,
             duracion: s.duracion,
             esAeropuerto: s.esAeropuerto,
             esPorHoras: s.esPorHoras,
@@ -143,7 +159,7 @@ export function toCatalogServices(
                 : { aplica: false },
             configuracion: s.configuracion,
             linkReserva: `${base}/reservas?serviceId=${s.id}&form=1`,
-            vehiculos: s.vehiculosPermitidos.map((sv) => ({
+            vehiculos: esPorPersona ? [] : s.vehiculosPermitidos.map((sv) => ({
                 id: sv.vehiculo.id,
                 nombre: sv.vehiculo.nombre,
                 capacidadMinima: sv.vehiculo.capacidadMinima,
