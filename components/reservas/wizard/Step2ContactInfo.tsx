@@ -2,7 +2,7 @@
 
 import { ReservationFormData, Asistente } from '@/types/reservation';
 import { TipoDocumento } from '@prisma/client';
-import { FiUser, FiUsers, FiAlertCircle, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiUser, FiUsers, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { useLanguage, t } from '@/lib/i18n';
 import LegalNotice from '@/components/LegalNotice';
 import { useEffect, useState } from 'react';
@@ -504,18 +504,6 @@ export default function Step2ContactInfo({ formData, updateFormData, onNext, onB
                             </div>
                         </>
                     )}
-                </div>
-            )}
-
-            {/* Warning if not all passengers filled - Only show for non-airport/non-ally services */}
-            {!esAeropuerto && !isAlly && completedPassengers < formData.numeroPasajeros && formData.numeroPasajeros > 0 && (
-                <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-800">
-                    <FiAlertCircle size={20} />
-                    <p className="text-sm">
-                        {language === 'es'
-                            ? `Debes completar los datos de todos los ${formData.numeroPasajeros} pasajeros para continuar.`
-                            : `You must complete the details for all ${formData.numeroPasajeros} passengers to continue.`}
-                    </p>
                 </div>
             )}
 
