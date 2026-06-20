@@ -38,6 +38,10 @@ interface Service {
     destinoAutoFill: string | null;
     camposPersonalizados: any[];
     vehiculosPermitidos?: any[];
+    /** Categoría de tarifa. 'POR_PERSONA' => precio por persona en tramos (1/2/3+). */
+    tipoTarifa?: 'POR_PERSONA' | null;
+    /** Precios por persona (solo cuando tipoTarifa === 'POR_PERSONA'). */
+    preciosPorPersona?: { p1: number; p2: number; p3: number } | null;
 }
 
 interface ReservationWizardProps {

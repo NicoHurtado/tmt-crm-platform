@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { EstadoReserva, Prisma } from '@prisma/client';
 import { buildDatosFromBody } from '@/types/reserva-datos';
 import { calculateBoldCommission } from '@/lib/bold';
+import { getConfiguracion, totalPorPersona } from '@/types/servicio-config';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import crypto from 'crypto';
@@ -98,19 +99,27 @@ export async function POST(request: Request) {
             );
         }
 
-        // Validar campos requeridos (municipio no es requerido para TOUR_COMPARTIDO)
+        // Categoría de tarifa por persona: formulario ágil (sin hora, vehículo ni municipio)
+        const cfgServicio = getConfiguracion((servicio as any).configuracion);
+        const esPorPersona = cfgServicio.tipoTarifa === 'POR_PERSONA';
+
+        // Validar campos requeridos (municipio/hora no requeridos para TOUR_COMPARTIDO ni por persona)
         const requiredFields = [
             'servicioId',
             'fecha',
-            'hora',
             'nombreCliente',
             'whatsappCliente',
             'emailCliente',
             'numeroPasajeros',
         ];
 
-        // Add municipio to required fields only if NOT a shared tour
-        if (!servicio.esCompartido) {
+        // hora no aplica a tours por persona (no hay selección de hora)
+        if (!esPorPersona) {
+            requiredFields.push('hora');
+        }
+
+        // Add municipio to required fields only if NOT a shared tour / per-person tour
+        if (!servicio.esCompartido && !esPorPersona) {
             requiredFields.push('municipio');
         }
 
@@ -129,18 +138,44 @@ export async function POST(request: Request) {
         // Generar código único de 8 caracteres
         const codigo = await generateUniqueCodigo();
 
+        // Precio calculado server-side para tours por persona (no se confía en el front)
         // Componentes del precio base (sin comisión de aliado ni Bold)
-        const precioBase = parseFloat(body.precioBase) || 0;
-        const precioAdicionales = parseFloat(body.precioAdicionales) || 0;
-        const recargoNocturno = parseFloat(body.recargoNocturno) || 0;
-        const tarifaMunicipio = (parseFloat(body.tarifaMunicipio) || 0) + (parseFloat(body.tarifaMunicipioConfig) || 0);
+        let precioBase = parseFloat(body.precioBase) || 0;
+        let precioAdicionales = parseFloat(body.precioAdicionales) || 0;
+        let recargoNocturno = parseFloat(body.recargoNocturno) || 0;
+        let tarifaMunicipio = (parseFloat(body.tarifaMunicipio) || 0) + (parseFloat(body.tarifaMunicipioConfig) || 0);
         const descuentoAliado = parseFloat(body.descuentoAliado) || 0;
-
-        const subtotal = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio - descuentoAliado;
 
         // Calcular comisión de aliado si aplica — ahora por (aliado, servicio, vehículo)
         let comisionAliado = 0;
-        if (body.esReservaAliado && body.aliadoId && body.vehiculoId) {
+
+        if (esPorPersona) {
+            // 🔒 Recálculo autoritativo desde la configuración del servicio.
+            // total = precio del tramo (1/2/3+) × nº de pasajeros. Sin vehículo ni municipio.
+            const pasajeros = parseInt(body.numeroPasajeros) || 1;
+            precioBase = totalPorPersona(cfgServicio.preciosPorPersona, pasajeros);
+            precioAdicionales = 0;
+            recargoNocturno = 0;
+            tarifaMunicipio = 0;
+
+            // Comisión por tipo de aliado: HOTEL/AIRBNB +10%, AGENCIA −10% (sobre el precio base).
+            if (body.esReservaAliado && body.aliadoId) {
+                try {
+                    const aliado = await prisma.aliado.findUnique({
+                        where: { id: body.aliadoId },
+                        select: { tipo: true },
+                    });
+                    if (aliado?.tipo === 'HOTEL' || aliado?.tipo === 'AIRBNB') {
+                        comisionAliado = Math.round(precioBase * 0.1);
+                    } else if (aliado?.tipo === 'AGENCIA') {
+                        comisionAliado = -Math.round(precioBase * 0.1);
+                    }
+                } catch (e) {
+                    console.error('Error calculating per-person ally commission:', e);
+                }
+            }
+        } else if (body.esReservaAliado && body.aliadoId && body.vehiculoId) {
+            const subtotalPrevio = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio - descuentoAliado;
             try {
                 const sa = await prisma.servicioAliado.findUnique({
                     where: {
@@ -162,13 +197,15 @@ export async function POST(request: Request) {
                         ? Number(pv.comisionValorOlaya)
                         : Number(pv.comisionValor);
                     comisionAliado = tipoComision === 'PORCENTAJE'
-                        ? subtotal * (comisionValor / 100)
+                        ? subtotalPrevio * (comisionValor / 100)
                         : comisionValor;
                 }
             } catch (e) {
                 console.error('Error calculating ally commission:', e);
             }
         }
+
+        const subtotal = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio - descuentoAliado;
 
         // Subtotal final incluye comisión de aliado (el cliente la paga)
         const subtotalTotal = subtotal + comisionAliado;
@@ -227,19 +264,19 @@ export async function POST(request: Request) {
                             codigo: codigoActual,
                             servicioId: body.servicioId,
                             fecha: new Date(body.fecha + 'T12:00:00.000Z'),
-                            hora: body.hora,
+                            hora: body.hora || (esPorPersona ? '08:00' : body.hora),
                             nombreCliente: body.nombreCliente,
                             whatsappCliente: body.whatsappCliente,
                             emailCliente: body.emailCliente,
                             idioma: body.idioma || 'ES',
-                            municipio: body.municipio || null,
+                            municipio: esPorPersona ? null : (body.municipio || null),
                             otroMunicipio: body.otroMunicipio || null,
                             aeropuertoNombre:
                                 body.aeropuertoNombre === 'JOSE_MARIA_CORDOVA' || body.aeropuertoNombre === 'OLAYA_HERRERA'
                                     ? body.aeropuertoNombre
                                     : null,
                             numeroPasajeros: parseInt(body.numeroPasajeros),
-                            vehiculoId: body.vehiculoId || null,
+                            vehiculoId: esPorPersona ? null : (body.vehiculoId || null),
 
                             // Datos específicos del servicio (unificados en JSON)
                             datos: datosReserva as any,

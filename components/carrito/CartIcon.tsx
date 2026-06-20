@@ -55,10 +55,10 @@ export const CartIcon = ({ onClick, className = '' }: CartIconProps) => {
     return (
         <button
             onClick={onClick}
-            className={`relative p-2 hover:bg-gray-100 rounded-full transition-colors ${className}`}
+            className={`relative p-2 text-gray-700 hover:bg-gray-100 rounded-full transition-colors ${className}`}
             aria-label="Carrito de compras"
         >
-            <ShoppingCart className="w-6 h-6 text-gray-700" />
+            <ShoppingCart className="w-6 h-6" />
             {itemCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-[#D6A75D] text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                     {itemCount > 9 ? '9+' : itemCount}

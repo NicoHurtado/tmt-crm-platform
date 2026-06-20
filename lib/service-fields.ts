@@ -34,6 +34,8 @@ export interface ServiceDescriptor {
     esMunicipal?: boolean;
     esTraslado?: boolean;
     esPorHoras?: boolean;
+    /** 'POR_PERSONA' => tour con precio por persona (formulario ágil con dirección de recogida). */
+    tipoTarifa?: 'POR_PERSONA' | null;
 }
 
 /**
@@ -46,6 +48,15 @@ export function getCamposBuiltin(service: ServiceDescriptor): CampoBuiltin[] {
         return [
             { id: 'fecha', required: true, labelEs: 'Fecha', labelEn: 'Date' },
             { id: 'numeroPasajeros', required: true, labelEs: 'Pasajeros', labelEn: 'Passengers' },
+        ];
+    }
+
+    // Tours con precio por persona: formulario ágil con dirección de recogida
+    if (service.tipoTarifa === 'POR_PERSONA') {
+        return [
+            { id: 'fecha', required: true, labelEs: 'Fecha', labelEn: 'Date' },
+            { id: 'numeroPasajeros', required: true, labelEs: 'Pasajeros', labelEn: 'Passengers' },
+            { id: 'lugarRecogida', required: true, labelEs: 'Dirección de recogida', labelEn: 'Pickup address' },
         ];
     }
 

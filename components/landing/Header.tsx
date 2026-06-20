@@ -5,11 +5,18 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { FiMenu, FiX, FiGlobe, FiLogIn, FiCalendar, FiLogOut, FiChevronDown, FiUser } from 'react-icons/fi';
 import AliadoModal from './AliadoModal';
+import { CartIcon } from '@/components/carrito/CartIcon';
 import { useLanguage, t } from '@/lib/i18n';
 import { useAliado } from '@/lib/hooks/useAliado';
 import { useRouter } from 'next/navigation';
 
-export default function Header() {
+interface HeaderProps {
+    /** Muestra el ícono de carrito en la barra (solo páginas con carrito, ej. /reservas). */
+    showCart?: boolean;
+    onCartClick?: () => void;
+}
+
+export default function Header({ showCart = false, onCartClick }: HeaderProps) {
     const [isScrolled, setIsScrolled] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isAliadoModalOpen, setIsAliadoModalOpen] = useState(false);
@@ -93,6 +100,10 @@ export default function Header() {
                             {language.toUpperCase()}
                         </button>
 
+                        {showCart && onCartClick && (
+                            <CartIcon onClick={onCartClick} className="!text-white hover:!bg-white/10" />
+                        )}
+
                         <Link
                             href="/reservas"
                             className="bg-[#D6A75D] hover:bg-[#C5964A] text-black font-bold py-2 px-6 rounded-lg transition-all transform hover:scale-105 active:scale-95 text-sm"
@@ -164,13 +175,19 @@ export default function Header() {
                         )}
                     </nav>
 
-                    {/* Mobile Menu Button */}
-                    <button
-                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        className="md:hidden relative z-50 text-white p-2"
-                    >
-                        {isMobileMenuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
-                    </button>
+                    {/* Mobile: carrito + botón de menú */}
+                    <div className="md:hidden flex items-center gap-1 relative z-50">
+                        {showCart && onCartClick && !isMobileMenuOpen && (
+                            <CartIcon onClick={onCartClick} className="!text-white hover:!bg-white/10" />
+                        )}
+                        <button
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            className="text-white p-2"
+                            aria-label="Menú"
+                        >
+                            {isMobileMenuOpen ? <FiX size={24} /> : <FiMenu size={24} />}
+                        </button>
+                    </div>
                 </div>
             </header>
 

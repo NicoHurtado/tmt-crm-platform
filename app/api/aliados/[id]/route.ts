@@ -76,6 +76,7 @@ export async function PUT(
         if (body.ciudad !== undefined) updateData.ciudad = body.ciudad;
         if (body.direccion !== undefined) updateData.direccion = body.direccion;
         if (body.contacto !== undefined) updateData.contacto = body.contacto;
+        if (body.imagen !== undefined) updateData.imagen = body.imagen;
         if (body.notas !== undefined) updateData.notas = body.notas;
 
         const aliado = await prisma.aliado.update({

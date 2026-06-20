@@ -63,6 +63,8 @@ interface Servicio {
   esPorHoras: boolean
   esCompartido: boolean
   esMunicipal: boolean
+  tipoTarifa?: 'POR_PERSONA' | null
+  preciosPorPersona?: { p1: number; p2: number; p3: number } | null
   destinoAutoFill: string | null
   camposPersonalizados: any[]
   vehiculosPermitidos: { id: string; precio: number; vehiculo: { id: string; nombre: string } }[]
@@ -76,6 +78,7 @@ export default function ServiciosPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [activoFilter, setActivoFilter] = useState('ALL')
+  const [catFilter, setCatFilter] = useState<'todos' | 'aeropuerto' | 'tours' | 'compartidos' | 'otros'>('todos')
   const [tab, setTab] = useState<'servicios' | 'municipal' | 'ubicaciones'>('servicios')
 
   // Municipios config state
@@ -243,6 +246,29 @@ export default function ServiciosPage() {
   const nonMunicipal = servicios.filter((s) => !s.esMunicipal)
   const municipal = servicios.filter((s) => s.esMunicipal)
 
+  // Categoriza un servicio (misma lógica que la página pública de reservas)
+  const categorizar = (s: Servicio): 'aeropuerto' | 'tours' | 'compartidos' | 'otros' => {
+    if (s.esAeropuerto) return 'aeropuerto'
+    if (s.tipoTarifa === 'POR_PERSONA') return 'tours'
+    if (s.esCompartido) return 'compartidos'
+    return 'otros'
+  }
+
+  const catCounts = { todos: nonMunicipal.length, aeropuerto: 0, tours: 0, compartidos: 0, otros: 0 }
+  nonMunicipal.forEach((s) => { catCounts[categorizar(s)]++ })
+
+  const categorias = [
+    { key: 'todos', label: 'Todos' },
+    { key: 'aeropuerto', label: 'Aeropuerto' },
+    { key: 'tours', label: 'Tours' },
+    { key: 'compartidos', label: 'Tours compartidos' },
+    { key: 'otros', label: 'Otros servicios' },
+  ] as const
+
+  const nonMunicipalFiltered = catFilter === 'todos'
+    ? nonMunicipal
+    : nonMunicipal.filter((s) => categorizar(s) === catFilter)
+
   return (
     <div className="flex flex-col gap-4 p-6 w-full">
       {/* Header */}
@@ -303,6 +329,32 @@ export default function ServiciosPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Franja de categorías (solo tab Servicios) */}
+      {tab === 'servicios' && (
+        <div className="flex flex-wrap gap-2">
+          {categorias.map(({ key, label }) => {
+            const active = catFilter === key
+            const count = catCounts[key]
+            return (
+              <button
+                key={key}
+                onClick={() => setCatFilter(key)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  active
+                    ? 'bg-amber-500 text-white border-amber-500'
+                    : 'bg-white text-neutral-600 border-neutral-200 hover:border-amber-400 hover:text-neutral-900'
+                }`}
+              >
+                {label}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${active ? 'bg-white/25' : 'bg-neutral-100 text-neutral-500'}`}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Services list */}
       {tab === 'ubicaciones' ? (
@@ -430,9 +482,11 @@ export default function ServiciosPage() {
           onToggle={handleToggleActive}
           onDelete={handleDelete}
         />
-      ) : nonMunicipal.length === 0 ? (
+      ) : nonMunicipalFiltered.length === 0 ? (
         <div className="border border-neutral-200 rounded-lg py-16 text-center bg-white">
-          <p className="text-sm text-neutral-400 mb-3">No se encontraron servicios</p>
+          <p className="text-sm text-neutral-400 mb-3">
+            {catFilter === 'todos' ? 'No se encontraron servicios' : 'No hay servicios en esta categoría'}
+          </p>
           <Button size="sm" asChild className="gap-1.5">
             <Link href="/admin/dashboard/servicios/crear">
               <Plus size={14} />
@@ -442,7 +496,7 @@ export default function ServiciosPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {nonMunicipal.map((s) => (
+          {nonMunicipalFiltered.map((s) => (
             <div
               key={s.id}
               className="border border-neutral-200 rounded-lg bg-white p-4 hover:border-neutral-300 transition-colors"
@@ -482,31 +536,54 @@ export default function ServiciosPage() {
                             Visible en reservas · pos. {s.orden}
                           </Badge>
                         )}
+                        {s.tipoTarifa === 'POR_PERSONA' && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-medium h-5 bg-amber-50 text-amber-700 border-amber-200"
+                            title="Tarifa por persona (tramos 1 / 2 / 3+)"
+                          >
+                            Por persona
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-neutral-500 mt-1.5 line-clamp-1">
                         {getLocalizedText(s.descripcion, 'ES')}
                       </p>
                       <div className="flex items-center gap-4 mt-1.5 text-xs text-neutral-500">
-                        {(() => {
-                          const precios = (s.vehiculosPermitidos || [])
-                            .map((v: any) => Number(v.precio ?? 0))
-                            .filter((p: number) => p > 0);
-                          if (precios.length === 0) return null;
-                          return (
+                        {s.tipoTarifa === 'POR_PERSONA' ? (
+                          (s.preciosPorPersona?.p1 ?? 0) > 0 && (
                             <span>
                               Desde:{' '}
                               <span className="font-semibold text-neutral-700">
-                                ${Math.min(...precios).toLocaleString('es-CO')}
+                                ${Number(s.preciosPorPersona!.p1).toLocaleString('es-CO')}
+                              </span>
+                              <span className="text-neutral-400"> / persona</span>
+                            </span>
+                          )
+                        ) : (
+                          <>
+                            {(() => {
+                              const precios = (s.vehiculosPermitidos || [])
+                                .map((v: any) => Number(v.precio ?? 0))
+                                .filter((p: number) => p > 0);
+                              if (precios.length === 0) return null;
+                              return (
+                                <span>
+                                  Desde:{' '}
+                                  <span className="font-semibold text-neutral-700">
+                                    ${Math.min(...precios).toLocaleString('es-CO')}
+                                  </span>
+                                </span>
+                              );
+                            })()}
+                            <span>
+                              Vehículos:{' '}
+                              <span className="font-semibold text-neutral-700">
+                                {s.vehiculosPermitidos.length}
                               </span>
                             </span>
-                          );
-                        })()}
-                        <span>
-                          Vehículos:{' '}
-                          <span className="font-semibold text-neutral-700">
-                            {s.vehiculosPermitidos.length}
-                          </span>
-                        </span>
+                          </>
+                        )}
                         {(s._count?.reservas ?? 0) > 0 ? (
                           <Link
                             href={`/admin/dashboard/reservas?servicioId=${s.id}`}

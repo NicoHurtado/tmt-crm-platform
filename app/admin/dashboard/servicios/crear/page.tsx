@@ -59,6 +59,12 @@ export default function CrearServicioPage() {
     const [esMunicipal, setEsMunicipal] = useState(false);
     const [destinoAutoFill, setDestinoAutoFill] = useState('');
 
+    // Tarifa por persona (tours con precio por persona en tramos 1/2/3+)
+    const [esPorPersona, setEsPorPersona] = useState(false);
+    const [precioPersona1, setPrecioPersona1] = useState(0);
+    const [precioPersona2, setPrecioPersona2] = useState(0);
+    const [precioPersona3, setPrecioPersona3] = useState(0);
+
     // Display order in public catalog
     const [orden, setOrden] = useState(999);
 
@@ -148,15 +154,22 @@ export default function CrearServicioPage() {
             return;
         }
 
-        if (!esCompartido && vehiculosSeleccionados.length === 0) {
+        if (!esCompartido && !esPorPersona && vehiculosSeleccionados.length === 0) {
             alert('Debes seleccionar al menos un vehiculo');
             return;
         }
 
-        const sinPrecio = vehiculosSeleccionados.find((v) => !v.precio || v.precio <= 0);
-        if (sinPrecio) {
-            alert('Cada vehículo seleccionado debe tener un precio mayor a 0');
-            return;
+        if (esPorPersona) {
+            if (precioPersona1 <= 0 || precioPersona2 <= 0 || precioPersona3 <= 0) {
+                alert('Para tarifa por persona, define los 3 precios (1, 2 y 3+ personas) mayores a 0');
+                return;
+            }
+        } else {
+            const sinPrecio = vehiculosSeleccionados.find((v) => !v.precio || v.precio <= 0);
+            if (sinPrecio) {
+                alert('Cada vehículo seleccionado debe tener un precio mayor a 0');
+                return;
+            }
         }
 
         setLoading(true);
@@ -190,8 +203,12 @@ export default function CrearServicioPage() {
                     guiaInglesDisponible,
                     precioGuiaIngles: guiaInglesDisponible ? precioGuiaIngles : null,
                     orden,
+                    tipoTarifa: esPorPersona ? 'POR_PERSONA' : null,
+                    preciosPorPersona: esPorPersona
+                        ? { p1: precioPersona1, p2: precioPersona2, p3: precioPersona3 }
+                        : null,
                     camposPersonalizados,
-                    vehiculos: vehiculosSeleccionados.map((v) => ({
+                    vehiculos: esPorPersona ? [] : vehiculosSeleccionados.map((v) => ({
                         vehiculoId: v.vehiculoId,
                         precio: v.precio,
                         precioOlaya: esAeropuerto && v.precioOlaya ? v.precioOlaya : null,
@@ -492,9 +509,9 @@ export default function CrearServicioPage() {
                         {/* Compartido */}
                         <div
                             className={`flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${esCompartido ? 'border-[#D6A75D] bg-[#D6A75D]/5' : 'border-gray-200 hover:border-gray-300'}`}
-                            onClick={() => setEsCompartido(!esCompartido)}
+                            onClick={() => { const v = !esCompartido; setEsCompartido(v); if (v) setEsPorPersona(false); }}
                         >
-                            <Switch checked={esCompartido} onClick={(e) => { e.stopPropagation(); setEsCompartido(!esCompartido); }} />
+                            <Switch checked={esCompartido} onClick={(e) => { e.stopPropagation(); const v = !esCompartido; setEsCompartido(v); if (v) setEsPorPersona(false); }} />
                             <div className="flex-1">
                                 <p className="text-sm font-medium text-gray-900">Servicio Compartido</p>
                                 <p className="text-xs text-gray-500 mt-0.5">Activa capacidad total, cupos disponibles y precio por persona. No requiere asignación de vehículo individual.</p>
@@ -512,8 +529,67 @@ export default function CrearServicioPage() {
                                 <p className="text-xs text-gray-500 mt-0.5">Agrupa este servicio en la sección de Transporte Municipal. Las tarifas por ubicación se configuran en la pestaña "Tarifas por Ubicación".</p>
                             </div>
                         </div>
+
+                        {/* Tour con precio por persona */}
+                        <div
+                            className={`flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${esPorPersona ? 'border-[#D6A75D] bg-[#D6A75D]/5' : 'border-gray-200 hover:border-gray-300'}`}
+                            onClick={() => { const v = !esPorPersona; setEsPorPersona(v); if (v) setEsCompartido(false); }}
+                        >
+                            <Switch checked={esPorPersona} onClick={(e) => { e.stopPropagation(); const v = !esPorPersona; setEsPorPersona(v); if (v) setEsCompartido(false); }} />
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-900">Tour con precio por persona</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Formulario ágil (fecha, nº de personas, dirección de recogida). El precio se cobra por persona en tramos (1, 2, 3+). No usa vehículo ni municipio.</p>
+                            </div>
+                        </div>
                     </div>
                 </section>
+
+                {esPorPersona && (
+                    <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+                            <h2 className="text-base font-semibold text-gray-900">Precios por persona</h2>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                                Precio por persona según el nº de pasajeros. El total = precio del tramo × nº de personas.
+                                3 o más personas usan el precio de "3+".
+                            </p>
+                        </div>
+                        <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">1 persona (COP)</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    value={precioPersona1 || ''}
+                                    onChange={(e) => setPrecioPersona1(Number(e.target.value) || 0)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D6A75D]/30 focus:border-[#D6A75D] outline-none"
+                                    placeholder="Ej: 700000"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">2 personas (COP c/u)</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    value={precioPersona2 || ''}
+                                    onChange={(e) => setPrecioPersona2(Number(e.target.value) || 0)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D6A75D]/30 focus:border-[#D6A75D] outline-none"
+                                    placeholder="Ej: 350000"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">3+ personas (COP c/u)</label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    value={precioPersona3 || ''}
+                                    onChange={(e) => setPrecioPersona3(Number(e.target.value) || 0)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D6A75D]/30 focus:border-[#D6A75D] outline-none"
+                                    placeholder="Ej: 270000"
+                                />
+                            </div>
+                        </div>
+                    </section>
+                )}
 
                 {/* ─── Tour compartido: textos de logística ─── */}
                 {esCompartido && (
@@ -674,6 +750,7 @@ export default function CrearServicioPage() {
                 </section>
 
                 {/* ─── SECTION 5: Vehicles ─── */}
+                {!esPorPersona && (
                 <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
                         <h2 className="text-base font-semibold text-gray-900">Vehiculos y Precios</h2>
@@ -768,6 +845,7 @@ export default function CrearServicioPage() {
                         )}
                     </div>
                 </section>
+                )}
 
                 {/* ─── SECTION: Campos Adicionales en el Wizard de Reservas ─── */}
                 <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">

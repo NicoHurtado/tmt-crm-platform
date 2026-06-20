@@ -75,7 +75,13 @@ export async function GET(req: NextRequest) {
 
         const enriched = servicios.map((s: any) => {
             const cfg = getConfiguracion(s.configuracion);
-            return { ...s, camposPersonalizados: cfg.camposCustom, infoTourCompartido: cfg.infoCompartido };
+            return {
+                ...s,
+                camposPersonalizados: cfg.camposCustom,
+                infoTourCompartido: cfg.infoCompartido,
+                tipoTarifa: cfg.tipoTarifa ?? null,
+                preciosPorPersona: cfg.preciosPorPersona ?? null,
+            };
         });
 
         return NextResponse.json({
@@ -134,6 +140,8 @@ export async function POST(req: NextRequest) {
             precioGuiaIngles,
             vehiculos,
             orden,
+            tipoTarifa,
+            preciosPorPersona,
         } = body;
 
         // Validate required fields
@@ -174,7 +182,11 @@ export async function POST(req: NextRequest) {
                 esCompartido: esCompartido || false,
                 esMunicipal: esMunicipal || false,
                 destinoAutoFill: destinoAutoFill || null,
-                configuracion: buildConfiguracion(camposPersonalizados || [], esCompartido ? infoTourCompartido : null) as any,
+                configuracion: buildConfiguracion(
+                    camposPersonalizados || [],
+                    esCompartido ? infoTourCompartido : null,
+                    { tipoTarifa: tipoTarifa ?? null, preciosPorPersona: preciosPorPersona ?? null },
+                ) as any,
                 guiaEspanolDisponible: guiaEspanolDisponible || false,
                 precioGuiaEspanol: guiaEspanolDisponible ? precioGuiaEspanol : null,
                 guiaInglesDisponible: guiaInglesDisponible || false,

@@ -13,6 +13,18 @@ import { useLanguage, t } from '@/lib/i18n';
 import { DateInput, TimeInput } from '@/components/ui';
 import { SharedTourLogisticsCard } from '@/components/reservas/SharedTourLogisticsCard';
 import { normalizeInfoTourCompartido } from '@/lib/info-tour-compartido';
+import { precioTramoPorPersona, totalPorPersona } from '@/types/servicio-config';
+
+/**
+ * Factor de comisión por tipo de aliado para tours con precio por persona.
+ * HOTEL/AIRBNB suman 10% (comisión positiva); AGENCIA resta 10% (comisión negativa);
+ * cliente independiente => 0.
+ */
+function comisionFactorPorPersona(aliadoTipo?: string | null): number {
+    if (aliadoTipo === 'HOTEL' || aliadoTipo === 'AIRBNB') return 0.1;
+    if (aliadoTipo === 'AGENCIA') return -0.1;
+    return 0;
+}
 
 /** Convierte "7:50 AM", "7:50am", "07:50", "7:50" → "07:50" (HH:MM 24h). */
 function parseSalidaToHora(salida: string): string {
@@ -52,6 +64,10 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
     // 🏨 Check if this is a hotel reservation
     const isHotel = aliadoTipo === 'HOTEL';
     const hotelName = aliadoNombre || '';
+
+    // 🎟️ Tour con precio por persona (formulario ágil con dirección de recogida)
+    const isTourPersona = service.tipoTarifa === 'POR_PERSONA';
+    const preciosPorPersona = service.preciosPorPersona ?? null;
 
     // 🚗 Check if this is a traslado or municipal transport service (but NOT airport service)
     const isTraslado = !service.esAeropuerto && (
@@ -225,6 +241,27 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         let horaInicioRecargo = service.recargoNocturnoInicio;
         let horaFinRecargo = service.recargoNocturnoFin;
 
+        // ─── TOUR POR PERSONA: precio por tramos (1/2/3+) + ajuste silencioso por tipo de aliado ───
+        // El ±10% (hotel/airbnb +10%, agencia −10%) se pliega en el precio mostrado para que el
+        // cliente NO vea una línea de "comisión". La comisión real se calcula y guarda en el servidor
+        // (POST /api/reservas) para que aparezca en el CRM.
+        if (isTourPersona) {
+            const total = totalPorPersona(preciosPorPersona, formData.numeroPasajeros || 0);
+            const factor = comisionFactorPorPersona(aliadoTipo);
+            const totalConFactor = Math.round(total * (1 + factor));
+            const updates: Partial<ReservationFormData> = {
+                precioBase: totalConFactor,
+                recargoNocturno: 0,
+                tarifaMunicipio: 0,
+                precioAdicionales: 0,
+                comisionAliado: 0, // silencioso: no se muestra al cliente
+                precioTotal: totalConFactor,
+            };
+            if (formData.municipio !== null) updates.municipio = null as any;
+            updateFormData(updates);
+            return;
+        }
+
         // ─── SHARED TOUR PRICING + FIXED VALUES FROM ADMIN CONFIG ───
         const isSharedTourPricing = service.esCompartido;
         if (isSharedTourPricing) {
@@ -374,6 +411,9 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         service.esCompartido,
         service.destinoAutoFill,
         service.infoTourCompartido,
+        isTourPersona,
+        preciosPorPersona,
+        aliadoTipo,
         formData.lugarRecogida,
         formData.trasladoDestino,
         updateFormData
@@ -518,6 +558,112 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
 
                     {/* Participant details have been moved to Step 2 (Contact Info) */}
 
+                </div>
+            )}
+
+            {/* 🎟️ TOUR POR PERSONA SECTION (formulario ágil con dirección de recogida) */}
+            {isTourPersona && (
+                <div className="space-y-5">
+                    {/* Date Selection */}
+                    <div>
+                        <label className={labelClass}>{language === 'es' ? 'Fecha' : 'Date'} *</label>
+                        <DateInput
+                            value={formData.fecha ? formData.fecha.toISOString().split('T')[0] : ''}
+                            onChange={(dateStr) => {
+                                if (!dateStr) {
+                                    updateFormData({ fecha: null });
+                                } else {
+                                    const date = new Date(dateStr + 'T12:00:00Z');
+                                    updateFormData({ fecha: date });
+                                }
+                            }}
+                            min={(() => {
+                                const now = new Date();
+                                const base = new Date(now);
+                                base.setDate(base.getDate() + (now.getHours() >= 21 ? 2 : 1));
+                                return base.toISOString().split('T')[0];
+                            })()}
+                            required
+                            className={inputClass}
+                        />
+                        {new Date().getHours() >= 21 && (
+                            <p className="text-xs text-amber-600 mt-1.5">
+                                {language === 'es'
+                                    ? 'Después de las 9 PM las reservas son desde pasado mañana.'
+                                    : 'After 9 PM reservations start from the day after tomorrow.'}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Pickup address */}
+                    <div>
+                        <label className={labelClass}>{language === 'es' ? 'Dirección de recogida' : 'Pickup address'} *</label>
+                        <input
+                            type="text"
+                            value={formData.lugarRecogida || ''}
+                            onChange={(e) => updateFormData({ lugarRecogida: e.target.value })}
+                            placeholder={language === 'es' ? 'Hotel, dirección o punto de recogida' : 'Hotel, address or pickup point'}
+                            className={inputClass}
+                            required
+                        />
+                    </div>
+
+                    {/* Passengers Count */}
+                    <div>
+                        <label className={labelClass}>{t('reservas.paso1_pasajeros', language)}</label>
+                        <div className="flex items-center justify-between border border-gray-300 rounded-xl px-4 py-2 bg-white">
+                            <div className="flex items-center gap-1 text-gray-500 text-sm">
+                                <FiUsers size={15} />
+                                <span>{language === 'es' ? 'Pasajeros' : 'Passengers'}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newVal = Math.max(1, formData.numeroPasajeros - 1);
+                                        const newAsistentes = [...(formData.asistentes || [])];
+                                        if (newAsistentes.length > newVal) newAsistentes.length = newVal;
+                                        updateFormData({ numeroPasajeros: newVal, asistentes: newAsistentes });
+                                    }}
+                                    className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:border-gray-400 transition-colors font-bold text-lg leading-none"
+                                >−</button>
+                                <span className="text-lg font-bold w-6 text-center text-gray-900">{formData.numeroPasajeros}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newVal = formData.numeroPasajeros + 1;
+                                        const newAsistentes = [...(formData.asistentes || [])];
+                                        while (newAsistentes.length < newVal) {
+                                            // @ts-ignore
+                                            newAsistentes.push({ nombre: '', tipoDocumento: 'PASAPORTE', numeroDocumento: '', email: '', telefono: '' });
+                                        }
+                                        updateFormData({ numeroPasajeros: newVal, asistentes: newAsistentes });
+                                    }}
+                                    className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:border-gray-400 transition-colors font-bold text-lg leading-none"
+                                >+</button>
+                            </div>
+                        </div>
+
+                        {/* Per-person price summary */}
+                        {formData.numeroPasajeros > 0 && preciosPorPersona && (
+                            <div className="mt-2 flex items-center justify-between px-1">
+                                <span className="text-xs text-gray-400">
+                                    {formData.numeroPasajeros} × {formatPrice(
+                                        precioTramoPorPersona(preciosPorPersona, formData.numeroPasajeros)
+                                        * (1 + comisionFactorPorPersona(aliadoTipo))
+                                    )}
+                                </span>
+                                <span className="text-sm font-bold text-gray-900">
+                                    = {formatPrice(
+                                        totalPorPersona(preciosPorPersona, formData.numeroPasajeros)
+                                        * (1 + comisionFactorPorPersona(aliadoTipo))
+                                    )}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Participant details have been moved to Step 2 (Contact Info) */}
                 </div>
             )}
 
@@ -868,8 +1014,8 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                 </div>
             )}
 
-            {/* Common Fields - Hidden for Tour Compartido since it has its own dedicated section */}
-            {!isSharedTour && (
+            {/* Common Fields - Hidden for Tour Compartido y Tour por persona (tienen su propia sección) */}
+            {!isSharedTour && !isTourPersona && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Origen fijo para hoteles en servicios NO aeropuerto y NO traslado */}
                     {!service.esAeropuerto && !isTransporteMunicipal && !isTraslado && isHotel && (
@@ -1232,7 +1378,7 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
 
                     {/* Vehicle Auto-Assignment — hidden for shared tours and fixed-destination services */}
                     <div className="md:col-span-2">
-                        {formData.numeroPasajeros > 0 && !service.esCompartido && !service.destinoAutoFill && (
+                        {formData.numeroPasajeros > 0 && !service.esCompartido && !isTourPersona && !service.destinoAutoFill && (
                             recommendedVehicle ? (
                                 <div className="flex items-center gap-4 p-4 border border-gray-100 bg-white rounded-2xl shadow-sm">
                                     <div className="relative w-20 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
@@ -1276,7 +1422,7 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
             )}
 
             {/* 🔥 NEW: Dynamic Fields with updated interface */}
-            {dynamicFields.length > 0 && (
+            {dynamicFields.length > 0 && !isTourPersona && (
                 <DynamicFields
                     fields={dynamicFields}
                     values={formData.datosDinamicos || {}}

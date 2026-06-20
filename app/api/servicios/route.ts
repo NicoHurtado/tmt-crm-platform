@@ -52,6 +52,8 @@ export async function GET(request: Request) {
                 ...s,
                 camposPersonalizados: cfg.camposCustom,
                 infoTourCompartido: cfg.infoCompartido,
+                tipoTarifa: cfg.tipoTarifa ?? null,
+                preciosPorPersona: cfg.preciosPorPersona ?? null,
             };
         });
 

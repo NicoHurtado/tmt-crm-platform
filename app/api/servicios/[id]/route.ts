@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { getConfiguracion } from '@/types/servicio-config';
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic';
@@ -35,7 +36,17 @@ export async function GET(
             );
         }
 
-        return NextResponse.json({ success: true, data: servicio });
+        const cfg = getConfiguracion((servicio as any).configuracion);
+        return NextResponse.json({
+            success: true,
+            data: {
+                ...servicio,
+                camposPersonalizados: cfg.camposCustom,
+                infoTourCompartido: cfg.infoCompartido,
+                tipoTarifa: cfg.tipoTarifa ?? null,
+                preciosPorPersona: cfg.preciosPorPersona ?? null,
+            },
+        });
     } catch (error) {
         console.error('Error fetching servicio:', error);
         return NextResponse.json(

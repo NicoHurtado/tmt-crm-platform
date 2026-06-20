@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sortServicesByPriority } from '@/lib/service-order';
+import { getConfiguracion } from '@/types/servicio-config';
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,7 @@ export async function GET(
         // 3. Construir respuesta — cada servicio expone sus ServicioVehiculo con precio + comisión opcional del aliado
         const data = sortedServicios.map((servicio: any) => {
             const sa = servicioAliadoMap.get(servicio.id);
+            const cfg = getConfiguracion(servicio.configuracion);
 
             const preciosVehiculosMap = new Map(
                 (sa?.preciosVehiculos ?? []).map((pv: any) => [pv.vehiculoId, pv])
@@ -101,8 +103,10 @@ export async function GET(
                 esMunicipal: servicio.esMunicipal,
                 esTraslado: servicio.esTraslado,
                 destinoAutoFill: servicio.destinoAutoFill,
-                infoTourCompartido: servicio.infoTourCompartido,
-                camposPersonalizados: servicio.camposPersonalizados ?? [],
+                infoTourCompartido: cfg.infoCompartido,
+                camposPersonalizados: cfg.camposCustom ?? [],
+                tipoTarifa: cfg.tipoTarifa ?? null,
+                preciosPorPersona: cfg.preciosPorPersona ?? null,
                 adicionales: [],
                 configuracion: servicio.configuracion,
                 orden: servicio.orden,

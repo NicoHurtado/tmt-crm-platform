@@ -89,6 +89,7 @@ export async function POST(request: Request) {
                 codigo,
                 email: body.email,
                 contacto: body.contacto,
+                imagen: body.imagen || null,
                 activo: body.activo !== undefined ? body.activo : true,
             },
         });

@@ -34,6 +34,7 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 import ConfiguracionPrecios from '@/components/admin/ConfiguracionPrecios'
+import ImageUploader from '@/components/admin/ImageUploader'
 
 interface Aliado {
   id: string
@@ -42,6 +43,7 @@ interface Aliado {
   codigo: string
   email: string
   contacto: string
+  imagen?: string | null
   activo: boolean
   _count?: { reservas: number }
 }
@@ -51,6 +53,7 @@ const EMPTY_FORM = {
   tipo: 'HOTEL' as 'HOTEL' | 'AIRBNB' | 'AGENCIA',
   email: '',
   contacto: '',
+  imagen: '',
   activo: true,
 }
 
@@ -169,6 +172,7 @@ export default function AliadosPage() {
       tipo: aliado.tipo,
       email: aliado.email,
       contacto: aliado.contacto,
+      imagen: aliado.imagen || '',
       activo: aliado.activo,
     })
     setDialogOpen(true)
@@ -485,6 +489,17 @@ export default function AliadosPage() {
                     className="h-9 text-sm border-neutral-200"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-neutral-700">
+                  Imagen del aliado (para la card pública de hoteles)
+                </Label>
+                <ImageUploader
+                  currentImageUrl={formData.imagen}
+                  onImageUploaded={(url) => setFormData({ ...formData, imagen: url })}
+                  label=""
+                />
               </div>
 
               {editingAliado && (

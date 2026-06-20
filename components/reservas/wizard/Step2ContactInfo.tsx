@@ -79,7 +79,6 @@ export default function Step2ContactInfo({ formData, updateFormData, onNext, onB
 
             updateFormData({ asistentes: newAsistentes });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData.numeroPasajeros, esAeropuerto, isAlly]);
 
     // Sync contact info to first attendee when contact fields change
@@ -203,15 +202,15 @@ export default function Step2ContactInfo({ formData, updateFormData, onNext, onB
             </div>
 
             {/* Passenger count indicator */}
-            <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                <FiUsers className="text-gray-500" size={24} />
+            <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <FiUsers className="text-blue-600" size={24} />
                 <div>
-                    <p className="font-medium text-gray-800">
+                    <p className="font-medium text-blue-900">
                         {language === 'es'
                             ? `${formData.numeroPasajeros} pasajero${formData.numeroPasajeros > 1 ? 's' : ''} en total`
                             : `${formData.numeroPasajeros} passenger${formData.numeroPasajeros > 1 ? 's' : ''} total`}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-blue-700">
                         {esAeropuerto || isAlly
                             ? (language === 'es'
                                 ? 'Solo los datos del representante son obligatorios'

@@ -224,3 +224,6 @@ select {
     @apply font-sans;
   }
 }
+/* Oculta la barra de scroll en filtros horizontales (barra de categorías de /reservas) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

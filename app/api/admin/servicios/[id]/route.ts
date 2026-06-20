@@ -44,7 +44,13 @@ export async function GET(
         const cfg = getConfiguracion((servicio as any).configuracion);
         return NextResponse.json({
             success: true,
-            data: { ...servicio, camposPersonalizados: cfg.camposCustom, infoTourCompartido: cfg.infoCompartido },
+            data: {
+                ...servicio,
+                camposPersonalizados: cfg.camposCustom,
+                infoTourCompartido: cfg.infoCompartido,
+                tipoTarifa: cfg.tipoTarifa ?? null,
+                preciosPorPersona: cfg.preciosPorPersona ?? null,
+            },
         });
     } catch (error) {
         console.error('Error fetching service:', error);
@@ -94,6 +100,8 @@ export async function PUT(
             guiaInglesDisponible,
             precioGuiaIngles,
             orden,
+            tipoTarifa,
+            preciosPorPersona,
             vehiculos, // Array of { vehiculoId, precio? }
         } = body;
 
@@ -143,6 +151,28 @@ export async function PUT(
             }
         }
 
+        // Para preservar campos de configuracion no enviados, leer la config actual.
+        const configChange = camposPersonalizados !== undefined
+            || infoTourCompartido !== undefined
+            || tipoTarifa !== undefined
+            || preciosPorPersona !== undefined;
+        let nuevaConfiguracion: any = undefined;
+        if (configChange) {
+            const actual = await prisma.servicio.findUnique({
+                where: { id: params.id },
+                select: { configuracion: true },
+            });
+            const cfgActual = getConfiguracion((actual as any)?.configuracion);
+            nuevaConfiguracion = buildConfiguracion(
+                camposPersonalizados !== undefined ? (camposPersonalizados ?? []) : cfgActual.camposCustom,
+                infoTourCompartido !== undefined ? (esCompartido ? infoTourCompartido : null) : cfgActual.infoCompartido,
+                {
+                    tipoTarifa: tipoTarifa !== undefined ? tipoTarifa : cfgActual.tipoTarifa,
+                    preciosPorPersona: preciosPorPersona !== undefined ? preciosPorPersona : cfgActual.preciosPorPersona,
+                },
+            );
+        }
+
         // Update service
         const servicio = await prisma.servicio.update({
             where: { id: params.id },
@@ -162,12 +192,7 @@ export async function PUT(
                 esCompartido,
                 esMunicipal,
                 destinoAutoFill,
-                ...(camposPersonalizados !== undefined || infoTourCompartido !== undefined ? {
-                    configuracion: buildConfiguracion(
-                        camposPersonalizados ?? [],
-                        infoTourCompartido !== undefined ? (esCompartido ? infoTourCompartido : null) : null
-                    ) as any
-                } : {}),
+                ...(nuevaConfiguracion !== undefined ? { configuracion: nuevaConfiguracion as any } : {}),
                 ...(guiaEspanolDisponible !== undefined ? { guiaEspanolDisponible } : {}),
                 ...(precioGuiaEspanol !== undefined ? { precioGuiaEspanol } : {}),
                 ...(guiaInglesDisponible !== undefined ? { guiaInglesDisponible } : {}),
@@ -207,7 +232,13 @@ export async function PUT(
         const updCfg = getConfiguracion((servicio as any).configuracion);
         return NextResponse.json({
             success: true,
-            data: { ...servicio, camposPersonalizados: updCfg.camposCustom, infoTourCompartido: updCfg.infoCompartido },
+            data: {
+                ...servicio,
+                camposPersonalizados: updCfg.camposCustom,
+                infoTourCompartido: updCfg.infoCompartido,
+                tipoTarifa: updCfg.tipoTarifa ?? null,
+                preciosPorPersona: updCfg.preciosPorPersona ?? null,
+            },
         });
     } catch (error) {
         console.error('Error updating service:', error);
