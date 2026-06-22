@@ -37,23 +37,27 @@ export default function ImageUploader({ currentImageUrl, onImageUploaded, label 
         setError('');
         setSelectedFile(file);
 
-        // Crear preview
+        // Crear preview inmediata
         const reader = new FileReader();
         reader.onloadend = () => {
             setPreviewUrl(reader.result as string);
         };
         reader.readAsDataURL(file);
+
+        // Subir automáticamente: evita que el usuario guarde sin haber subido.
+        handleUpload(file);
     };
 
-    const handleUpload = async () => {
-        if (!selectedFile) return;
+    const handleUpload = async (file?: File) => {
+        const target = file ?? selectedFile;
+        if (!target) return;
 
         setUploading(true);
         setError('');
 
         try {
             const formData = new FormData();
-            formData.append('file', selectedFile);
+            formData.append('file', target);
 
             const response = await fetch('/api/upload/image', {
                 method: 'POST',
@@ -82,6 +86,7 @@ export default function ImageUploader({ currentImageUrl, onImageUploaded, label 
         setSelectedFile(null);
         setPreviewUrl('');
         setError('');
+        onImageUploaded('');
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -105,42 +110,30 @@ export default function ImageUploader({ currentImageUrl, onImageUploaded, label 
                 />
                 <label
                     htmlFor="image-upload"
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg cursor-pointer transition-colors"
+                    className={`flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors ${uploading ? 'opacity-50 pointer-events-none cursor-not-allowed' : 'cursor-pointer'}`}
                 >
                     <FiImage />
-                    Seleccionar Archivo
+                    {previewUrl ? 'Cambiar imagen' : 'Seleccionar Archivo'}
                 </label>
 
-                {selectedFile && (
-                    <>
-                        <button
-                            type="button"
-                            onClick={handleUpload}
-                            disabled={uploading}
-                            className="flex items-center gap-2 px-4 py-2 bg-[#D6A75D] hover:bg-[#C5964A] text-black rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <FiUpload />
-                            {uploading ? 'Subiendo...' : 'Subir'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleClear}
-                            disabled={uploading}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                            <FiX size={20} />
-                        </button>
-                    </>
+                {uploading && (
+                    <span className="flex items-center gap-2 text-sm text-gray-600">
+                        <FiUpload className="animate-pulse" />
+                        Subiendo...
+                    </span>
+                )}
+
+                {!uploading && previewUrl && (
+                    <button
+                        type="button"
+                        onClick={handleClear}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Quitar imagen"
+                    >
+                        <FiX size={20} />
+                    </button>
                 )}
             </div>
-
-            {/* Selected File Info */}
-            {selectedFile && (
-                <div className="text-sm text-gray-600">
-                    <p>Archivo seleccionado: <span className="font-medium">{selectedFile.name}</span></p>
-                    <p>Tamaño: <span className="font-medium">{(selectedFile.size / 1024).toFixed(2)} KB</span></p>
-                </div>
-            )}
 
             {/* Error Message */}
             {error && (

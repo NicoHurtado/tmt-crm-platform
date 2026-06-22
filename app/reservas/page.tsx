@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { FiClock, FiUsers, FiMapPin, FiChevronRight, FiChevronLeft } from 'react-icons/fi';
-import { FaWhatsapp } from 'react-icons/fa';
+import { FiClock, FiUsers, FiMapPin, FiChevronRight, FiChevronLeft, FiArrowRight } from 'react-icons/fi';
 import ReservationWizard from '@/components/reservas/ReservationWizard';
 import TransporteMunicipalModal from '@/components/reservas/TransporteMunicipalModal';
 import Header from '@/components/landing/Header';
@@ -45,6 +44,7 @@ interface HotelAliado {
     nombre: string;
     contacto: string;
     imagen: string | null;
+    tipo: 'HOTEL' | 'AIRBNB';
 }
 
 // Fila horizontal por categoría (carrusel). Muestra título + flechas + scroll horizontal.
@@ -314,6 +314,67 @@ export default function ReservasPage() {
     const serviciosCompartidos = serviciosRegulares.filter(s => !s.esAeropuerto && s.tipoTarifa !== 'POR_PERSONA' && s.esCompartido);
     const serviciosOtros = serviciosRegulares.filter(s => !s.esAeropuerto && s.tipoTarifa !== 'POR_PERSONA' && !s.esCompartido);
 
+    // Aliados públicos separados por tipo (solo activos — los filtra la API)
+    const hotelesAliados = hoteles.filter(h => h.tipo === 'HOTEL');
+    const airbnbsAliados = hoteles.filter(h => h.tipo === 'AIRBNB');
+
+    // Card sobria y minimalista de aliado: toda la card abre el WhatsApp del aliado
+    // (mismo enlace/mensaje de siempre), sin verde ni logo de WhatsApp.
+    const renderPartnerCard = (partner: HotelAliado) => {
+        const numero = (partner.contacto || '').replace(/\D/g, '');
+        const mensaje = encodeURIComponent(t('reservas.hoteles_mensaje', language).replace('{hotel}', partner.nombre));
+        const waUrl = numero ? `https://wa.me/${numero}?text=${mensaje}` : null;
+
+        const inner = (
+            <>
+                <div className="relative h-52 overflow-hidden bg-neutral-50">
+                    <Image
+                        src={partner.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368602/tmt/servicios/gasahtldulliounqtmot.jpg'}
+                        alt={partner.nombre}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                </div>
+                <div className="p-5 flex-1 flex flex-col">
+                    <h3 className="text-lg font-semibold text-neutral-900 mb-1">
+                        {partner.nombre}
+                    </h3>
+                    <p className="text-neutral-500 text-sm mb-4 flex-1">
+                        {t('reservas.hoteles_descripcion', language)}
+                    </p>
+                    {waUrl ? (
+                        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 group-hover:text-[#D6A75D] transition-colors">
+                            {t('reservas.partners_cta', language)}
+                            <FiArrowRight className="transition-transform group-hover:translate-x-0.5" />
+                        </span>
+                    ) : (
+                        <span className="text-xs text-neutral-400">
+                            {language === 'es' ? 'Contacto no disponible' : 'Contact unavailable'}
+                        </span>
+                    )}
+                </div>
+            </>
+        );
+
+        const cardClass = 'group w-[300px] shrink-0 snap-start bg-white rounded-xl overflow-hidden border border-neutral-100 shadow-sm hover:shadow-md hover:border-neutral-200 transition-all duration-300 flex flex-col';
+
+        return waUrl ? (
+            <a
+                key={partner.id}
+                href={waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cardClass}
+            >
+                {inner}
+            </a>
+        ) : (
+            <div key={partner.id} className={cardClass}>
+                {inner}
+            </div>
+        );
+    };
+
     // Card reutilizable de servicio (ancho fijo para el carrusel horizontal)
     const renderServiceCard = (service: Service) => (
         <div
@@ -488,51 +549,16 @@ export default function ReservasPage() {
                             )}
 
                             {/* 5. Hoteles aliados (solo página pública) */}
-                            {!aliado && hoteles.length > 0 && (
+                            {!aliado && hotelesAliados.length > 0 && (
                                 <CarouselRow title={t('reservas.seccion_hoteles', language)}>
-                                    {hoteles.map((hotel) => {
-                                            const numero = (hotel.contacto || '').replace(/\D/g, '');
-                                            const mensaje = encodeURIComponent(t('reservas.hoteles_mensaje', language).replace('{hotel}', hotel.nombre));
-                                            const waUrl = numero ? `https://wa.me/${numero}?text=${mensaje}` : null;
-                                            return (
-                                                <div
-                                                    key={hotel.id}
-                                                    className="group w-[300px] shrink-0 snap-start bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col"
-                                                >
-                                                    <div className="relative h-56 overflow-hidden bg-gray-100">
-                                                        <Image
-                                                            src={hotel.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368602/tmt/servicios/gasahtldulliounqtmot.jpg'}
-                                                            alt={hotel.nombre}
-                                                            fill
-                                                            className="object-cover transition-transform duration-500 group-hover:scale-110"
-                                                        />
-                                                    </div>
-                                                    <div className="p-6 flex-1 flex flex-col">
-                                                        <h3 className="text-xl font-bold mb-2 group-hover:text-[#D6A75D] transition-colors">
-                                                            {hotel.nombre}
-                                                        </h3>
-                                                        <p className="text-gray-600 text-sm mb-4 flex-1">
-                                                            {t('reservas.hoteles_descripcion', language)}
-                                                        </p>
-                                                        {waUrl ? (
-                                                            <a
-                                                                href={waUrl}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="inline-flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1da851] text-white font-bold py-2.5 px-4 rounded-lg transition-colors"
-                                                            >
-                                                                <FaWhatsapp className="text-lg" />
-                                                                {t('reservas.hoteles_boton', language)}
-                                                            </a>
-                                                        ) : (
-                                                            <span className="text-xs text-gray-400">
-                                                                {language === 'es' ? 'Contacto no disponible' : 'Contact unavailable'}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                    {hotelesAliados.map(renderPartnerCard)}
+                                </CarouselRow>
+                            )}
+
+                            {/* 6. Airbnbs aliados (solo página pública) */}
+                            {!aliado && airbnbsAliados.length > 0 && (
+                                <CarouselRow title={t('reservas.seccion_airbnbs', language)}>
+                                    {airbnbsAliados.map(renderPartnerCard)}
                                 </CarouselRow>
                             )}
                         </div>

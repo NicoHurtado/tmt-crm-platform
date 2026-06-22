@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, Copy, Check, Settings, X, Search, Link } from 'lucide-react'
+import { Plus, Trash2, Copy, Check, Settings, X, Search, Link, QrCode, ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import ConfiguracionPrecios from '@/components/admin/ConfiguracionPrecios'
 import ImageUploader from '@/components/admin/ImageUploader'
+import AliadoQRModal from '@/components/admin/AliadoQRModal'
 
 interface Aliado {
   id: string
@@ -84,6 +85,7 @@ export default function AliadosPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [tipoTab, setTipoTab] = useState<TipoTab>('ALL')
   const [activoFilter, setActivoFilter] = useState<ActivoFilter>('ALL')
+  const [qrAliado, setQrAliado] = useState<Aliado | null>(null)
 
   const filtered = useMemo(() => {
     return aliados.filter((a) => {
@@ -326,7 +328,24 @@ export default function AliadosPage() {
               {filtered.map((aliado) => (
                 <TableRow key={aliado.id} className="hover:bg-neutral-50 transition-colors">
                   <TableCell className="py-3 pl-5">
-                    <p className="text-sm font-semibold text-neutral-900">{aliado.nombre}</p>
+                    <div className="flex items-center gap-3">
+                      {aliado.imagen ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={aliado.imagen}
+                          alt={aliado.nombre}
+                          className="w-10 h-10 rounded-md object-cover border border-neutral-200 shrink-0"
+                        />
+                      ) : (
+                        <div
+                          className="w-10 h-10 rounded-md bg-neutral-100 border border-dashed border-neutral-300 flex items-center justify-center shrink-0"
+                          title="Sin imagen"
+                        >
+                          <ImageIcon size={16} className="text-neutral-300" />
+                        </div>
+                      )}
+                      <p className="text-sm font-semibold text-neutral-900">{aliado.nombre}</p>
+                    </div>
                   </TableCell>
                   <TableCell className="py-3">
                     <Badge variant="outline" className={`text-[10px] font-medium h-5 ${TIPO_BADGE[aliado.tipo]}`}>
@@ -390,6 +409,13 @@ export default function AliadosPage() {
                         title="Generar link de aliado"
                       >
                         <Link size={13} />
+                      </button>
+                      <button
+                        onClick={() => setQrAliado(aliado)}
+                        className="p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                        title="QR de referido"
+                      >
+                        <QrCode size={13} />
                       </button>
                       <button
                         onClick={() => copyLink(aliado.codigo)}
@@ -623,6 +649,13 @@ export default function AliadosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* QR de referido */}
+      <AliadoQRModal
+        open={!!qrAliado}
+        onClose={() => setQrAliado(null)}
+        aliado={qrAliado ? { nombre: qrAliado.nombre, codigo: qrAliado.codigo } : null}
+      />
     </div>
   )
 }
