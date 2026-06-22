@@ -41,6 +41,8 @@ Este diseño cubre cuatro cambios solicitados por el dueño del producto.
 
 - Cambiar el `where` de `{ tipo: 'HOTEL', activo: true }` a
   `{ tipo: { in: ['HOTEL', 'AIRBNB'] }, activo: true }`.
+- **Requisito:** solo aparecen aliados con `activo: true`. Si el admin marca un
+  hotel o airbnb como inactivo, deja de mostrarse en /reservas inmediatamente.
 - Añadir `tipo: true` al `select` para que el cliente pueda separar las filas.
 - Respuesta: `{ success, data: [{ id, nombre, contacto, imagen, tipo }] }`.
 - Se mantiene la ruta y el nombre del endpoint para no romper otros consumidores.
