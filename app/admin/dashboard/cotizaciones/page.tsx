@@ -176,7 +176,26 @@ export default function CotizacionesPage() {
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
 
   const municipalServices = services.filter((s) => s.esMunicipal)
-  const otherServices = services.filter((s) => !s.esMunicipal)
+  const nonMunicipalServices = services.filter((s) => !s.esMunicipal)
+
+  // Categoriza un servicio (misma lógica que la página de servicios y reservas)
+  const categorizar = (s: any): 'aeropuerto' | 'tours' | 'compartidos' | 'otros' => {
+    if (s.esAeropuerto) return 'aeropuerto'
+    if (s.tipoTarifa === 'POR_PERSONA') return 'tours'
+    if (s.esCompartido) return 'compartidos'
+    return 'otros'
+  }
+
+  const CATEGORIAS = [
+    { key: 'aeropuerto', label: 'Aeropuerto', icon: '✈️' },
+    { key: 'tours', label: 'Tours', icon: '🧭' },
+    { key: 'compartidos', label: 'Tours compartidos', icon: '👥' },
+    { key: 'otros', label: 'Otros servicios', icon: '🚗' },
+  ] as const
+
+  const groupedServices = CATEGORIAS
+    .map((c) => ({ ...c, items: nonMunicipalServices.filter((s) => categorizar(s) === c.key) }))
+    .filter((g) => g.items.length > 0)
 
   return (
     <div className="flex flex-col gap-0 w-full">
@@ -212,40 +231,24 @@ export default function CotizacionesPage() {
                 ))}
               </div>
             ) : (
-              <div className="space-y-3">
-                {/* Other services */}
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {otherServices.map((svc) => (
-                    <button
-                      key={svc.id}
-                      onClick={() => handleSelectService(svc)}
-                      className="text-left p-4 border border-neutral-200 rounded-lg hover:border-amber-400 hover:bg-amber-50/40 transition-all group bg-white"
-                    >
-                      <div className="flex items-center gap-3">
-                        {svc.imagen && (
-                          <div className="relative w-10 h-10 rounded-md overflow-hidden flex-shrink-0">
-                            <Image
-                              src={svc.imagen}
-                              alt={getLocalizedText(svc.nombre, 'ES')}
-                              fill
-                              style={{ objectFit: 'cover' }}
-                            />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-neutral-800 group-hover:text-amber-700 truncate">
-                            {getLocalizedText(svc.nombre, 'ES')}
-                          </p>
-                          {svc.descripcion && (
-                            <p className="text-xs text-neutral-400 line-clamp-1 mt-0.5">
-                              {getLocalizedText(svc.descripcion, 'ES')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+              <div className="space-y-5">
+                {/* Servicios agrupados por tipo */}
+                {groupedServices.map((group) => (
+                  <div key={group.key}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm leading-none">{group.icon}</span>
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                        {group.label}
+                      </h3>
+                      <span className="text-[11px] text-neutral-400">({group.items.length})</span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {group.items.map((svc) => (
+                        <ServiceCard key={svc.id} svc={svc} onSelect={handleSelectService} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
 
                 {/* Municipal services collapsible */}
                 {municipalServices.length > 0 && (
@@ -521,6 +524,38 @@ export default function CotizacionesPage() {
         />
       )}
     </div>
+  )
+}
+
+function ServiceCard({ svc, onSelect }: { svc: any; onSelect: (svc: any) => void }) {
+  return (
+    <button
+      onClick={() => onSelect(svc)}
+      className="text-left p-4 border border-neutral-200 rounded-lg hover:border-amber-400 hover:bg-amber-50/40 transition-all group bg-white"
+    >
+      <div className="flex items-center gap-3">
+        {svc.imagen && (
+          <div className="relative w-10 h-10 rounded-md overflow-hidden flex-shrink-0">
+            <Image
+              src={svc.imagen}
+              alt={getLocalizedText(svc.nombre, 'ES')}
+              fill
+              style={{ objectFit: 'cover' }}
+            />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-neutral-800 group-hover:text-amber-700 truncate">
+            {getLocalizedText(svc.nombre, 'ES')}
+          </p>
+          {svc.descripcion && (
+            <p className="text-xs text-neutral-400 line-clamp-1 mt-0.5">
+              {getLocalizedText(svc.descripcion, 'ES')}
+            </p>
+          )}
+        </div>
+      </div>
+    </button>
   )
 }
 

@@ -11,6 +11,7 @@ import { Idioma, Municipio, TipoDocumento } from '@prisma/client';
 import { getLocalizedText, getLocalizedArray } from '@/types/multi-language';
 import { useAliadoCommission } from '@/lib/hooks/useAliadoCommission';
 import { formatPrice } from '@/lib/pricing';
+import { getMissingBuiltinFields } from '@/lib/service-fields';
 
 interface Service {
     id: string;
@@ -29,6 +30,7 @@ interface Service {
     esCompartido: boolean;
     esMunicipal: boolean;
     esTraslado?: boolean;
+    tipoTarifa?: 'POR_PERSONA' | null;
     destinoAutoFill: string | null;
     camposPersonalizados: any[];
     adicionales: any[];
@@ -146,54 +148,23 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
         if (step === 0) return true;
 
         if (step === 1) {
-            if (!formData.fecha) {
-                showError('Por favor completa todos los campos obligatorios');
-                return false;
-            }
-            if (formData.numeroPasajeros <= 0) {
-                showError('Por favor ingresa el número de pasajeros');
-                return false;
-            }
-
-            // En Tour Compartido, hora/lugar se autocompletan y no hay selección manual de vehículo/municipio.
-            if (service.esCompartido) {
-                return true;
-            }
-
-            if (!formData.hora || !formData.municipio) {
-                showError('Por favor completa todos los campos obligatorios');
-                return false;
-            }
+            // Reglas especiales que no se derivan de la simple presencia de un campo.
             if (formData.municipio === Municipio.OTRO && !(formData as any).municipioConfigId && !formData.otroMunicipio) {
                 showError('Por favor especifica el municipio');
-                return false;
-            }
-            if (!formData.vehiculoId) {
-                showError('Por favor selecciona un vehículo');
                 return false;
             }
             if (service.esPorHoras && (!formData.cantidadHoras || formData.cantidadHoras < 4)) {
                 showError('Por favor ingresa una cantidad válida de horas (mínimo 4)');
                 return false;
             }
-            if (service.esAeropuerto) {
-                if (!formData.aeropuertoTipo) {
-                    showError('Por favor selecciona la dirección del aeropuerto');
-                    return false;
-                }
-                if (!formData.lugarRecogida) {
-                    showError('Por favor ingresa el lugar de recogida/destino');
-                    return false;
-                }
-                if (formData.aeropuertoTipo === 'DESDE' && (!formData.numeroVuelo || formData.numeroVuelo.trim() === '')) {
-                    showError('Por favor ingresa el número de vuelo');
-                    return false;
-                }
-            } else {
-                if (!formData.lugarRecogida) {
-                    showError('Por favor ingresa el lugar de recogida');
-                    return false;
-                }
+
+            // Validación declarativa: misma fuente de verdad que el wizard público (reservas).
+            // Cubre todos los tipos de servicio (tour normal, compartido, por persona, aeropuerto,
+            // traslado/municipal, por horas) sin lógica duplicada que se desincronice.
+            const missing = getMissingBuiltinFields(service as any, formData as Record<string, any>);
+            if (missing.length > 0) {
+                showError(`Por favor completa: ${missing[0].labelEs}`);
+                return false;
             }
             return true;
         }
