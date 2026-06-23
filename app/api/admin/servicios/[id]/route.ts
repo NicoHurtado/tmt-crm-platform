@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { validateDynamicFields } from '@/types/dynamic-fields';
 import { MultiLangTextSchema, MultiLangArraySchema } from '@/types/multi-language';
 import { buildConfiguracion, getConfiguracion } from '@/types/servicio-config';
+import { categoriaDeServicio, modeloPrecioDeServicio, tipoServicioEstructural } from '@/lib/servicio-categoria';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -151,6 +152,23 @@ export async function PUT(
             }
         }
 
+        // Estado actual del servicio: necesario para (a) preservar config no enviada y
+        // (b) calcular categoría/modelo con los flags EFECTIVOS (entrante ?? actual),
+        // porque un update parcial puede no enviar todos los flags.
+        const actual = await prisma.servicio.findUnique({
+            where: { id: params.id },
+            select: {
+                configuracion: true,
+                tipoServicio: true,
+                esAeropuerto: true,
+                esTraslado: true,
+                esPorHoras: true,
+                esCompartido: true,
+                esMunicipal: true,
+            },
+        });
+        const cfgActual = getConfiguracion((actual as any)?.configuracion);
+
         // Para preservar campos de configuracion no enviados, leer la config actual.
         const configChange = camposPersonalizados !== undefined
             || infoTourCompartido !== undefined
@@ -158,11 +176,6 @@ export async function PUT(
             || preciosPorPersona !== undefined;
         let nuevaConfiguracion: any = undefined;
         if (configChange) {
-            const actual = await prisma.servicio.findUnique({
-                where: { id: params.id },
-                select: { configuracion: true },
-            });
-            const cfgActual = getConfiguracion((actual as any)?.configuracion);
             nuevaConfiguracion = buildConfiguracion(
                 camposPersonalizados !== undefined ? (camposPersonalizados ?? []) : cfgActual.camposCustom,
                 infoTourCompartido !== undefined ? (esCompartido ? infoTourCompartido : null) : cfgActual.infoCompartido,
@@ -172,6 +185,19 @@ export async function PUT(
                 },
             );
         }
+
+        // Flags efectivos = lo enviado, o lo que ya tenía el servicio.
+        const flagsEfectivos = {
+            esAeropuerto: esAeropuerto !== undefined ? !!esAeropuerto : !!actual?.esAeropuerto,
+            esTraslado: esTraslado !== undefined ? !!esTraslado : !!actual?.esTraslado,
+            esPorHoras: esPorHoras !== undefined ? !!esPorHoras : !!actual?.esPorHoras,
+            esCompartido: esCompartido !== undefined ? !!esCompartido : !!actual?.esCompartido,
+            esMunicipal: esMunicipal !== undefined ? !!esMunicipal : !!actual?.esMunicipal,
+            tipoTarifa: (tipoTarifa !== undefined ? tipoTarifa : cfgActual.tipoTarifa) as 'POR_PERSONA' | null,
+        };
+        const categoria = categoriaDeServicio(flagsEfectivos);
+        const modeloPrecio = modeloPrecioDeServicio(flagsEfectivos);
+        const tipoEstructural = tipoServicioEstructural(flagsEfectivos);
 
         // Update service
         const servicio = await prisma.servicio.update({
@@ -192,6 +218,11 @@ export async function PUT(
                 esCompartido,
                 esMunicipal,
                 destinoAutoFill,
+                categoria,
+                modeloPrecio,
+                // tipoServicio legacy: solo se fija si los flags lo determinan (estructural).
+                // Si no, se deja como está para no pisar tipos de tour curados a mano.
+                ...(tipoEstructural ? { tipoServicio: tipoEstructural } : {}),
                 ...(nuevaConfiguracion !== undefined ? { configuracion: nuevaConfiguracion as any } : {}),
                 ...(guiaEspanolDisponible !== undefined ? { guiaEspanolDisponible } : {}),
                 ...(precioGuiaEspanol !== undefined ? { precioGuiaEspanol } : {}),

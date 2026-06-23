@@ -198,7 +198,22 @@ export default function EditarServicioPage() {
         if (exists) {
             setVehiculosSeleccionados(vehiculosSeleccionados.filter((v) => v.vehiculoId !== vehiculoId));
         } else {
+            // Compartido: solo 1 vehículo (su precio es el costo por persona). Si ya hay uno
+            // seleccionado, los demás quedan bloqueados hasta quitar el actual.
+            if (esCompartido && vehiculosSeleccionados.length >= 1) return;
             setVehiculosSeleccionados([...vehiculosSeleccionados, { vehiculoId, precio: 0, precioOlaya: null }]);
+        }
+    };
+
+    // Compartido: solo aplica a este tipo. Al activarlo, recorta a un único vehículo.
+    const toggleCompartido = () => {
+        const v = !esCompartido;
+        setEsCompartido(v);
+        if (v) {
+            setEsPorPersona(false);
+            if (vehiculosSeleccionados.length > 1) {
+                setVehiculosSeleccionados(vehiculosSeleccionados.slice(0, 1));
+            }
         }
     };
 
@@ -592,9 +607,9 @@ export default function EditarServicioPage() {
                         {/* Compartido */}
                         <div
                             className={`flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${esCompartido ? 'border-[#D6A75D] bg-[#D6A75D]/5' : 'border-gray-200 hover:border-gray-300'}`}
-                            onClick={() => { const v = !esCompartido; setEsCompartido(v); if (v) setEsPorPersona(false); }}
+                            onClick={toggleCompartido}
                         >
-                            <Switch checked={esCompartido} onClick={(e) => { e.stopPropagation(); const v = !esCompartido; setEsCompartido(v); if (v) setEsPorPersona(false); }} />
+                            <Switch checked={esCompartido} onClick={(e) => { e.stopPropagation(); toggleCompartido(); }} />
                             <div className="flex-1">
                                 <p className="text-sm font-medium text-gray-900">Servicio Compartido</p>
                                 <p className="text-xs text-gray-500 mt-0.5">Activa capacidad total, cupos disponibles y precio por persona. No requiere asignación de vehículo individual.</p>
@@ -841,7 +856,9 @@ export default function EditarServicioPage() {
                     <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
                         <h2 className="text-base font-semibold text-gray-900">Vehiculos</h2>
                         <p className="text-xs text-gray-500 mt-0.5">
-                            Selecciona los vehiculos disponibles para este servicio
+                            {esCompartido
+                                ? 'Servicio compartido: selecciona un único vehículo. Su precio es el costo por persona. Para cambiarlo, quita el actual y elige otro.'
+                                : 'Selecciona los vehiculos disponibles para este servicio'}
                         </p>
                         <p className="text-xs text-amber-700 mt-2 bg-amber-50 border border-amber-200 rounded px-3 py-2">
                             <strong>Nota:</strong> Este precio aplica <strong>solo</strong> a reservas directas (clientes independientes que llegan a la web sin código ni link de aliado). Para configurar los precios de aliados, ve a <strong>Aliados → Configuración de precios y servicios</strong>. Los precios de aliados son independientes y no se sincronizan con este.
@@ -859,6 +876,8 @@ export default function EditarServicioPage() {
                                     const isSelected = vehiculosSeleccionados.find(
                                         (v) => v.vehiculoId === vehiculo.id
                                     );
+                                    // Compartido: si ya hay un vehículo elegido, los demás se bloquean.
+                                    const blocked = esCompartido && !isSelected && vehiculosSeleccionados.length >= 1;
 
                                     return (
                                         <div
@@ -866,15 +885,18 @@ export default function EditarServicioPage() {
                                             className={`rounded-lg border-2 p-4 transition-all ${
                                                 isSelected
                                                     ? 'border-[#D6A75D] bg-[#D6A75D]/5'
-                                                    : 'border-gray-200 hover:border-gray-300'
+                                                    : blocked
+                                                        ? 'border-gray-200 bg-gray-50 opacity-60'
+                                                        : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                         >
                                             <div className="flex items-center gap-4">
                                                 <input
                                                     type="checkbox"
                                                     checked={!!isSelected}
+                                                    disabled={blocked}
                                                     onChange={() => handleVehiculoToggle(vehiculo.id)}
-                                                    className="w-4 h-4 text-[#D6A75D] border-gray-300 rounded focus:ring-[#D6A75D] cursor-pointer"
+                                                    className={`w-4 h-4 text-[#D6A75D] border-gray-300 rounded focus:ring-[#D6A75D] ${blocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                                                 />
 
                                                 <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
@@ -887,7 +909,14 @@ export default function EditarServicioPage() {
                                                 </div>
 
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="text-sm font-semibold text-gray-900">{vehiculo.nombre}</h3>
+                                                    <h3 className="text-sm font-semibold text-gray-900">
+                                                        {vehiculo.nombre}
+                                                        {blocked && (
+                                                            <span className="ml-2 inline-block text-[10px] font-medium text-gray-400 border border-gray-300 rounded px-1.5 py-0.5 align-middle">
+                                                                Bloqueado · compartido usa 1 vehículo
+                                                            </span>
+                                                        )}
+                                                    </h3>
                                                     <p className="text-xs text-gray-500">
                                                         Capacidad: {vehiculo.capacidadMinima} - {vehiculo.capacidadMaxima} pasajeros
                                                     </p>

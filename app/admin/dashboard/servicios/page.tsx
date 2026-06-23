@@ -42,6 +42,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { getLocalizedText } from '@/types/multi-language'
+import { categoriaDeServicio } from '@/lib/servicio-categoria'
 import MunicipalServicesGroup from './MunicipalServicesGroup'
 
 interface MunicipioConfig {
@@ -63,6 +64,7 @@ interface Servicio {
   esPorHoras: boolean
   esCompartido: boolean
   esMunicipal: boolean
+  esTraslado: boolean
   tipoTarifa?: 'POR_PERSONA' | null
   preciosPorPersona?: { p1: number; p2: number; p3: number } | null
   destinoAutoFill: string | null
@@ -78,7 +80,7 @@ export default function ServiciosPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [activoFilter, setActivoFilter] = useState('ALL')
-  const [catFilter, setCatFilter] = useState<'todos' | 'aeropuerto' | 'tours' | 'compartidos' | 'otros'>('todos')
+  const [catFilter, setCatFilter] = useState<'todos' | 'aeropuerto' | 'tours' | 'compartidos' | 'traslados' | 'otros'>('todos')
   const [tab, setTab] = useState<'servicios' | 'municipal' | 'ubicaciones'>('servicios')
 
   // Municipios config state
@@ -246,15 +248,19 @@ export default function ServiciosPage() {
   const nonMunicipal = servicios.filter((s) => !s.esMunicipal)
   const municipal = servicios.filter((s) => s.esMunicipal)
 
-  // Categoriza un servicio (misma lógica que la página pública de reservas)
-  const categorizar = (s: Servicio): 'aeropuerto' | 'tours' | 'compartidos' | 'otros' => {
-    if (s.esAeropuerto) return 'aeropuerto'
-    if (s.tipoTarifa === 'POR_PERSONA') return 'tours'
-    if (s.esCompartido) return 'compartidos'
-    return 'otros'
+  // Categoriza un servicio usando la lógica canónica compartida (lib/servicio-categoria).
+  const CAT_A_FILTRO: Record<string, 'aeropuerto' | 'tours' | 'compartidos' | 'traslados' | 'otros'> = {
+    AEROPUERTO: 'aeropuerto',
+    TOUR_PERSONA: 'tours',
+    COMPARTIDO: 'compartidos',
+    TRASLADO: 'traslados',
+    OTRO: 'otros',
+    MUNICIPAL: 'otros', // los municipales ya se filtran aparte; fallback seguro
   }
+  const categorizar = (s: Servicio): 'aeropuerto' | 'tours' | 'compartidos' | 'traslados' | 'otros' =>
+    CAT_A_FILTRO[categoriaDeServicio(s)]
 
-  const catCounts = { todos: nonMunicipal.length, aeropuerto: 0, tours: 0, compartidos: 0, otros: 0 }
+  const catCounts = { todos: nonMunicipal.length, aeropuerto: 0, tours: 0, compartidos: 0, traslados: 0, otros: 0 }
   nonMunicipal.forEach((s) => { catCounts[categorizar(s)]++ })
 
   const categorias = [
@@ -262,6 +268,7 @@ export default function ServiciosPage() {
     { key: 'aeropuerto', label: 'Aeropuerto' },
     { key: 'tours', label: 'Tours' },
     { key: 'compartidos', label: 'Tours compartidos' },
+    { key: 'traslados', label: 'Traslados' },
     { key: 'otros', label: 'Otros servicios' },
   ] as const
 

@@ -273,6 +273,129 @@ export async function calculateReservationPrice(
 }
 
 // ============================================
+// FASE 3 — RECÁLCULO AUTORITATIVO (WEB DIRECTO, NO-ALIADO)
+// ============================================
+
+export interface WebDirectoVehiculo {
+    vehiculoId: string;
+    precio: any;
+    precioOlaya?: any;
+}
+
+export interface WebDirectoServicio {
+    esCompartido: boolean;
+    esPorHoras: boolean;
+    esAeropuerto: boolean;
+    aplicaRecargoNocturno: boolean;
+    montoRecargoNocturno: any;
+    recargoNocturnoInicio: string | null;
+    recargoNocturnoFin: string | null;
+    configuracion: unknown;
+    vehiculosPermitidos: WebDirectoVehiculo[];
+}
+
+export interface WebDirectoInput {
+    servicio: WebDirectoServicio;
+    vehiculoId?: string | null;
+    numeroPasajeros: number;
+    cantidadHoras?: number | null;
+    hora: string;
+    datosDinamicos: DynamicFieldValues;
+    aeropuertoNombre?: AeropuertoNombreInput | null;
+    municipio?: string | null;
+    municipioConfigId?: string | null;
+    /** Recargo del MunicipioConfig seleccionado (COP). 0 si no aplica. */
+    municipioConfigRecargo?: number;
+}
+
+export interface WebDirectoComponentes {
+    precioBase: number;
+    precioAdicionales: number;
+    recargoNocturno: number;
+    tarifaMunicipio: number;
+}
+
+/**
+ * 🔒 FASE 3 — Recalcula server-side, desde la BD, los 4 componentes de precio que hoy la
+ * ruta web confía al frontend, para el camino web directo (cliente final, sin aliado).
+ *
+ * Espeja EXACTAMENTE la lógica del wizard (components/reservas/wizard/Step1TripDetails.tsx):
+ *  - Compartido: precio del cupo × pasajeros; adicionales/recargo/municipio = 0.
+ *  - Por horas:  precio del vehículo × horas.
+ *  - Aeropuerto: usa precioOlaya cuando el destino es Olaya Herrera (fallback a precio).
+ *  - Municipio "OTRO" sin config dinámica: todo a 0 (cotización manual), igual que el wizard.
+ *  - Tarifa de municipio: SOLO desde MunicipioConfig (el mapa estático MUNICIPALITY_PRICES
+ *    no participa en el flujo web — el wizard pasa Municipio.OTRO y su fee es 0).
+ *
+ * NO cubre el camino de aliado (precio base y comisión de aliado se resuelven aparte en la
+ * ruta). El precio por persona (POR_PERSONA_TRAMOS) tampoco: ese ya se recalcula server-side.
+ */
+export function recalcularPrecioWebDirecto(input: WebDirectoInput): WebDirectoComponentes {
+    const { servicio } = input;
+    const cero: WebDirectoComponentes = { precioBase: 0, precioAdicionales: 0, recargoNocturno: 0, tarifaMunicipio: 0 };
+
+    // Municipio desconocido sin config dinámica → cotización manual (precio 0), igual que el wizard.
+    if (input.municipio === 'OTRO' && !input.municipioConfigId) {
+        return cero;
+    }
+
+    // ── Precio base del vehículo ──
+    const vehiculoConfig = servicio.vehiculosPermitidos.find((v) => v.vehiculoId === input.vehiculoId);
+    const esOlaya = !!servicio.esAeropuerto && input.aeropuertoNombre === 'OLAYA_HERRERA';
+    const precioOlaya = vehiculoConfig ? (vehiculoConfig as any).precioOlaya : null;
+    const precioVehiculo = vehiculoConfig
+        ? (esOlaya && precioOlaya != null && Number(precioOlaya) > 0
+            ? Number(precioOlaya)
+            : Number(vehiculoConfig.precio))
+        : 0;
+
+    // ── Compartido: precio del cupo × pasajeros, sin adicionales/recargo/municipio ──
+    if (servicio.esCompartido) {
+        return {
+            precioBase: (Number.isFinite(precioVehiculo) ? precioVehiculo : 0) * (input.numeroPasajeros || 0),
+            precioAdicionales: 0,
+            recargoNocturno: 0,
+            tarifaMunicipio: 0,
+        };
+    }
+
+    let precioBase = Number.isFinite(precioVehiculo) ? precioVehiculo : 0;
+    if (servicio.esPorHoras && input.cantidadHoras && input.cantidadHoras > 0) {
+        precioBase = precioBase * input.cantidadHoras;
+    }
+
+    // ── Campos dinámicos (adicionales) ──
+    let precioAdicionales = 0;
+    const camposConfig = validateDynamicFields(getConfiguracion(servicio.configuracion).camposCustom);
+    for (const campo of camposConfig) {
+        if (!campo.tienePrecio || !campo.precioUnitario) continue;
+        const valor = input.datosDinamicos?.[campo.clave];
+        if (valor === undefined || valor === null) continue;
+        if (campo.tipo === 'COUNTER') {
+            const n = Number(valor);
+            if (Number.isFinite(n) && n > 0) precioAdicionales += n * campo.precioUnitario;
+        } else if (campo.tipo === 'SWITCH') {
+            if (valor === true) precioAdicionales += campo.precioUnitario;
+        } else if (campo.tipo === 'SELECT' && 'opciones' in campo) {
+            const opcion = campo.opciones.find((o) => o.valor === valor);
+            if (opcion?.precio) precioAdicionales += opcion.precio;
+        }
+    }
+
+    // ── Recargo nocturno (config del servicio) ──
+    let recargoNocturno = 0;
+    if (servicio.aplicaRecargoNocturno && servicio.montoRecargoNocturno != null &&
+        isNightSurchargeApplicable(input.hora, servicio.recargoNocturnoInicio, servicio.recargoNocturnoFin)) {
+        recargoNocturno = Number(servicio.montoRecargoNocturno) || 0;
+    }
+
+    // ── Tarifa de municipio (solo MunicipioConfig) ──
+    const tarifaMunicipio = Number(input.municipioConfigRecargo) || 0;
+
+    return { precioBase, precioAdicionales, recargoNocturno, tarifaMunicipio };
+}
+
+// ============================================
 // CLIENT-SIDE PRICE CALCULATION (FOR DISPLAY)
 // ============================================
 

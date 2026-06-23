@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { checkApiKey, unauthorized } from '../../_auth';
 import { calculateReservationPrice } from '@/lib/priceCalculator';
+import { categoriaDeServicio, modeloPrecioDeServicio } from '@/lib/servicio-categoria';
 import { calculateBoldCommission } from '@/lib/bold';
 import { TipoServicio, Municipio, EstadoReserva, EstadoPago } from '@prisma/client';
 import crypto from 'crypto';
@@ -135,6 +136,8 @@ export async function POST(request: NextRequest) {
                 emailCliente,
                 servicioId: servicio.id,
                 vehiculoId: vehiculoEntry.vehiculoId,
+                categoriaServicio: categoriaDeServicio(servicio as any),
+                modeloPrecio: modeloPrecioDeServicio(servicio as any),
                 fecha: fechaDate,
                 hora,
                 numeroPasajeros,

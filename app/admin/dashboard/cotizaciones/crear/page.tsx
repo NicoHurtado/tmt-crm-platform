@@ -16,6 +16,7 @@ export default function CreateQuotePage() {
     const [selectedService, setSelectedService] = useState<any>(null);
     const [wizardOpen, setWizardOpen] = useState(false);
     const [municipalExpanded, setMunicipalExpanded] = useState(false);
+    const [trasladosExpanded, setTrasladosExpanded] = useState(false);
     const [aliados, setAliados] = useState<Array<{ id: string; nombre: string }>>([]);
     const [aliadoId, setAliadoId] = useState<string | null>(null);
     const [clientePaga, setClientePaga] = useState(true);
@@ -77,9 +78,10 @@ export default function CreateQuotePage() {
         return null;
     }
 
-    // Separar servicios municipales de otros servicios
+    // Separar servicios municipales, traslados y otros servicios
     const municipalServices = services.filter(s => s.esMunicipal);
-    const otherServices = services.filter(s => !s.esMunicipal);
+    const trasladoServices = services.filter(s => !s.esMunicipal && s.esTraslado && !s.esAeropuerto);
+    const otherServices = services.filter(s => !s.esMunicipal && !(s.esTraslado && !s.esAeropuerto));
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -173,6 +175,65 @@ export default function CreateQuotePage() {
                                 </button>
                             ))}
                         </div>
+
+                        {/* Traslados Agrupados */}
+                        {trasladoServices.length > 0 && (
+                            <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                                <button
+                                    onClick={() => setTrasladosExpanded(!trasladosExpanded)}
+                                    className="w-full p-4 bg-amber-50 hover:bg-amber-100 transition-colors flex items-center justify-between group"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-amber-200 rounded-lg flex items-center justify-center group-hover:ring-2 group-hover:ring-amber-400 transition-all">
+                                            <FiMapPin className="text-amber-700 text-2xl" />
+                                        </div>
+                                        <div className="text-left">
+                                            <h3 className="font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
+                                                Traslados
+                                            </h3>
+                                            <p className="text-sm text-gray-600">
+                                                {trasladoServices.length} traslado{trasladoServices.length !== 1 ? 's' : ''} disponible{trasladoServices.length !== 1 ? 's' : ''}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="text-gray-600 group-hover:text-amber-700 transition-colors">
+                                        {trasladosExpanded ? <FiChevronUp size={24} /> : <FiChevronDown size={24} />}
+                                    </div>
+                                </button>
+
+                                {trasladosExpanded && (
+                                    <div className="p-4 bg-gray-50 border-t-2 border-gray-200">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {trasladoServices.map((service) => (
+                                                <button
+                                                    key={service.id}
+                                                    onClick={() => handleSelectService(service)}
+                                                    className="text-left p-3 bg-white border border-gray-200 rounded-lg hover:border-[#D6A75D] hover:shadow-md transition-all group"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="relative flex-shrink-0 w-10 h-10 bg-gray-100 rounded-lg overflow-hidden group-hover:ring-2 group-hover:ring-[#D6A75D] transition-all">
+                                                            {service.imagen && (
+                                                                <Image
+                                                                    src={service.imagen}
+                                                                    alt={getLocalizedText(service.nombre, 'ES')}
+                                                                    fill
+                                                                    style={{ objectFit: 'cover' }}
+                                                                />
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="font-semibold text-gray-900 group-hover:text-[#D6A75D] transition-colors text-sm truncate">
+                                                                {getLocalizedText(service.nombre, 'ES')}
+                                                            </h4>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Servicios Municipales Agrupados */}
                         {municipalServices.length > 0 && (

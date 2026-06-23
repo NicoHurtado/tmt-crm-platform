@@ -5,10 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { getLocalizedText } from '@/types/multi-language';
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { categoriaDeServicio, modeloPrecioDeServicio, type Categoria } from '@/lib/servicio-categoria';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type TipoComision = 'PORCENTAJE' | 'FIJO';
+
+// Metadata de categorías para agrupar y etiquetar los servicios del aliado.
+// El orden define el orden de las secciones en el modal.
+const CATEGORIA_META: { key: Categoria; label: string; chip: string }[] = [
+  { key: 'AEROPUERTO', label: 'Aeropuerto', chip: 'bg-sky-50 text-sky-700 border-sky-200' },
+  { key: 'TRASLADO', label: 'Traslados', chip: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { key: 'TOUR_PERSONA', label: 'Tours por persona', chip: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { key: 'COMPARTIDO', label: 'Tours compartidos', chip: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { key: 'OTRO', label: 'Tours y otros servicios', chip: 'bg-neutral-100 text-neutral-600 border-neutral-200' },
+];
+const CHIP_POR_HORAS = 'bg-purple-50 text-purple-700 border-purple-200';
 
 interface VehiculoConfig {
   vehiculoId: string;
@@ -32,6 +44,9 @@ interface ServicioConfig {
   esCompartido: boolean;
   esMunicipal: boolean;
   esAeropuerto: boolean;
+  esTraslado: boolean;
+  esPorHoras: boolean;
+  tipoTarifa: 'POR_PERSONA' | null;
   activo: boolean;
   vehiculos: VehiculoConfig[];
 }
@@ -142,6 +157,9 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
         esCompartido: s.esCompartido ?? false,
         esMunicipal: s.esMunicipal ?? false,
         esAeropuerto: s.esAeropuerto ?? false,
+        esTraslado: s.esTraslado ?? false,
+        esPorHoras: s.esPorHoras ?? false,
+        tipoTarifa: s.tipoTarifa === 'POR_PERSONA' ? 'POR_PERSONA' : null,
         activo: s.activo ?? false,
         vehiculos: [...(s.vehiculos || [])].sort(
           (a: any, b: any) => (a.capacidadMinima ?? 0) - (b.capacidadMinima ?? 0)
@@ -427,7 +445,13 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
       const nombreStr = typeof s.nombre === 'string' ? s.nombre : getLocalizedText(s.nombre, 'ES');
       const dimCls = !s.activo ? 'opacity-40' : '';
       const isExpanded = expandedServices.has(s.servicioId);
-      const hasVehicles = s.vehiculos.length > 0;
+      const cat = categoriaDeServicio(s);
+      const catMeta = CATEGORIA_META.find(m => m.key === cat);
+      const esPorHoras = modeloPrecioDeServicio(s) === 'POR_HORAS';
+      const esPorPersona = s.tipoTarifa === 'POR_PERSONA';
+      // Por persona: el precio se cobra por tramos (p1/p2/p3) y la comisión es ±10% automática.
+      // Los vehículos NO afectan el precio aquí, así que no se muestran (aunque existan residuales).
+      const hasVehicles = !esPorPersona && s.vehiculos.length > 0;
 
       return [
         /* ── Service row ─────────────────────────────────────────────────── */
@@ -450,9 +474,19 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
               )}
               {!hasVehicles && <div className="w-6 shrink-0" />}
               <span className="font-semibold text-neutral-800 text-sm">{nombreStr}</span>
-              {s.esCompartido && (
-                <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 font-medium">
-                  Compartido
+              {catMeta && (
+                <span className={`text-[10px] border rounded-full px-2 py-0.5 font-medium ${catMeta.chip}`}>
+                  {catMeta.label}
+                </span>
+              )}
+              {esPorHoras && (
+                <span className={`text-[10px] border rounded-full px-2 py-0.5 font-medium ${CHIP_POR_HORAS}`}>
+                  Por horas
+                </span>
+              )}
+              {esPorPersona && (
+                <span className="text-[10px] text-neutral-400" title="El precio se cobra por persona en tramos (1/2/3+). La comisión del aliado es automática: HOTEL/AIRBNB +10%, AGENCIA −10%. No se configura por vehículo.">
+                  precio por persona · comisión ±10% automática
                 </span>
               )}
               {hasVehicles && (
@@ -481,7 +515,7 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
         </tr>,
 
         /* ── Vehicle sub-rows (collapsible) ───────────────────────────────── */
-        ...(isExpanded
+        ...(isExpanded && hasVehicles
           ? s.vehiculos.flatMap(v =>
               s.esAeropuerto
                 ? [renderVehicleRow(s, v, 'jmc', isGreen), renderVehicleRow(s, v, 'olaya', isGreen)]
@@ -528,7 +562,20 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
                     No hay servicios disponibles
                   </td>
                 </tr>
-              ) : renderServicioRows(regularServicios)}
+              ) : (
+                CATEGORIA_META
+                  .map(meta => ({ meta, items: regularServicios.filter(s => categoriaDeServicio(s) === meta.key) }))
+                  .filter(g => g.items.length > 0)
+                  .flatMap(({ meta, items }) => [
+                    <tr key={`grp-${meta.key}`} className="bg-neutral-50">
+                      <td colSpan={7} className="px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                        {meta.label}
+                        <span className="ml-1.5 text-neutral-400 normal-case">· {items.filter(s => s.activo).length}/{items.length} activos</span>
+                      </td>
+                    </tr>,
+                    ...renderServicioRows(items),
+                  ])
+              )}
             </tbody>
           </table>
         </div>

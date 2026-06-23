@@ -64,6 +64,10 @@ model Servicio {
   guiaInglesDisponible  Boolean            @default(false)
   precioGuiaIngles      Decimal?           @db.Decimal(10, 2)
   orden                 Int                @default(999)
+  /// Categoría canónica derivada de los flags (lib/servicio-categoria.ts). Aditiva.
+  categoria             CategoriaServicio?
+  /// Modelo de precio derivado de los flags (lib/servicio-categoria.ts). Aditiva.
+  modeloPrecio          ModeloPrecio?
   calificaciones        Calificacion[]
   reservas              Reserva[]
   serviciosAliado       ServicioAliado[]
@@ -71,6 +75,7 @@ model Servicio {
 
   @@index([activo])
   @@index([orden])
+  @@index([categoria])
 }
 
 model Vehiculo {
@@ -88,15 +93,15 @@ model Vehiculo {
 }
 
 model ServicioVehiculo {
-  id         String   @id @default(cuid())
-  servicioId String
-  vehiculoId String
-  precio     Decimal? @db.Decimal(10, 2)
+  id          String   @id @default(cuid())
+  servicioId  String
+  vehiculoId  String
+  precio      Decimal? @db.Decimal(10, 2)
   // Precio alterno para aeropuerto Olaya Herrera (solo servicios esAeropuerto).
   // El campo `precio` representa José María Córdova / por defecto. Si está vacío, se usa `precio`.
   precioOlaya Decimal? @db.Decimal(10, 2)
-  servicio   Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
-  vehiculo   Vehiculo @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
+  servicio    Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  vehiculo    Vehiculo @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
 
   @@unique([servicioId, vehiculoId])
 }
@@ -130,8 +135,8 @@ model ConductorInvite {
 }
 
 model Reserva {
-  id                    String           @id @default(cuid())
-  codigo                String           @unique
+  id                    String             @id @default(cuid())
+  codigo                String             @unique
   nombreCliente         String
   whatsappCliente       String
   emailCliente          String
@@ -144,47 +149,51 @@ model Reserva {
   aeropuertoNombre      AeropuertoNombre?
   numeroPasajeros       Int
   vehiculoId            String?
-  datos                 Json             @default("{}")
-  precioBase            Decimal          @db.Decimal(10, 2)
-  precioAdicionales     Decimal          @default(0) @db.Decimal(10, 2)
-  recargoNocturno       Decimal          @default(0) @db.Decimal(10, 2)
-  tarifaMunicipio       Decimal          @default(0) @db.Decimal(10, 2)
-  descuentoAliado       Decimal          @default(0) @db.Decimal(10, 2)
-  precioTotal           Decimal          @db.Decimal(10, 2)
-  comisionBold          Decimal?         @db.Decimal(10, 2)
-  comisionAliado        Decimal?         @db.Decimal(10, 2)
+  datos                 Json               @default("{}")
+  precioBase            Decimal            @db.Decimal(10, 2)
+  precioAdicionales     Decimal            @default(0) @db.Decimal(10, 2)
+  recargoNocturno       Decimal            @default(0) @db.Decimal(10, 2)
+  tarifaMunicipio       Decimal            @default(0) @db.Decimal(10, 2)
+  descuentoAliado       Decimal            @default(0) @db.Decimal(10, 2)
+  precioTotal           Decimal            @db.Decimal(10, 2)
+  comisionBold          Decimal?           @db.Decimal(10, 2)
+  comisionAliado        Decimal?           @db.Decimal(10, 2)
   estado                EstadoReserva
   estadoPago            EstadoPago?
   conductorId           String?
   conductorAsignadoAt   DateTime?
   aliadoId              String?
-  esReservaAliado       Boolean          @default(false)
+  esReservaAliado       Boolean            @default(false)
   notas                 String?
   notasInternas         String?
   hashPago              String?
   pagoId                String?
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
   canceladaAt           DateTime?
-  metodoPago            MetodoPago       @default(TARJETA)
+  metodoPago            MetodoPago         @default(TARJETA)
   googleCalendarEventId String?
-  esCotizacion          Boolean          @default(false)
-  linkCotizacion        String?          @unique
-  precioManual          Boolean          @default(false)
-  clientePaga           Boolean          @default(true)
-  esPedido              Boolean          @default(false)
-  origen                String           @default("web_directa")
+  esCotizacion          Boolean            @default(false)
+  linkCotizacion        String?            @unique
+  precioManual          Boolean            @default(false)
+  clientePaga           Boolean            @default(true)
+  esPedido              Boolean            @default(false)
+  origen                String             @default("web_directa")
   municipioConfigId     String?
   pedidoId              String?
-  pagoConductor         Boolean          @default(false)
+  pagoConductor         Boolean            @default(false)
+  /// Snapshot de la categoría/modelo del servicio al momento de crear la reserva.
+  /// Aditivo: permite interpretar reservas históricas aunque la config del servicio cambie.
+  categoriaServicio     CategoriaServicio?
+  modeloPrecio          ModeloPrecio?
   asistentes            Asistente[]
   calificacion          Calificacion?
-  aliado                Aliado?          @relation(fields: [aliadoId], references: [id])
-  conductor             Conductor?       @relation(fields: [conductorId], references: [id])
-  municipioConfig       MunicipioConfig? @relation(fields: [municipioConfigId], references: [id])
-  pedido                Pedido?          @relation(fields: [pedidoId], references: [id])
-  servicio              Servicio         @relation(fields: [servicioId], references: [id])
-  vehiculo              Vehiculo?        @relation(fields: [vehiculoId], references: [id])
+  aliado                Aliado?            @relation(fields: [aliadoId], references: [id])
+  conductor             Conductor?         @relation(fields: [conductorId], references: [id])
+  municipioConfig       MunicipioConfig?   @relation(fields: [municipioConfigId], references: [id])
+  pedido                Pedido?            @relation(fields: [pedidoId], references: [id])
+  servicio              Servicio           @relation(fields: [servicioId], references: [id])
+  vehiculo              Vehiculo?          @relation(fields: [vehiculoId], references: [id])
 
   @@index([codigo])
   @@index([estado])
@@ -278,23 +287,23 @@ model ServicioAliado {
 }
 
 model PrecioVehiculoAliado {
-  id               String         @id @default(cuid())
-  servicioAliadoId String
-  vehiculoId       String
-  activo           Boolean        @default(true)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  comisionValor    Decimal        @default(0) @db.Decimal(10, 2)
-  tipoComision     TipoComision   @default(PORCENTAJE)
-  precioBase       Decimal        @default(0) @db.Decimal(10, 2)
+  id                 String         @id @default(cuid())
+  servicioAliadoId   String
+  vehiculoId         String
+  activo             Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  comisionValor      Decimal        @default(0) @db.Decimal(10, 2)
+  tipoComision       TipoComision   @default(PORCENTAJE)
+  precioBase         Decimal        @default(0) @db.Decimal(10, 2)
   // Config alterna para aeropuerto Olaya Herrera (solo servicios esAeropuerto).
   // precioBase/comisionValor/tipoComision representan José María Córdova / por defecto.
   // Si los campos Olaya están vacíos, se usa la config JMC.
-  precioBaseOlaya    Decimal?      @db.Decimal(10, 2)
-  comisionValorOlaya Decimal?      @db.Decimal(10, 2)
+  precioBaseOlaya    Decimal?       @db.Decimal(10, 2)
+  comisionValorOlaya Decimal?       @db.Decimal(10, 2)
   tipoComisionOlaya  TipoComision?
-  servicioAliado   ServicioAliado @relation(fields: [servicioAliadoId], references: [id], onDelete: Cascade)
-  vehiculo         Vehiculo       @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
+  servicioAliado     ServicioAliado @relation(fields: [servicioAliadoId], references: [id], onDelete: Cascade)
+  vehiculo           Vehiculo       @relation(fields: [vehiculoId], references: [id], onDelete: Cascade)
 
   @@unique([servicioAliadoId, vehiculoId])
   @@index([servicioAliadoId])
@@ -357,6 +366,25 @@ enum TipoAliado {
 enum TipoComision {
   FIJO
   PORCENTAJE
+}
+
+/// Categoría canónica derivada de los flags del servicio (ver lib/servicio-categoria.ts).
+/// Aditiva: convive con los flags y con el enum legacy TipoServicio.
+enum CategoriaServicio {
+  AEROPUERTO
+  TOUR_PERSONA
+  COMPARTIDO
+  TRASLADO
+  MUNICIPAL
+  OTRO
+}
+
+/// Modelo de cálculo de precio del servicio (ver lib/servicio-categoria.ts).
+enum ModeloPrecio {
+  POR_VEHICULO
+  POR_HORAS
+  POR_PERSONA_TRAMOS
+  COMPARTIDO_POR_PERSONA
 }
 
 enum TipoServicio {

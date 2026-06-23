@@ -14,6 +14,7 @@ import { getLocalizedText } from '@/types/multi-language';
 import { buildDatosFromBody, getDatos } from '@/types/reserva-datos';
 import { validateFieldValues, validateDynamicFieldsSafe } from '@/types/dynamic-fields';
 import { getConfiguracion, totalPorPersona } from '@/types/servicio-config';
+import { categoriaDeServicio, modeloPrecioDeServicio } from '@/lib/servicio-categoria';
 
 const RESERVA_INCLUDE = {
     servicio: true,
@@ -329,6 +330,8 @@ export async function createExternalReserva(body: any): Promise<ReservaWithRelat
             codigo,
             servicioId: servicio.id,
             vehiculoId,
+            categoriaServicio: categoriaDeServicio(servicio as any),
+            modeloPrecio: modeloPrecioDeServicio(servicio as any),
             fecha,
             hora,
             nombreCliente: body.nombreCliente,

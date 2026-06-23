@@ -4,6 +4,8 @@ import { EstadoReserva, Prisma } from '@prisma/client';
 import { buildDatosFromBody } from '@/types/reserva-datos';
 import { calculateBoldCommission } from '@/lib/bold';
 import { getConfiguracion, totalPorPersona } from '@/types/servicio-config';
+import { categoriaDeServicio, modeloPrecioDeServicio } from '@/lib/servicio-categoria';
+import { recalcularPrecioWebDirecto } from '@/lib/priceCalculator';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import crypto from 'crypto';
@@ -89,7 +91,8 @@ export async function POST(request: Request) {
 
         // Get service first to check type
         const servicio = await prisma.servicio.findUnique({
-            where: { id: body.servicioId }
+            where: { id: body.servicioId },
+            include: { vehiculosPermitidos: true }
         });
 
         if (!servicio) {
@@ -102,6 +105,10 @@ export async function POST(request: Request) {
         // Categoría de tarifa por persona: formulario ágil (sin hora, vehículo ni municipio)
         const cfgServicio = getConfiguracion((servicio as any).configuracion);
         const esPorPersona = cfgServicio.tipoTarifa === 'POR_PERSONA';
+
+        // Snapshot de categoría/modelo del servicio al momento de reservar (aditivo).
+        const categoriaServicioSnapshot = categoriaDeServicio(servicio as any);
+        const modeloPrecioSnapshot = modeloPrecioDeServicio(servicio as any);
 
         // Validar campos requeridos (municipio/hora no requeridos para TOUR_COMPARTIDO ni por persona)
         const requiredFields = [
@@ -205,6 +212,48 @@ export async function POST(request: Request) {
             }
         }
 
+        // 🔒 FASE 3 — Camino web directo (cliente final, sin aliado): recálculo autoritativo
+        // de los 4 componentes de precio desde la BD. El front ya no se confía para fijar el
+        // precio. `precioManual` (override de admin) y las reservas de aliado quedan exentas.
+        if (!esPorPersona && !body.esReservaAliado && !body.precioManual) {
+            let municipioConfigRecargo = 0;
+            if (body.municipioConfigId) {
+                const mc = await prisma.municipioConfig.findUnique({
+                    where: { id: body.municipioConfigId },
+                    select: { recargo: true },
+                });
+                municipioConfigRecargo = mc ? Number(mc.recargo) : 0;
+            }
+            const comp = recalcularPrecioWebDirecto({
+                servicio: servicio as any,
+                vehiculoId: body.vehiculoId ?? null,
+                numeroPasajeros: parseInt(body.numeroPasajeros) || 0,
+                cantidadHoras: body.cantidadHoras != null ? Number(body.cantidadHoras) : null,
+                hora: body.hora || '',
+                datosDinamicos: (body.datosDinamicos ?? {}) as any,
+                aeropuertoNombre:
+                    body.aeropuertoNombre === 'JOSE_MARIA_CORDOVA' || body.aeropuertoNombre === 'OLAYA_HERRERA'
+                        ? body.aeropuertoNombre
+                        : null,
+                municipio: body.municipio ?? null,
+                municipioConfigId: body.municipioConfigId ?? null,
+                municipioConfigRecargo,
+            });
+            // Observabilidad: si lo recalculado difiere de lo enviado por el front, dejar
+            // rastro (no bloquea). Útil para detectar manipulación o gaps de paridad.
+            const enviado = (parseFloat(body.precioBase) || 0) + (parseFloat(body.precioAdicionales) || 0)
+                + (parseFloat(body.recargoNocturno) || 0)
+                + ((parseFloat(body.tarifaMunicipio) || 0) + (parseFloat(body.tarifaMunicipioConfig) || 0));
+            const recalc = comp.precioBase + comp.precioAdicionales + comp.recargoNocturno + comp.tarifaMunicipio;
+            if (Math.abs(enviado - recalc) > 1) {
+                console.warn(`[reservas] precio recalculado difiere del enviado: front=${enviado} server=${recalc} servicio=${body.servicioId}`);
+            }
+            precioBase = comp.precioBase;
+            precioAdicionales = comp.precioAdicionales;
+            recargoNocturno = comp.recargoNocturno;
+            tarifaMunicipio = comp.tarifaMunicipio;
+        }
+
         const subtotal = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio - descuentoAliado;
 
         // Subtotal final incluye comisión de aliado (el cliente la paga)
@@ -277,6 +326,10 @@ export async function POST(request: Request) {
                                     : null,
                             numeroPasajeros: parseInt(body.numeroPasajeros),
                             vehiculoId: esPorPersona ? null : (body.vehiculoId || null),
+
+                            // Snapshot de categoría/modelo del servicio (aditivo)
+                            categoriaServicio: categoriaServicioSnapshot,
+                            modeloPrecio: modeloPrecioSnapshot,
 
                             // Datos específicos del servicio (unificados en JSON)
                             datos: datosReserva as any,

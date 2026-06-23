@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { MultiLangTextSchema, MultiLangArraySchema } from '@/types/multi-language';
 import { buildConfiguracion, getConfiguracion } from '@/types/servicio-config';
+import { categoriaDeServicio, modeloPrecioDeServicio, tipoServicioEstructural } from '@/lib/servicio-categoria';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -164,6 +165,19 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // Categoría / modelo de precio / tipo legacy derivados de los flags (aditivo).
+        const flagsServicio = {
+            esAeropuerto: !!esAeropuerto,
+            esTraslado: !!esTraslado,
+            esPorHoras: !!esPorHoras,
+            esCompartido: !!esCompartido,
+            esMunicipal: !!esMunicipal,
+            tipoTarifa: (tipoTarifa ?? null) as 'POR_PERSONA' | null,
+        };
+        const categoria = categoriaDeServicio(flagsServicio);
+        const modeloPrecio = modeloPrecioDeServicio(flagsServicio);
+        const tipoServicio = tipoServicioEstructural(flagsServicio); // null => default OTRO
+
         // Create service
         const servicio = await prisma.servicio.create({
             data: {
@@ -171,6 +185,9 @@ export async function POST(req: NextRequest) {
                 descripcion,
                 imagen,
                 duracion,
+                categoria,
+                modeloPrecio,
+                ...(tipoServicio ? { tipoServicio } : {}),
                 incluye: incluye || [],
                 aplicaRecargoNocturno: aplicaRecargoNocturno || false,
                 recargoNocturnoInicio: aplicaRecargoNocturno ? recargoNocturnoInicio : null,

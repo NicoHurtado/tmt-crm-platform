@@ -12,6 +12,7 @@ import { CartModal } from '@/components/carrito/CartModal';
 import { useLanguage, t } from '@/lib/i18n';
 import { getLocalizedText, getLocalizedArray } from '@/types/multi-language';
 import { sortServicesByPriority } from '@/lib/service-order';
+import { categoriaDeServicio } from '@/lib/servicio-categoria';
 import WhatsAppButton from '@/components/ui/WhatsAppButton';
 import { useAliado } from '@/lib/hooks/useAliado';
 
@@ -31,6 +32,7 @@ interface Service {
     esPorHoras: boolean;
     esCompartido: boolean;
     esMunicipal: boolean;
+    esTraslado: boolean;
     destinoAutoFill: string | null;
     camposPersonalizados: any[];
     adicionales: any[];
@@ -308,11 +310,12 @@ export default function ReservasPage() {
     const serviciosMunicipales = services.filter(s => s.esMunicipal);
     const serviciosRegulares = services.filter(s => !s.esMunicipal);
 
-    // Agrupación por categorías para una página ordenada y fácil de escanear.
-    const serviciosAeropuerto = serviciosRegulares.filter(s => s.esAeropuerto);
-    const serviciosTours = serviciosRegulares.filter(s => !s.esAeropuerto && s.tipoTarifa === 'POR_PERSONA');
-    const serviciosCompartidos = serviciosRegulares.filter(s => !s.esAeropuerto && s.tipoTarifa !== 'POR_PERSONA' && s.esCompartido);
-    const serviciosOtros = serviciosRegulares.filter(s => !s.esAeropuerto && s.tipoTarifa !== 'POR_PERSONA' && !s.esCompartido);
+    // Agrupación por categorías (lógica canónica compartida: lib/servicio-categoria).
+    const serviciosAeropuerto = serviciosRegulares.filter(s => categoriaDeServicio(s) === 'AEROPUERTO');
+    const serviciosTours = serviciosRegulares.filter(s => categoriaDeServicio(s) === 'TOUR_PERSONA');
+    const serviciosCompartidos = serviciosRegulares.filter(s => categoriaDeServicio(s) === 'COMPARTIDO');
+    const serviciosTraslados = serviciosRegulares.filter(s => categoriaDeServicio(s) === 'TRASLADO');
+    const serviciosOtros = serviciosRegulares.filter(s => categoriaDeServicio(s) === 'OTRO');
 
     // Aliados públicos separados por tipo (solo activos — los filtra la API)
     const hotelesAliados = hoteles.filter(h => h.tipo === 'HOTEL');
@@ -494,7 +497,14 @@ export default function ReservasPage() {
                                 </CarouselRow>
                             )}
 
-                            {/* 4. Demás servicios (incluye tarjeta de Transporte Municipal) */}
+                            {/* 4. Traslados */}
+                            {serviciosTraslados.length > 0 && (
+                                <CarouselRow title={t('reservas.seccion_traslados', language)}>
+                                    {serviciosTraslados.map(renderServiceCard)}
+                                </CarouselRow>
+                            )}
+
+                            {/* 5. Demás servicios (incluye tarjeta de Transporte Municipal) */}
                             {(serviciosOtros.length > 0 || serviciosMunicipales.length > 0) && (
                                 <CarouselRow title={t('reservas.seccion_otros', language)}>
                                     {serviciosOtros.map(renderServiceCard)}
