@@ -488,22 +488,9 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                                     updateFormData({ fecha: date });
                                 }
                             }}
-                            min={(() => {
-                                const now = new Date();
-                                const base = new Date(now);
-                                base.setDate(base.getDate() + (now.getHours() >= 21 ? 2 : 1));
-                                return base.toISOString().split('T')[0];
-                            })()}
                             required
                             className={inputClass}
                         />
-                        {new Date().getHours() >= 21 && (
-                            <p className="text-xs text-amber-600 mt-1.5">
-                                {language === 'es'
-                                    ? 'Después de las 9 PM las reservas son desde pasado mañana.'
-                                    : 'After 9 PM reservations start from the day after tomorrow.'}
-                            </p>
-                        )}
                     </div>
 
 
@@ -577,22 +564,9 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                                     updateFormData({ fecha: date });
                                 }
                             }}
-                            min={(() => {
-                                const now = new Date();
-                                const base = new Date(now);
-                                base.setDate(base.getDate() + (now.getHours() >= 21 ? 2 : 1));
-                                return base.toISOString().split('T')[0];
-                            })()}
                             required
                             className={inputClass}
                         />
-                        {new Date().getHours() >= 21 && (
-                            <p className="text-xs text-amber-600 mt-1.5">
-                                {language === 'es'
-                                    ? 'Después de las 9 PM las reservas son desde pasado mañana.'
-                                    : 'After 9 PM reservations start from the day after tomorrow.'}
-                            </p>
-                        )}
                     </div>
 
                     {/* Pickup address */}
