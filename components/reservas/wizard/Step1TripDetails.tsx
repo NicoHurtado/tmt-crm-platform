@@ -13,18 +13,13 @@ import { useLanguage, t } from '@/lib/i18n';
 import { DateInput, TimeInput } from '@/components/ui';
 import { SharedTourLogisticsCard } from '@/components/reservas/SharedTourLogisticsCard';
 import { normalizeInfoTourCompartido } from '@/lib/info-tour-compartido';
-import { precioTramoPorPersona, totalPorPersona } from '@/types/servicio-config';
+import { precioTramoPorPersona, totalPorPersona, comisionPorPersona } from '@/types/servicio-config';
 
 /**
- * Factor de comisión por tipo de aliado para tours con precio por persona.
- * HOTEL/AIRBNB suman 10% (comisión positiva); AGENCIA resta 10% (comisión negativa);
- * cliente independiente => 0.
+ * La comisión por persona se calcula con `comisionPorPersona` de
+ * '@/types/servicio-config', que respeta el override configurado por aliado y
+ * cae al ±10% automático (HOTEL/AIRBNB +10%, AGENCIA −10%) cuando no hay override.
  */
-function comisionFactorPorPersona(aliadoTipo?: string | null): number {
-    if (aliadoTipo === 'HOTEL' || aliadoTipo === 'AIRBNB') return 0.1;
-    if (aliadoTipo === 'AGENCIA') return -0.1;
-    return 0;
-}
 
 /** Convierte "7:50 AM", "7:50am", "07:50", "7:50" → "07:50" (HH:MM 24h). */
 function parseSalidaToHora(salida: string): string {
@@ -68,6 +63,11 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
     // 🎟️ Tour con precio por persona (formulario ágil con dirección de recogida)
     const isTourPersona = service.tipoTarifa === 'POR_PERSONA';
     const preciosPorPersona = service.preciosPorPersona ?? null;
+    // Override de comisión por persona configurado para este aliado (null = ±10% automático).
+    const comisionPorPersonaOverride = {
+        tipo: service.comisionPorPersonaAliadoTipo ?? null,
+        valor: service.comisionPorPersonaAliadoValor ?? null,
+    };
 
     // 🚗 Check if this is a traslado or municipal transport service (but NOT airport service)
     const isTraslado = !service.esAeropuerto && (
@@ -247,15 +247,15 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         // (POST /api/reservas) para que aparezca en el CRM.
         if (isTourPersona) {
             const total = totalPorPersona(preciosPorPersona, formData.numeroPasajeros || 0);
-            const factor = comisionFactorPorPersona(aliadoTipo);
-            const totalConFactor = Math.round(total * (1 + factor));
+            const comision = comisionPorPersona(total, aliadoTipo, comisionPorPersonaOverride);
+            const totalConComision = total + comision;
             const updates: Partial<ReservationFormData> = {
-                precioBase: totalConFactor,
+                precioBase: totalConComision,
                 recargoNocturno: 0,
                 tarifaMunicipio: 0,
                 precioAdicionales: 0,
                 comisionAliado: 0, // silencioso: no se muestra al cliente
-                precioTotal: totalConFactor,
+                precioTotal: totalConComision,
             };
             if (formData.municipio !== null) updates.municipio = null as any;
             updateFormData(updates);
@@ -619,22 +619,21 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                         </div>
 
                         {/* Per-person price summary */}
-                        {formData.numeroPasajeros > 0 && preciosPorPersona && (
-                            <div className="mt-2 flex items-center justify-between px-1">
-                                <span className="text-xs text-gray-400">
-                                    {formData.numeroPasajeros} × {formatPrice(
-                                        precioTramoPorPersona(preciosPorPersona, formData.numeroPasajeros)
-                                        * (1 + comisionFactorPorPersona(aliadoTipo))
-                                    )}
-                                </span>
-                                <span className="text-sm font-bold text-gray-900">
-                                    = {formatPrice(
-                                        totalPorPersona(preciosPorPersona, formData.numeroPasajeros)
-                                        * (1 + comisionFactorPorPersona(aliadoTipo))
-                                    )}
-                                </span>
-                            </div>
-                        )}
+                        {formData.numeroPasajeros > 0 && preciosPorPersona && (() => {
+                            const totalBase = totalPorPersona(preciosPorPersona, formData.numeroPasajeros);
+                            const totalConComision = totalBase + comisionPorPersona(totalBase, aliadoTipo, comisionPorPersonaOverride);
+                            const porPersona = Math.round(totalConComision / Math.max(1, formData.numeroPasajeros));
+                            return (
+                                <div className="mt-2 flex items-center justify-between px-1">
+                                    <span className="text-xs text-gray-400">
+                                        {formData.numeroPasajeros} × {formatPrice(porPersona)}
+                                    </span>
+                                    <span className="text-sm font-bold text-gray-900">
+                                        = {formatPrice(totalConComision)}
+                                    </span>
+                                </div>
+                            );
+                        })()}
                     </div>
 
                     {/* Participant details have been moved to Step 2 (Contact Info) */}

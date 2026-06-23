@@ -90,3 +90,34 @@ export function totalPorPersona(precios: PreciosPorPersona | null | undefined, p
     const n = Math.max(1, Math.floor(pasajeros || 1))
     return precioTramoPorPersona(precios, n) * n
 }
+
+export type TipoComisionValor = 'PORCENTAJE' | 'FIJO'
+
+/** Override de comisión por aliado para un tour POR_PERSONA (configurable en admin). */
+export interface ComisionPorPersonaOverride {
+    tipo?: TipoComisionValor | null
+    valor?: number | null
+}
+
+/**
+ * Comisión (en pesos) de un tour POR_PERSONA para un aliado.
+ *
+ * - Si hay override configurado (`tipo` no nulo): PORCENTAJE => `valor`% del precio base;
+ *   FIJO => `valor` pesos. Admite valores negativos (comisión a favor del aliado o descuento).
+ * - Si no hay override: comportamiento automático por tipo de aliado:
+ *   HOTEL/AIRBNB +10%, AGENCIA −10%, cliente directo 0.
+ */
+export function comisionPorPersona(
+    precioBase: number,
+    aliadoTipo: string | null | undefined,
+    override?: ComisionPorPersonaOverride | null,
+): number {
+    if (override && override.tipo) {
+        const valor = Number(override.valor) || 0
+        if (override.tipo === 'FIJO') return Math.round(valor)
+        return Math.round(precioBase * (valor / 100))
+    }
+    if (aliadoTipo === 'HOTEL' || aliadoTipo === 'AIRBNB') return Math.round(precioBase * 0.1)
+    if (aliadoTipo === 'AGENCIA') return -Math.round(precioBase * 0.1)
+    return 0
+}

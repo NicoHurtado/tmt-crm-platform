@@ -277,6 +277,11 @@ model ServicioAliado {
   recargoNocturnoFin          String?
   recargoNocturnoInicio       String?
   sobrescribirRecargoNocturno Boolean                @default(false)
+  // Comisión configurable para tours POR_PERSONA (que no se cobran por vehículo).
+  // null = comportamiento automático por tipo de aliado (HOTEL/AIRBNB +10%, AGENCIA −10%).
+  // PORCENTAJE: comisionPorPersonaValor % del precio base. FIJO: monto en pesos. Admite valores negativos.
+  comisionPorPersonaTipo      TipoComision?
+  comisionPorPersonaValor     Decimal?               @db.Decimal(10, 2)
   preciosVehiculos            PrecioVehiculoAliado[]
   aliado                      Aliado                 @relation(fields: [aliadoId], references: [id], onDelete: Cascade)
   servicio                    Servicio               @relation(fields: [servicioId], references: [id], onDelete: Cascade)

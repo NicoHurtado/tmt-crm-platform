@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { EstadoReserva, Prisma } from '@prisma/client';
 import { buildDatosFromBody } from '@/types/reserva-datos';
 import { calculateBoldCommission } from '@/lib/bold';
-import { getConfiguracion, totalPorPersona } from '@/types/servicio-config';
+import { getConfiguracion, totalPorPersona, comisionPorPersona } from '@/types/servicio-config';
 import { categoriaDeServicio, modeloPrecioDeServicio } from '@/lib/servicio-categoria';
 import { recalcularPrecioWebDirecto } from '@/lib/priceCalculator';
 import { getServerSession } from 'next-auth';
@@ -165,18 +165,24 @@ export async function POST(request: Request) {
             recargoNocturno = 0;
             tarifaMunicipio = 0;
 
-            // Comisión por tipo de aliado: HOTEL/AIRBNB +10%, AGENCIA −10% (sobre el precio base).
+            // Comisión: override configurado por (aliado, servicio) si existe; si no,
+            // automático por tipo de aliado (HOTEL/AIRBNB +10%, AGENCIA −10%).
             if (body.esReservaAliado && body.aliadoId) {
                 try {
-                    const aliado = await prisma.aliado.findUnique({
-                        where: { id: body.aliadoId },
-                        select: { tipo: true },
+                    const [aliado, sa] = await Promise.all([
+                        prisma.aliado.findUnique({
+                            where: { id: body.aliadoId },
+                            select: { tipo: true },
+                        }),
+                        prisma.servicioAliado.findUnique({
+                            where: { aliadoId_servicioId: { aliadoId: body.aliadoId, servicioId: body.servicioId } },
+                            select: { comisionPorPersonaTipo: true, comisionPorPersonaValor: true },
+                        }),
+                    ]);
+                    comisionAliado = comisionPorPersona(precioBase, aliado?.tipo, {
+                        tipo: (sa?.comisionPorPersonaTipo ?? null) as any,
+                        valor: sa?.comisionPorPersonaValor != null ? Number(sa.comisionPorPersonaValor) : null,
                     });
-                    if (aliado?.tipo === 'HOTEL' || aliado?.tipo === 'AIRBNB') {
-                        comisionAliado = Math.round(precioBase * 0.1);
-                    } else if (aliado?.tipo === 'AGENCIA') {
-                        comisionAliado = -Math.round(precioBase * 0.1);
-                    }
                 } catch (e) {
                     console.error('Error calculating per-person ally commission:', e);
                 }

@@ -107,6 +107,9 @@ export async function GET(
                 camposPersonalizados: cfg.camposCustom ?? [],
                 tipoTarifa: cfg.tipoTarifa ?? null,
                 preciosPorPersona: cfg.preciosPorPersona ?? null,
+                // Override de comisión por persona configurado para este aliado (null = ±10% automático).
+                comisionPorPersonaAliadoTipo: sa?.comisionPorPersonaTipo ?? null,
+                comisionPorPersonaAliadoValor: sa && sa.comisionPorPersonaValor != null ? Number(sa.comisionPorPersonaValor) : null,
                 adicionales: [],
                 configuracion: servicio.configuracion,
                 orden: servicio.orden,
@@ -139,15 +142,25 @@ export async function POST(
     try {
         const { id: aliadoId } = params;
         const body = await request.json();
-        const { servicioId, activo, vehiculos } = body;
+        const { servicioId, activo, vehiculos, comisionPorPersonaTipo, comisionPorPersonaValor } = body;
 
-        // Upsert ServicioAliado (flag de activación)
+        // Override de comisión para tours POR_PERSONA. null/'' = ±10% automático por tipo de aliado.
+        const cppTipo = comisionPorPersonaTipo === 'FIJO'
+            ? 'FIJO'
+            : comisionPorPersonaTipo === 'PORCENTAJE'
+                ? 'PORCENTAJE'
+                : null;
+        const cppValor = cppTipo != null && comisionPorPersonaValor != null && comisionPorPersonaValor !== ''
+            ? Number(comisionPorPersonaValor) || 0
+            : null;
+
+        // Upsert ServicioAliado (flag de activación + override comisión por persona)
         const servicioAliado = await prisma.servicioAliado.upsert({
             where: {
                 aliadoId_servicioId: { aliadoId, servicioId }
             },
-            update: { activo },
-            create: { aliadoId, servicioId, activo }
+            update: { activo, comisionPorPersonaTipo: cppTipo as any, comisionPorPersonaValor: cppValor },
+            create: { aliadoId, servicioId, activo, comisionPorPersonaTipo: cppTipo as any, comisionPorPersonaValor: cppValor }
         });
 
         // Upsert PrecioVehiculoAliado con comisión por vehículo

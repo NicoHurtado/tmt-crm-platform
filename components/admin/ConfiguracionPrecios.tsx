@@ -49,6 +49,9 @@ interface ServicioConfig {
   tipoTarifa: 'POR_PERSONA' | null;
   activo: boolean;
   vehiculos: VehiculoConfig[];
+  // Override de comisión para tours POR_PERSONA. null = ±10% automático por tipo de aliado.
+  comisionPorPersonaTipo: TipoComision | null;
+  comisionPorPersonaValor: number | null;
 }
 
 interface ConfiguracionPreciosProps {
@@ -71,6 +74,8 @@ function calcComisionMonto(base: number, tipo: TipoComision, valor: number): num
 function snapshotOf(s: ServicioConfig): string {
   return JSON.stringify({
     activo: s.activo,
+    comisionPorPersonaTipo: s.comisionPorPersonaTipo,
+    comisionPorPersonaValor: s.comisionPorPersonaValor,
     vehiculos: s.vehiculos.map(v => ({
       vehiculoId: v.vehiculoId,
       activo: v.activo,
@@ -161,6 +166,8 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
         esPorHoras: s.esPorHoras ?? false,
         tipoTarifa: s.tipoTarifa === 'POR_PERSONA' ? 'POR_PERSONA' : null,
         activo: s.activo ?? false,
+        comisionPorPersonaTipo: (s.comisionPorPersonaAliadoTipo as TipoComision) || null,
+        comisionPorPersonaValor: s.comisionPorPersonaAliadoValor != null ? Number(s.comisionPorPersonaAliadoValor) : null,
         vehiculos: [...(s.vehiculos || [])].sort(
           (a: any, b: any) => (a.capacidadMinima ?? 0) - (b.capacidadMinima ?? 0)
         ).map((v: any) => ({
@@ -391,6 +398,9 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
           body: JSON.stringify({
             servicioId: s.servicioId,
             activo: s.activo,
+            // Override de comisión por persona (solo aplica a tours POR_PERSONA).
+            comisionPorPersonaTipo: s.tipoTarifa === 'POR_PERSONA' ? s.comisionPorPersonaTipo : null,
+            comisionPorPersonaValor: s.tipoTarifa === 'POR_PERSONA' ? s.comisionPorPersonaValor : null,
             vehiculos: s.vehiculos.map(v => ({
               vehiculoId: v.vehiculoId,
               activo: v.activo,
@@ -485,8 +495,8 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
                 </span>
               )}
               {esPorPersona && (
-                <span className="text-[10px] text-neutral-400" title="El precio se cobra por persona en tramos (1/2/3+). La comisión del aliado es automática: HOTEL/AIRBNB +10%, AGENCIA −10%. No se configura por vehículo.">
-                  precio por persona · comisión ±10% automática
+                <span className="text-[10px] text-neutral-400" title="El precio se cobra por persona en tramos (1/2/3+). La comisión del aliado se configura a la derecha; si se deja en 'Automático' usa HOTEL/AIRBNB +10%, AGENCIA −10%.">
+                  precio por persona · comisión configurable →
                 </span>
               )}
               {hasVehicles && (
@@ -506,12 +516,74 @@ export default function ConfiguracionPrecios({ aliadoId, onClose, onSave }: Conf
             />
           </td>
 
-          {/* Tipo / valor / precio / comisión / total se configuran por vehículo */}
-          <td className="px-4 py-3 text-center text-[11px] text-neutral-300">—</td>
-          <td className="px-4 py-3 text-center text-[11px] text-neutral-300">—</td>
-          <td className="px-4 py-3 text-right text-[11px] text-neutral-300">↓ por vehículo</td>
-          <td className="px-4 py-3 text-right text-[11px] text-neutral-300">—</td>
-          <td className="px-4 py-3 text-right text-[11px] text-neutral-300">—</td>
+          {esPorPersona ? (
+            <>
+              {/* Tipo comisión por persona: Auto (±10%) / % / $ */}
+              <td className="px-4 py-3">
+                <div className={`flex rounded-lg border overflow-hidden text-[11px] font-medium ${!s.activo ? 'opacity-50 pointer-events-none' : ''} border-neutral-200`}>
+                  {([
+                    { key: null, label: 'Auto' },
+                    { key: 'PORCENTAJE' as TipoComision, label: '%' },
+                    { key: 'FIJO' as TipoComision, label: '$' },
+                  ]).map(opt => {
+                    const active = (s.comisionPorPersonaTipo ?? null) === opt.key;
+                    return (
+                      <button
+                        key={String(opt.key)}
+                        type="button"
+                        title={opt.key === null ? 'Automático: HOTEL/AIRBNB +10%, AGENCIA −10%' : undefined}
+                        onClick={() => updateServicio(s.servicioId, {
+                          comisionPorPersonaTipo: opt.key,
+                          comisionPorPersonaValor: opt.key === null ? null : (s.comisionPorPersonaValor ?? 0),
+                        })}
+                        className={`flex-1 py-1 px-1.5 transition-colors whitespace-nowrap
+                          ${active ? 'bg-neutral-800 text-white' : 'bg-white text-neutral-500 hover:bg-neutral-50'}`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </td>
+              {/* Valor comisión por persona */}
+              <td className="px-4 py-3">
+                {s.comisionPorPersonaTipo == null ? (
+                  <span className="text-[11px] text-neutral-300">±10%</span>
+                ) : (
+                  <div className="flex items-center gap-1.5 border rounded-lg px-2 py-1 bg-white border-neutral-200 focus-within:ring-1 focus-within:ring-amber-400">
+                    <span className="text-xs font-semibold shrink-0 text-amber-500">
+                      {s.comisionPorPersonaTipo === 'PORCENTAJE' ? '%' : '$'}
+                    </span>
+                    <input
+                      type="number"
+                      value={s.comisionPorPersonaValor ?? ''}
+                      placeholder="0"
+                      onChange={e => {
+                        const val = e.target.value;
+                        const num = parseFloat(val);
+                        updateServicio(s.servicioId, { comisionPorPersonaValor: val === '' ? null : (isNaN(num) ? 0 : num) });
+                      }}
+                      onFocus={e => e.target.select()}
+                      disabled={!s.activo}
+                      className="w-full text-xs bg-transparent outline-none text-neutral-800 placeholder-neutral-300 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+                )}
+              </td>
+              <td className="px-4 py-3 text-right text-[11px] text-neutral-300">por persona</td>
+              <td className="px-4 py-3 text-right text-[11px] text-neutral-300">—</td>
+              <td className="px-4 py-3 text-right text-[11px] text-neutral-300">—</td>
+            </>
+          ) : (
+            <>
+              {/* Tipo / valor / precio / comisión / total se configuran por vehículo */}
+              <td className="px-4 py-3 text-center text-[11px] text-neutral-300">—</td>
+              <td className="px-4 py-3 text-center text-[11px] text-neutral-300">—</td>
+              <td className="px-4 py-3 text-right text-[11px] text-neutral-300">↓ por vehículo</td>
+              <td className="px-4 py-3 text-right text-[11px] text-neutral-300">—</td>
+              <td className="px-4 py-3 text-right text-[11px] text-neutral-300">—</td>
+            </>
+          )}
         </tr>,
 
         /* ── Vehicle sub-rows (collapsible) ───────────────────────────────── */
