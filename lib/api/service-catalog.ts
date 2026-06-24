@@ -193,6 +193,45 @@ export async function buildCatalogJson(lang: CatalogLanguage = 'ES', appUrl?: st
     };
 }
 
+const COMBINING = new RegExp('[\\u0300-\\u036f]', 'g');
+function normTxt(s: string): string {
+    return s.toLowerCase().normalize('NFD').replace(COMBINING, '').trim();
+}
+
+export interface CatalogMatch {
+    id: string;
+    nombre: string;
+    categoria: string;
+    precioDesde: number;
+    esMunicipal: boolean;
+    linkReserva: string;
+}
+
+export function searchCatalogServices(servicios: CatalogService[], q: string): CatalogMatch[] {
+    const nq = normTxt(q || '');
+    if (!nq) return [];
+    return servicios
+        .filter((s) => {
+            const es = normTxt(s.nombreES);
+            const en = normTxt(s.nombreEN);
+            return es.includes(nq) || en.includes(nq) || nq.includes(es);
+        })
+        .map((s) => ({
+            id: s.id,
+            nombre: s.nombreES,
+            categoria: s.esMunicipal
+                ? 'MUNICIPAL'
+                : s.esAeropuerto
+                ? 'AEROPUERTO'
+                : s.tipoTarifa === 'POR_PERSONA'
+                ? 'TOUR_PERSONA'
+                : 'SERVICIO',
+            precioDesde: s.precioDesde,
+            esMunicipal: s.esMunicipal,
+            linkReserva: s.linkReserva,
+        }));
+}
+
 export async function buildCatalogText(
     formato: 'contexto' | 'texto',
     appUrl?: string,
