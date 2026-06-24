@@ -119,7 +119,9 @@ export async function POST(request: NextRequest) {
             hora,
             municipioEnum,
             undefined,
-            cantidadHoras
+            cantidadHoras,
+            null,
+            numeroPasajeros
         );
 
         const camposTotal = priceBreakdown.camposDinamicos.reduce((sum: number, c: any) => sum + c.total, 0);

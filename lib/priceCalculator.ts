@@ -4,7 +4,7 @@ import {
     DynamicFieldValues,
     validateDynamicFields,
 } from '@/types/dynamic-fields';
-import { getConfiguracion } from '@/types/servicio-config';
+import { getConfiguracion, totalPorPersona } from '@/types/servicio-config';
 import { MUNICIPALITY_PRICES, isNightSurchargeApplicable } from '@/lib/pricing';
 
 // ============================================
@@ -83,8 +83,32 @@ export async function calculateReservationPrice(
     municipio: Municipio,
     aliadoConfig?: AliadoConfig,
     cantidadHoras?: number,
-    aeropuertoNombre?: AeropuertoNombreInput | null
+    aeropuertoNombre?: AeropuertoNombreInput | null,
+    numeroPasajeros?: number
 ): Promise<PriceBreakdown> {
+    const pax = Math.max(1, Math.floor(numeroPasajeros || 1));
+
+    // 0. Tour POR PERSONA: total = precio del tramo (1/2/3+) × nº de personas.
+    //    Sin vehículo, sin municipio, sin recargos ni adicionales (mismo modelo que el
+    //    flujo web y recalcularPrecioWebDirecto). Se resuelve antes de tocar vehículos.
+    const cfg = getConfiguracion((servicio as any).configuracion);
+    if (cfg.tipoTarifa === 'POR_PERSONA') {
+        const precioBasePP = totalPorPersona(cfg.preciosPorPersona, pax);
+        if (!Number.isFinite(precioBasePP) || precioBasePP <= 0) {
+            throw new Error('El servicio es por persona pero no tiene precios por persona configurados');
+        }
+        return {
+            precioBase: precioBasePP,
+            camposDinamicos: [],
+            recargoNocturno: 0,
+            tarifaMunicipio: 0,
+            descuentoAliado: 0,
+            comisionAliado: 0,
+            subtotal: precioBasePP,
+            total: precioBasePP,
+        };
+    }
+
     // 1. Get base price.
     //    - Cliente independiente (sin aliadoConfig): usa ServicioVehiculo.precio (precio público).
     //    - Cliente bajo aliado (con aliadoConfig.precioBaseAliado): usa el precio base configurado
@@ -121,6 +145,23 @@ export async function calculateReservationPrice(
     // 1b. If service has esPorHoras module, multiply base price by hours
     if (servicio.esPorHoras && cantidadHoras && cantidadHoras > 0) {
         precioBase = precioBase * cantidadHoras;
+    }
+
+    // 1c. Compartido: el precio del cupo es POR PERSONA → precio del cupo × nº de pasajeros,
+    //     sin adicionales/recargo/municipio (mismo modelo que el wizard web y
+    //     recalcularPrecioWebDirecto). Se resuelve aquí para no aplicar recargos indebidos.
+    if (servicio.esCompartido) {
+        const precioBaseCompartido = precioBase * pax;
+        return {
+            precioBase: precioBaseCompartido,
+            camposDinamicos: [],
+            recargoNocturno: 0,
+            tarifaMunicipio: 0,
+            descuentoAliado: 0,
+            comisionAliado: 0,
+            subtotal: precioBaseCompartido,
+            total: precioBaseCompartido,
+        };
     }
 
     // 2. Validate and parse dynamic fields configuration from DB

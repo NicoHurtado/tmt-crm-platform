@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchActiveCatalogServices } from '@/lib/api/service-catalog';
 import { getLocalizedText } from '@/types/multi-language';
 import { isNightSurchargeApplicable } from '@/lib/pricing';
+import { getConfiguracion, totalPorPersona } from '@/types/servicio-config';
 
 export const dynamic = 'force-dynamic';
 
@@ -148,6 +149,36 @@ async function handle(params: {
         };
     }
 
+    // 4b. Tour POR PERSONA: precio del tramo (1/2/3+) × nº de personas. No depende de vehículo.
+    const cfgSvc = getConfiguracion((svc as any).configuracion);
+    if (cfgSvc.tipoTarifa === 'POR_PERSONA') {
+        const precioPP = totalPorPersona(cfgSvc.preciosPorPersona, paxNum);
+        if (!Number.isFinite(precioPP) || precioPP <= 0) {
+            return {
+                status: 'fuera_de_rango',
+                servicioId: svc.id,
+                nombre,
+                mensaje: 'Este servicio es por persona pero no tiene precios configurados. Ofrece conectar con un asesor.',
+            };
+        }
+        return {
+            status: 'ok',
+            servicioId: svc.id,
+            nombre,
+            tipo: svc.tipoServicio,
+            esAeropuerto: false,
+            aeropuerto: null,
+            pax: paxNum,
+            vehiculo: null,
+            precio: precioPP,
+            precioFormateado: fmtCOP(precioPP),
+            moneda: 'COP',
+            nota: `Precio por persona × ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'}.`,
+            recargoNocturno: { aplica: false },
+            linkReserva: link(svc.id),
+        };
+    }
+
     // 5. Vehículo que cubre el grupo
     const vehiculos = [...svc.vehiculosPermitidos].sort(
         (a, b) => a.vehiculo.capacidadMaxima - b.vehiculo.capacidadMaxima
@@ -169,9 +200,12 @@ async function handle(params: {
     // 6. Precio exacto (independiente). Olaya usa precioOlaya si existe (fallback a precio).
     const usarOlaya = svc.esAeropuerto && aeropuerto === 'OLAYA_HERRERA';
     const precioOlaya = (elegido as any).precioOlaya;
-    const precio = usarOlaya && precioOlaya != null && Number(precioOlaya) > 0
+    const precioVehiculo = usarOlaya && precioOlaya != null && Number(precioOlaya) > 0
         ? Number(precioOlaya)
         : Number(elegido.precio ?? 0);
+
+    // Compartido: el precio del cupo es POR PERSONA → multiplicar por nº de pasajeros.
+    const precio = svc.esCompartido ? precioVehiculo * paxNum : precioVehiculo;
 
     if (!Number.isFinite(precio) || precio <= 0) {
         return {
@@ -212,7 +246,9 @@ async function handle(params: {
         precio,
         precioFormateado: fmtCOP(precio),
         moneda: 'COP',
-        nota: 'Precio por el vehículo completo (servicio privado), salvo que el servicio sea compartido.',
+        nota: svc.esCompartido
+            ? `Precio por persona (cupo compartido) × ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'}.`
+            : 'Precio por el vehículo completo (servicio privado).',
         recargoNocturno,
         linkReserva: link(svc.id),
     };

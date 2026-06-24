@@ -493,3 +493,52 @@ describe('calculateReservationPrice — precios duales de aeropuerto', () => {
         expect(r.comisionAliado).toBe(20_000); // 10% de 200k
     });
 });
+
+describe('calculateReservationPrice — compartido y por persona (paridad con la web)', () => {
+    it('compartido: precio del cupo × nº de pasajeros, sin recargos ni municipio', async () => {
+        const servicio = makeServicio({
+            esCompartido: true,
+            aplicaRecargoNocturno: true,
+            montoRecargoNocturno: 50_000,
+            recargoNocturnoInicio: '00:00',
+            recargoNocturnoFin: '23:59',
+            vehiculosPermitidos: [{ vehiculoId: 'veh-1', precio: 195_000 }],
+        });
+        const r = await calculateReservationPrice(
+            servicio, 'veh-1', {}, fecha, '14:00', Municipio.MEDELLIN,
+            undefined, undefined, null, 4
+        );
+        expect(r.precioBase).toBe(780_000); // 195k × 4
+        expect(r.recargoNocturno).toBe(0);
+        expect(r.tarifaMunicipio).toBe(0);
+        expect(r.total).toBe(780_000);
+    });
+
+    it('compartido con 1 pasajero (default): cobra un cupo', async () => {
+        const servicio = makeServicio({
+            esCompartido: true,
+            vehiculosPermitidos: [{ vehiculoId: 'veh-1', precio: 195_000 }],
+        });
+        const r = await calculateReservationPrice(
+            servicio, 'veh-1', {}, fecha, '14:00', Municipio.MEDELLIN
+        );
+        expect(r.precioBase).toBe(195_000);
+        expect(r.total).toBe(195_000);
+    });
+
+    it('por persona: total = precio del tramo (1/2/3+) × pasajeros', async () => {
+        const servicio = makeServicio({
+            configuracion: {
+                camposCustom: [],
+                tipoTarifa: 'POR_PERSONA',
+                preciosPorPersona: { p1: 120_000, p2: 100_000, p3: 90_000 },
+            },
+        });
+        const r = await calculateReservationPrice(
+            servicio, 'veh-1', {}, fecha, '14:00', Municipio.MEDELLIN,
+            undefined, undefined, null, 3
+        );
+        expect(r.precioBase).toBe(270_000); // tramo 3+ = 90k × 3
+        expect(r.total).toBe(270_000);
+    });
+});

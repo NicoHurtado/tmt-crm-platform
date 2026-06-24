@@ -222,6 +222,7 @@ async function calculateExternalPrice(input: {
     hora: string;
     municipio: Municipio;
     aeropuertoNombre?: 'JOSE_MARIA_CORDOVA' | 'OLAYA_HERRERA' | null;
+    numeroPasajeros: number;
 }) {
     const cantidadHoras =
         typeof input.datosDinamicos?.cantidadHoras === 'number'
@@ -236,7 +237,8 @@ async function calculateExternalPrice(input: {
         input.municipio,
         undefined,
         cantidadHoras,
-        input.aeropuertoNombre ?? null
+        input.aeropuertoNombre ?? null,
+        input.numeroPasajeros
     );
     const precioAdicionales = breakdown.camposDinamicos.reduce((sum, c) => sum + c.total, 0);
 
@@ -315,6 +317,7 @@ export async function createExternalReserva(body: any): Promise<ReservaWithRelat
             hora,
             municipio,
             aeropuertoNombre,
+            numeroPasajeros,
         });
         precioBase = Number(calc.breakdown.precioBase);
         precioAdicionales = calc.precioAdicionales;
@@ -471,6 +474,7 @@ export async function updateExternalReserva(codigo: string, body: any): Promise<
                 fecha,
                 hora,
                 municipio,
+                numeroPasajeros,
             });
 
             updateData.servicio = { connect: { id: servicio.id } };

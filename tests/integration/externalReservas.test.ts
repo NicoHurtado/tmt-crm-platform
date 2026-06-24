@@ -153,7 +153,9 @@ describe('external reservas API', () => {
             '07:00',
             'MEDELLIN',
             undefined,
-            undefined
+            undefined,
+            null,
+            2
         );
         expect(prisma.reserva.create).toHaveBeenCalledWith(
             expect.objectContaining({

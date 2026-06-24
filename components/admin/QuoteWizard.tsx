@@ -91,6 +91,8 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
     // lo que cobraría el flujo real (independiente o aliado, todos los tipos de servicio).
     const [preciosPersonalizados, setPreciosPersonalizados] = useState<any>(null);
     const [aliadoTipo, setAliadoTipo] = useState<string | null>(null);
+    // Override de comisión por-persona configurado para este (aliado, servicio), si existe.
+    const [comisionPorPersonaOverride, setComisionPorPersonaOverride] = useState<{ tipo: string | null; valor: number | null }>({ tipo: null, valor: null });
 
     useEffect(() => {
         if (!isOpen || !aliadoId) {
@@ -121,10 +123,16 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
                 });
                 setPreciosPersonalizados(pricingMap);
                 setAliadoTipo(dataAliado?.data?.tipo ?? null);
+                const saThis = (dataSrv.data || []).find((sa: any) => sa.servicioId === service.id);
+                setComisionPorPersonaOverride({
+                    tipo: saThis?.comisionPorPersonaAliadoTipo ?? null,
+                    valor: saThis?.comisionPorPersonaAliadoValor ?? null,
+                });
             } catch (e) {
                 if (!cancelled) {
                     setPreciosPersonalizados(null);
                     setAliadoTipo(null);
+                    setComisionPorPersonaOverride({ tipo: null, valor: null });
                 }
             }
         })();
@@ -413,7 +421,12 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
 
                     {currentStep === 1 && (
                         <Step1TripDetails
-                            service={{ ...service, nombre: processedService.nombre }}
+                            service={{
+                                ...service,
+                                nombre: processedService.nombre,
+                                comisionPorPersonaAliadoTipo: comisionPorPersonaOverride.tipo,
+                                comisionPorPersonaAliadoValor: comisionPorPersonaOverride.valor,
+                            } as any}
                             formData={formData}
                             updateFormData={updateFormData}
                             onNext={handleNext}

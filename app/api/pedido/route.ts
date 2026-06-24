@@ -4,6 +4,8 @@ import { EstadoReserva, EstadoPago } from '@prisma/client';
 import { getVehicleForPassengers } from '@/lib/vehicle-selector';
 import { buildDatosFromBody } from '@/types/reserva-datos';
 import { calculateBoldCommission } from '@/lib/bold';
+import { getConfiguracion, totalPorPersona, comisionPorPersona } from '@/types/servicio-config';
+import { recalcularPrecioWebDirecto } from '@/lib/priceCalculator';
 import crypto from 'crypto';
 
 // Force dynamic rendering
@@ -32,32 +34,57 @@ export async function POST(request: Request) {
         // Generar código único para el pedido
         const codigoPedido = await generateUniqueCodigo('PED');
 
-        // Pre-calcular precios por item (incluyendo comisión de aliado) antes de la transacción
+        // Pre-calcular precios por item antes de la transacción, con la MISMA cascada
+        // autoritativa que POST /api/reservas: por persona (recalcula base+comisión),
+        // aliado por vehículo (comisión), o web directo (recalcularPrecioWebDirecto).
+        // Nunca se confía el precio del front salvo precioManual (override de admin).
         const itemPrices = await Promise.all(body.cartItems.map(async (item: any) => {
-            const precioBase = parseFloat(item.precioBase) || 0;
-            const precioAdicionales = parseFloat(item.precioAdicionales) || 0;
-            const recargoNocturno = parseFloat(item.recargoNocturno) || 0;
-            // tarifaMunicipio incluye el recargo del MunicipioConfig dinámico
-            const tarifaMunicipio = (parseFloat(item.tarifaMunicipio) || 0) + (parseFloat(item.tarifaMunicipioConfig) || 0);
             const descuentoAliado = parseFloat(item.descuentoAliado) || 0;
+            const pasajeros = parseInt(item.numeroPasajeros) || 1;
 
-            const itemSubtotal = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio - descuentoAliado;
+            const servicio = await prisma.servicio.findUnique({
+                where: { id: item.servicioId },
+                include: { vehiculosPermitidos: true },
+            });
+            const cfgServicio = getConfiguracion((servicio as any)?.configuracion);
+            const esPorPersona = cfgServicio.tipoTarifa === 'POR_PERSONA';
 
+            let precioBase = parseFloat(item.precioBase) || 0;
+            let precioAdicionales = parseFloat(item.precioAdicionales) || 0;
+            let recargoNocturno = parseFloat(item.recargoNocturno) || 0;
+            let tarifaMunicipio = (parseFloat(item.tarifaMunicipio) || 0) + (parseFloat(item.tarifaMunicipioConfig) || 0);
             let comisionAliado = 0;
-            if (item.esReservaAliado && item.aliadoId && item.vehiculoId) {
+
+            if (esPorPersona) {
+                // Recálculo autoritativo: total = precio del tramo (1/2/3+) × pasajeros. Sin vehículo ni municipio.
+                precioBase = totalPorPersona(cfgServicio.preciosPorPersona, pasajeros);
+                precioAdicionales = 0;
+                recargoNocturno = 0;
+                tarifaMunicipio = 0;
+                if (item.esReservaAliado && item.aliadoId) {
+                    try {
+                        const [aliado, sa] = await Promise.all([
+                            prisma.aliado.findUnique({ where: { id: item.aliadoId }, select: { tipo: true } }),
+                            prisma.servicioAliado.findUnique({
+                                where: { aliadoId_servicioId: { aliadoId: item.aliadoId, servicioId: item.servicioId } },
+                                select: { comisionPorPersonaTipo: true, comisionPorPersonaValor: true },
+                            }),
+                        ]);
+                        comisionAliado = comisionPorPersona(precioBase, aliado?.tipo, {
+                            tipo: (sa?.comisionPorPersonaTipo ?? null) as any,
+                            valor: sa?.comisionPorPersonaValor != null ? Number(sa.comisionPorPersonaValor) : null,
+                        });
+                    } catch (e) {
+                        console.error('Error calculating per-person ally commission (pedido):', e);
+                    }
+                }
+            } else if (item.esReservaAliado && item.aliadoId && item.vehiculoId) {
+                // Comisión de aliado por (servicio, vehículo). El precio base del aliado viene del front.
+                const subtotalPrevio = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio - descuentoAliado;
                 try {
                     const sa = await prisma.servicioAliado.findUnique({
-                        where: {
-                            aliadoId_servicioId: {
-                                aliadoId: item.aliadoId,
-                                servicioId: item.servicioId,
-                            },
-                        },
-                        include: {
-                            preciosVehiculos: {
-                                where: { vehiculoId: item.vehiculoId },
-                            },
-                        },
+                        where: { aliadoId_servicioId: { aliadoId: item.aliadoId, servicioId: item.servicioId } },
+                        include: { preciosVehiculos: { where: { vehiculoId: item.vehiculoId } } },
                     });
                     const pv = sa?.preciosVehiculos?.[0];
                     if (pv) {
@@ -68,13 +95,44 @@ export async function POST(request: Request) {
                             ? Number(pv.comisionValorOlaya)
                             : Number(pv.comisionValor);
                         comisionAliado = tipoComision === 'PORCENTAJE'
-                            ? itemSubtotal * (comisionValor / 100)
+                            ? subtotalPrevio * (comisionValor / 100)
                             : comisionValor;
                     }
                 } catch (e) {
-                    console.error('Error calculating ally commission:', e);
+                    console.error('Error calculating ally commission (pedido):', e);
                 }
+            } else if (servicio && !item.precioManual) {
+                // Camino web directo (independiente): recálculo autoritativo de los 4 componentes desde la BD.
+                let municipioConfigRecargo = 0;
+                if (item.municipioConfigId) {
+                    const mc = await prisma.municipioConfig.findUnique({
+                        where: { id: item.municipioConfigId },
+                        select: { recargo: true },
+                    });
+                    municipioConfigRecargo = mc ? Number(mc.recargo) : 0;
+                }
+                const comp = recalcularPrecioWebDirecto({
+                    servicio: servicio as any,
+                    vehiculoId: item.vehiculoId ?? null,
+                    numeroPasajeros: pasajeros,
+                    cantidadHoras: item.cantidadHoras != null ? Number(item.cantidadHoras) : null,
+                    hora: item.hora || '',
+                    datosDinamicos: (item.datosDinamicos ?? {}) as any,
+                    aeropuertoNombre:
+                        item.aeropuertoNombre === 'JOSE_MARIA_CORDOVA' || item.aeropuertoNombre === 'OLAYA_HERRERA'
+                            ? item.aeropuertoNombre
+                            : null,
+                    municipio: item.municipio ?? null,
+                    municipioConfigId: item.municipioConfigId ?? null,
+                    municipioConfigRecargo,
+                });
+                precioBase = comp.precioBase;
+                precioAdicionales = comp.precioAdicionales;
+                recargoNocturno = comp.recargoNocturno;
+                tarifaMunicipio = comp.tarifaMunicipio;
             }
+
+            const itemSubtotal = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio - descuentoAliado;
 
             return {
                 precioBase,
