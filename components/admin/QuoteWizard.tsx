@@ -245,9 +245,14 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
         if (step === 3) return true;
 
         if (step === 4) {
-            if (precioPersonalizado !== '' && Number(precioPersonalizado) <= 0) {
-                showError('El precio personalizado debe ser mayor a 0');
-                return false;
+            // Si hay precio personalizado, reemplaza al calculado: solo validamos que sea > 0
+            // y no exigimos que el cálculo automático haya podido resolverse.
+            if (precioPersonalizado !== '') {
+                if (Number(precioPersonalizado) <= 0) {
+                    showError('El precio personalizado debe ser mayor a 0');
+                    return false;
+                }
+                return true;
             }
             if (totalCalculado <= 0) {
                 showError('No se pudo calcular el precio. Verifica los datos del viaje.');
