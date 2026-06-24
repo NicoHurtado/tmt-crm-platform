@@ -265,8 +265,21 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         // ─── SHARED TOUR PRICING + FIXED VALUES FROM ADMIN CONFIG ───
         const isSharedTourPricing = service.esCompartido;
         if (isSharedTourPricing) {
-            const pricePerPerson = availableVehicles[0]?.precio ?? 0;
+            const cupoVehiculo = availableVehicles[0];
+            const pricePerPerson = cupoVehiculo?.precio ?? 0;
             const totalShared = pricePerPerson * formData.numeroPasajeros;
+
+            // Comisión del aliado sobre el cupo (mismo criterio que la rama de vehículo).
+            // Se expone como línea separada y NO se pliega en precioBase, para mantener
+            // paridad con el servidor (POST /api/reservas usa body.precioBase como subtotal
+            // y le suma la comisión del PrecioVehiculoAliado).
+            let comisionAliado = 0;
+            if (cupoVehiculo && (cupoVehiculo.comisionValor ?? 0) > 0) {
+                comisionAliado = cupoVehiculo.tipoComision === 'FIJO'
+                    ? Number(cupoVehiculo.comisionValor)
+                    : Math.round(totalShared * (Number(cupoVehiculo.comisionValor) / 100));
+            }
+            const totalConComision = totalShared + comisionAliado;
 
             // Read meeting point and departure time from admin config — no hardcoding
             const info = normalizeInfoTourCompartido(service.infoTourCompartido);
@@ -285,7 +298,8 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                 recargoNocturno: 0,
                 tarifaMunicipio: 0,
                 precioAdicionales: 0,
-                precioTotal: totalShared,
+                comisionAliado,
+                precioTotal: totalConComision,
             };
 
             // Only update if value differs (prevent render loop)
@@ -317,15 +331,23 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
 
         // ─── SHARED TOUR: precio base × pasajeros ───
         if (service.esCompartido) {
-            const precioPorPersona = availableVehicles[0]?.precio ?? 0;
+            const cupoVehiculo = availableVehicles[0];
+            const precioPorPersona = cupoVehiculo?.precio ?? 0;
             const pasajeros = formData.numeroPasajeros || 0;
             const totalCompartido = precioPorPersona * pasajeros;
+            let comisionAliado = 0;
+            if (cupoVehiculo && (cupoVehiculo.comisionValor ?? 0) > 0) {
+                comisionAliado = cupoVehiculo.tipoComision === 'FIJO'
+                    ? Number(cupoVehiculo.comisionValor)
+                    : Math.round(totalCompartido * (Number(cupoVehiculo.comisionValor) / 100));
+            }
             updateFormData({
-                precioBase: precioPorPersona,
+                precioBase: totalCompartido,
                 recargoNocturno: 0,
                 tarifaMunicipio: 0,
                 precioAdicionales: 0,
-                precioTotal: totalCompartido,
+                comisionAliado,
+                precioTotal: totalCompartido + comisionAliado,
             });
             return;
         }
