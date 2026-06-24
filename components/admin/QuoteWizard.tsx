@@ -9,7 +9,6 @@ import Step3Notes from '../reservas/wizard/Step3Notes';
 import { ReservationFormData } from '@/types/reservation';
 import { Idioma, Municipio, TipoDocumento } from '@prisma/client';
 import { getLocalizedText, getLocalizedArray } from '@/types/multi-language';
-import { useAliadoCommission } from '@/lib/hooks/useAliadoCommission';
 import { formatPrice } from '@/lib/pricing';
 import { getMissingBuiltinFields } from '@/lib/service-fields';
 
@@ -86,6 +85,51 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
     const [copied, setCopied] = useState(false);
     const [activeTab, setActiveTab] = useState<'interno' | 'tercero'>('tercero');
     const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
+    // Pricing del aliado seleccionado (misma fuente que el wizard de reservas):
+    // precios y comisión POR VEHÍCULO viven en PrecioVehiculoAliado. Se inyectan en
+    // Step1TripDetails para que la sugerencia auto-calculada coincida exactamente con
+    // lo que cobraría el flujo real (independiente o aliado, todos los tipos de servicio).
+    const [preciosPersonalizados, setPreciosPersonalizados] = useState<any>(null);
+    const [aliadoTipo, setAliadoTipo] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!isOpen || !aliadoId) {
+            setPreciosPersonalizados(null);
+            setAliadoTipo(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const [resSrv, resAliado] = await Promise.all([
+                    fetch(`/api/aliados/${aliadoId}/servicios`, { cache: 'no-store' }),
+                    fetch(`/api/aliados/${aliadoId}`, { cache: 'no-store' }),
+                ]);
+                const dataSrv = await resSrv.json();
+                const dataAliado = await resAliado.json();
+                if (cancelled) return;
+                const pricingMap: any = {};
+                (dataSrv.data || []).forEach((sa: any) => {
+                    pricingMap[sa.servicioId] = {
+                        vehiculos: sa.vehiculos || [],
+                        sobrescribirRecargoNocturno: sa.sobrescribirRecargoNocturno,
+                        aplicaRecargoNocturno: sa.aplicaRecargoNocturno,
+                        recargoNocturnoInicio: sa.recargoNocturnoInicio,
+                        recargoNocturnoFin: sa.recargoNocturnoFin,
+                        montoRecargoNocturno: sa.montoRecargoNocturno,
+                    };
+                });
+                setPreciosPersonalizados(pricingMap);
+                setAliadoTipo(dataAliado?.data?.tipo ?? null);
+            } catch (e) {
+                if (!cancelled) {
+                    setPreciosPersonalizados(null);
+                    setAliadoTipo(null);
+                }
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [isOpen, aliadoId]);
 
     // ── PRICE BREAKDOWN ──────────────────────────────────────────────────────
     // Subtotal comes from formData (calculated in Step1TripDetails)
@@ -101,7 +145,10 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
     }, [formData.precioBase, formData.precioAdicionales, formData.recargoNocturno,
         formData.tarifaMunicipio, tarifaMunicipioConfig]);
 
-    const { comisionAliado } = useAliadoCommission(aliadoId, service.id, subtotal);
+    // La comisión del aliado la calcula Step1TripDetails con la misma lógica que el flujo
+    // real (por vehículo para tour/compartido/aeropuerto, ±10% o override para por persona).
+    // Para "por persona" la comisión ya viene plegada en precioBase y comisionAliado = 0.
+    const comisionAliado = Number(formData.comisionAliado) || 0;
 
     const subtotalConComision = subtotal + comisionAliado;
     const comisionBold = metodoPago === 'TARJETA' ? Math.round(subtotalConComision * 0.06) : 0;
@@ -371,8 +418,8 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
                             updateFormData={updateFormData}
                             onNext={handleNext}
                             onBack={handleBack}
-                            preciosPersonalizados={null}
-                            aliadoTipo={null}
+                            preciosPersonalizados={preciosPersonalizados}
+                            aliadoTipo={aliadoTipo as any}
                             aliadoNombre={null}
                         />
                     )}
