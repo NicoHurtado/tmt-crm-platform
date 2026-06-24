@@ -77,7 +77,7 @@ export async function fetchActiveCatalogServices(): Promise<ServicioWithVehiculo
                 orderBy: { vehiculo: { capacidadMaxima: 'asc' } },
             },
         },
-        orderBy: { orden: 'asc' },
+        orderBy: { createdAt: 'asc' },
     });
 }
 

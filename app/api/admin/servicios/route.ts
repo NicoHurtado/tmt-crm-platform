@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
             where,
             skip: search ? undefined : skip, // Si hay búsqueda, no paginamos aún
             take: search ? undefined : limit,
-            orderBy: [{ orden: 'asc' }, { createdAt: 'desc' }],
+            orderBy: [{ createdAt: 'desc' }],
             include: {
                 vehiculosPermitidos: {
                     include: {
@@ -140,7 +140,6 @@ export async function POST(req: NextRequest) {
             guiaInglesDisponible,
             precioGuiaIngles,
             vehiculos,
-            orden,
             tipoTarifa,
             preciosPorPersona,
         } = body;
@@ -208,7 +207,6 @@ export async function POST(req: NextRequest) {
                 precioGuiaEspanol: guiaEspanolDisponible ? precioGuiaEspanol : null,
                 guiaInglesDisponible: guiaInglesDisponible || false,
                 precioGuiaIngles: guiaInglesDisponible ? precioGuiaIngles : null,
-                orden: orden !== undefined ? parseInt(orden) : 999,
                 activo: true,
                 vehiculosPermitidos: vehiculos
                     ? {

@@ -65,9 +65,6 @@ export default function CrearServicioPage() {
     const [precioPersona2, setPrecioPersona2] = useState(0);
     const [precioPersona3, setPrecioPersona3] = useState(0);
 
-    // Display order in public catalog
-    const [orden, setOrden] = useState(999);
-
     // Dynamic custom fields shown in the reservation wizard
     const [camposPersonalizados, setCamposPersonalizados] = useState<DynamicField[]>([]);
 
@@ -217,7 +214,6 @@ export default function CrearServicioPage() {
                     precioGuiaEspanol: guiaEspanolDisponible ? precioGuiaEspanol : null,
                     guiaInglesDisponible,
                     precioGuiaIngles: guiaInglesDisponible ? precioGuiaIngles : null,
-                    orden,
                     tipoTarifa: esPorPersona ? 'POR_PERSONA' : null,
                     preciosPorPersona: esPorPersona
                         ? { p1: precioPersona1, p2: precioPersona2, p3: precioPersona3 }
@@ -378,20 +374,6 @@ export default function CrearServicioPage() {
                                         className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
                                         placeholder="ej: Guatape"
                                     />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                        Posición en catálogo de reservas
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={orden}
-                                        onChange={(e) => setOrden(Number(e.target.value))}
-                                        min="1"
-                                        max="999"
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
-                                    />
-                                    <p className="text-xs text-gray-400 mt-1">1 = primero, 999 = al final</p>
                                 </div>
                             </div>
                         </div>

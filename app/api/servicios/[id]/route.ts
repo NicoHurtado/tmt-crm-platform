@@ -101,7 +101,6 @@ export async function PUT(
             'precioGuiaEspanol',
             'guiaInglesDisponible',
             'precioGuiaIngles',
-            'orden',
         ] as const;
         for (const field of updatableFields) {
             if (field in body) {

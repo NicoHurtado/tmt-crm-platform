@@ -63,7 +63,6 @@ model Servicio {
   precioGuiaEspanol     Decimal?           @db.Decimal(10, 2)
   guiaInglesDisponible  Boolean            @default(false)
   precioGuiaIngles      Decimal?           @db.Decimal(10, 2)
-  orden                 Int                @default(999)
   /// Categoría canónica derivada de los flags (lib/servicio-categoria.ts). Aditiva.
   categoria             CategoriaServicio?
   /// Modelo de precio derivado de los flags (lib/servicio-categoria.ts). Aditiva.
@@ -74,7 +73,6 @@ model Servicio {
   vehiculosPermitidos   ServicioVehiculo[]
 
   @@index([activo])
-  @@index([orden])
   @@index([categoria])
 }
 

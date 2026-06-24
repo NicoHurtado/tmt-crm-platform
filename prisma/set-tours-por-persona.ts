@@ -80,7 +80,6 @@ async function main() {
         imagen: 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368602/tmt/servicios/gasahtldulliounqtmot.jpg',
         duracion: 'Full day',
         activo: true,
-        orden: 50,
         configuracion: buildConfiguracion([], null, {
           tipoTarifa: 'POR_PERSONA',
           preciosPorPersona: { p1: ORIENTE.p1, p2: ORIENTE.p2, p3: ORIENTE.p3 },

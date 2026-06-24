@@ -71,7 +71,6 @@ interface Servicio {
   camposPersonalizados: any[]
   vehiculosPermitidos: { id: string; precio: number; vehiculo: { id: string; nombre: string } }[]
   _count: { reservas: number }
-  orden: number
 }
 
 
@@ -540,7 +539,7 @@ export default function ServiciosPage() {
                             className="text-[10px] font-medium h-5 bg-blue-50 text-blue-700 border-blue-200"
                             title="Visible en la página de reservas"
                           >
-                            Visible en reservas · pos. {s.orden}
+                            Visible en reservas
                           </Badge>
                         )}
                         {s.tipoTarifa === 'POR_PERSONA' && (

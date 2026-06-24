@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sortServicesByPriority } from '@/lib/service-order';
 import { getConfiguracion } from '@/types/servicio-config';
 
 // Force dynamic rendering to prevent build-time execution
@@ -30,7 +29,7 @@ export async function GET(
             })
         ]);
 
-        const sortedServicios = sortServicesByPriority(allServicios);
+        const sortedServicios = allServicios;
 
         // 2. ServicioAliado + comisiones por vehículo
         const serviciosAliado = await prisma.servicioAliado.findMany({
@@ -112,7 +111,6 @@ export async function GET(
                 comisionPorPersonaAliadoValor: sa && sa.comisionPorPersonaValor != null ? Number(sa.comisionPorPersonaValor) : null,
                 adicionales: [],
                 configuracion: servicio.configuracion,
-                orden: servicio.orden,
             };
         });
 

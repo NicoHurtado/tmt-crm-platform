@@ -132,7 +132,7 @@ async function upsertDestino(
     servicio = await prisma.servicio.update({ where: { id: existente.id }, data })
     console.log(`♻️  Actualizado: ${nombre.es} (${servicio.id})`)
   } else {
-    servicio = await prisma.servicio.create({ data: { ...data, orden: source.orden } })
+    servicio = await prisma.servicio.create({ data: { ...data } })
     console.log(`✅ Creado: ${nombre.es} (${servicio.id})`)
   }
 

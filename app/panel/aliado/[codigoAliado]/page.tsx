@@ -1,18 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
-import { FiClock, FiUsers, FiAlertCircle, FiMapPin, FiChevronRight } from 'react-icons/fi';
+import { FiAlertCircle } from 'react-icons/fi';
 import ReservationWizard from '@/components/reservas/ReservationWizard';
 import TransporteMunicipalModal from '@/components/reservas/TransporteMunicipalModal';
+import ServiceCatalog from '@/components/reservas/ServiceCatalog';
 import Header from '@/components/landing/Header';
 import Footer from '@/components/landing/Footer';
 import { CartIcon } from '@/components/carrito/CartIcon';
 import { CartModal } from '@/components/carrito/CartModal';
 import { useLanguage, t } from '@/lib/i18n';
-import { getLocalizedText } from '@/types/multi-language';
-import { sortServicesByPriority } from '@/lib/service-order';
 import { useAliado } from '@/lib/hooks/useAliado';
 
 interface Service {
@@ -141,8 +139,7 @@ export default function PanelAliadoPage() {
                     return serviceFields;
                 });
 
-            const sortedServices = sortServicesByPriority(activeServices) as Service[];
-            setServices(sortedServices);
+            setServices(activeServices as Service[]);
         } catch (error) {
             console.error('Error loading services:', error);
         }
@@ -164,7 +161,6 @@ export default function PanelAliadoPage() {
     };
 
     const serviciosMunicipales = services.filter(s => s.esMunicipal);
-    const serviciosRegulares = services.filter(s => !s.esMunicipal);
 
     if (loading) {
         return (
@@ -205,105 +201,17 @@ export default function PanelAliadoPage() {
                     <div className="fixed top-24 right-6 z-30">
                         <CartIcon onClick={() => setIsCartOpen(true)} />
                     </div>
-                    {/* Services Catalog */}
+                    {/* Services Catalog — plantilla unificada por categorías */}
                     {services.length === 0 ? (
                         <div className="text-center py-12">
                             <p className="text-gray-500 text-lg">{t('hotel.no_servicios', language)}</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {serviciosRegulares.map((service) => (
-                                <div
-                                    key={service.id}
-                                    className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-                                    onClick={() => openWizard(service)}
-                                >
-                                    <div className="relative h-56 overflow-hidden">
-                                        <Image
-                                            src={service.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368602/tmt/servicios/gasahtldulliounqtmot.jpg'}
-                                            alt={getLocalizedText(service.nombre, language)}
-                                            fill
-                                            className="object-cover transition-transform duration-500 group-hover:scale-110"
-                                        />
-                                    </div>
-
-                                    <div className="p-6">
-                                        <h3 className="text-xl font-bold mb-3 group-hover:text-[#D6A75D] transition-colors">
-                                            {getLocalizedText(service.nombre, language)}
-                                        </h3>
-                                        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                                            {getLocalizedText(service.descripcion, language)}
-                                        </p>
-
-                                        <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                                            {service.duracion && (
-                                                <div className="flex items-center gap-1">
-                                                    <FiClock className="text-[#D6A75D]" />
-                                                    <span>{service.duracion}</span>
-                                                </div>
-                                            )}
-                                            <div className="flex items-center gap-1">
-                                                <FiUsers className="text-[#D6A75D]" />
-                                                <span>{t('landing.privado', language)}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center justify-end">
-                                            <button className="bg-gray-100 hover:bg-[#D6A75D] text-gray-800 hover:text-black font-bold py-2 px-4 rounded-lg transition-colors">
-                                                {t('header.reservar', language)}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-
-                            {/* Tarjeta Transporte Municipal */}
-                            {serviciosMunicipales.length > 0 && (
-                                <div
-                                    className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-                                    onClick={() => setMunicipalModalOpen(true)}
-                                >
-                                    <div className="relative h-56 overflow-hidden">
-                                        <Image
-                                            src={serviciosMunicipales[0]?.imagen || 'https://res.cloudinary.com/dnv8wdclp/image/upload/v1779368600/tmt/servicios/epyidj9zt9icdjxwi3ed.jpg'}
-                                            alt={language === 'es' ? 'Transporte Municipal Antioquia' : 'Antioquia Municipal Transport'}
-                                            fill
-                                            className="object-cover transition-transform duration-500 group-hover:scale-110"
-                                        />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                                    </div>
-
-                                    <div className="p-6">
-                                        <h3 className="text-xl font-bold mb-3 group-hover:text-[#D6A75D] transition-colors">
-                                            {language === 'es' ? 'Transporte Municipal' : 'Municipal Transport'}
-                                        </h3>
-                                        <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                                            {language === 'es'
-                                                ? `${serviciosMunicipales.length} destinos disponibles`
-                                                : `${serviciosMunicipales.length} destinations available`}
-                                        </p>
-
-                                        <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                                            <div className="flex items-center gap-1">
-                                                <FiMapPin className="text-[#D6A75D]" />
-                                                <span>{language === 'es' ? 'Múltiples destinos' : 'Multiple destinations'}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <FiUsers className="text-[#D6A75D]" />
-                                                <span>{t('landing.privado', language)}</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center justify-end">
-                                            <button className="bg-gray-100 hover:bg-[#D6A75D] text-gray-800 hover:text-black font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
-                                                {language === 'es' ? 'Ver Destinos' : 'View Destinations'}
-                                                <FiChevronRight />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <ServiceCatalog
+                            services={services}
+                            onSelectService={openWizard}
+                            onSelectMunicipal={() => setMunicipalModalOpen(true)}
+                        />
                     )}
                 </div>
             </main>

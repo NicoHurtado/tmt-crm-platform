@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { sortServicesByPriority } from '@/lib/service-order';
 import { buildConfiguracion, getConfiguracion } from '@/types/servicio-config';
 
 // Force dynamic rendering to prevent build-time execution
@@ -42,11 +41,8 @@ export async function GET(request: Request) {
             }
         });
 
-        // Apply custom service ordering based on priority
-        const sortedServicios = sortServicesByPriority(servicios);
-
-        // Add backward-compat shape so frontend components still work
-        const enriched = sortedServicios.map((s: any) => {
+        // El orden de presentación se decide en el cliente (filas por categoría).
+        const enriched = servicios.map((s: any) => {
             const cfg = getConfiguracion(s.configuracion);
             return {
                 ...s,

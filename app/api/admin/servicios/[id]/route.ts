@@ -100,7 +100,6 @@ export async function PUT(
             precioGuiaEspanol,
             guiaInglesDisponible,
             precioGuiaIngles,
-            orden,
             tipoTarifa,
             preciosPorPersona,
             vehiculos, // Array of { vehiculoId, precio? }
@@ -228,7 +227,6 @@ export async function PUT(
                 ...(precioGuiaEspanol !== undefined ? { precioGuiaEspanol } : {}),
                 ...(guiaInglesDisponible !== undefined ? { guiaInglesDisponible } : {}),
                 ...(precioGuiaIngles !== undefined ? { precioGuiaIngles } : {}),
-                ...(orden !== undefined ? { orden: parseInt(orden) } : {}),
                 // Update vehicle relationships
                 vehiculosPermitidos: vehiculos
                     ? {

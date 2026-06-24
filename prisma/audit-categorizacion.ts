@@ -17,7 +17,7 @@ type Issue = { sev: 'ALTO' | 'MEDIO' | 'INFO'; servicio: string; detalle: string
 async function main() {
   const servicios = await prisma.servicio.findMany({
     include: { vehiculosPermitidos: true, _count: { select: { reservas: true } } },
-    orderBy: { orden: 'asc' },
+    orderBy: { createdAt: 'asc' },
   })
 
   const issues: Issue[] = []
