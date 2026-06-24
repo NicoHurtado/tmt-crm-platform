@@ -97,6 +97,8 @@ export function toServicioContextData(rawServicios: ServicioWithVehiculos[]): Se
         esMunicipal: s.esMunicipal,
         configuracion: s.configuracion,
         esAeropuerto: s.esAeropuerto,
+        esCompartido: s.esCompartido,
+        esTraslado: s.esTraslado,
         vehiculosPermitidos: s.vehiculosPermitidos.map((sv) => ({
             precio: sv.precio ? Number(sv.precio) : null,
             precioOlaya: (sv as any).precioOlaya != null ? Number((sv as any).precioOlaya) : null,

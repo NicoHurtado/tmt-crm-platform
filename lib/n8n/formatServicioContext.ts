@@ -33,6 +33,8 @@ export interface ServicioContextData {
     esPorHoras: boolean;
     esMunicipal: boolean;
     esAeropuerto?: boolean;
+    esCompartido?: boolean;
+    esTraslado?: boolean;
     configuracion: unknown;
     vehiculosPermitidos: ServicioVehiculoData[];
 }
