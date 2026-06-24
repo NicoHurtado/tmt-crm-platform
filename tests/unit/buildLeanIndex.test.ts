@@ -30,7 +30,7 @@ describe('buildLeanIndex', () => {
     expect(out).toContain('id:svc1');
     expect(out).toContain('TRASLADO');
     expect(out).toContain('Traslado Urbano');
-    expect(out).toContain('$90.000');
+    expect(out).toMatch(/\$\s?90\.000/);
     expect(out).toContain('por vehículo');
     expect(out).not.toContain('Sedán | ');
   });
@@ -47,7 +47,7 @@ describe('buildLeanIndex', () => {
     };
     const out = buildLeanIndex([pp]);
     expect(out).toContain('TOUR_PERSONA');
-    expect(out).toContain('$350.000');
+    expect(out).toMatch(/\$\s?350\.000/);
     expect(out).toContain('por persona');
   });
 

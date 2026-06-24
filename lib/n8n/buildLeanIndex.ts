@@ -4,9 +4,11 @@ import { categoriaDeServicio, type Categoria } from '@/lib/servicio-categoria';
 import type { ServicioContextData } from './formatServicioContext';
 
 function formatCOP(amount: number): string {
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
-    .format(amount)
-    .replace(/\$\s+/, '$');
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 function asEsEn(value: unknown): { es: string; en: string } {
