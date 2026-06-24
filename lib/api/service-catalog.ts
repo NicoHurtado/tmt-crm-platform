@@ -97,6 +97,8 @@ export function toServicioContextData(rawServicios: ServicioWithVehiculos[]): Se
         esMunicipal: s.esMunicipal,
         configuracion: s.configuracion,
         esAeropuerto: s.esAeropuerto,
+        esCompartido: s.esCompartido,
+        esTraslado: s.esTraslado,
         vehiculosPermitidos: s.vehiculosPermitidos.map((sv) => ({
             precio: sv.precio ? Number(sv.precio) : null,
             precioOlaya: (sv as any).precioOlaya != null ? Number((sv as any).precioOlaya) : null,
@@ -189,6 +191,45 @@ export async function buildCatalogJson(lang: CatalogLanguage = 'ES', appUrl?: st
         tipoPrecio: PRICE_TYPE,
         servicios,
     };
+}
+
+const COMBINING = new RegExp('[\\u0300-\\u036f]', 'g');
+function normTxt(s: string): string {
+    return s.toLowerCase().normalize('NFD').replace(COMBINING, '').trim();
+}
+
+export interface CatalogMatch {
+    id: string;
+    nombre: string;
+    categoria: string;
+    precioDesde: number;
+    esMunicipal: boolean;
+    linkReserva: string;
+}
+
+export function searchCatalogServices(servicios: CatalogService[], q: string): CatalogMatch[] {
+    const nq = normTxt(q || '');
+    if (!nq) return [];
+    return servicios
+        .filter((s) => {
+            const es = normTxt(s.nombreES);
+            const en = normTxt(s.nombreEN);
+            return es.includes(nq) || en.includes(nq) || nq.includes(es);
+        })
+        .map((s) => ({
+            id: s.id,
+            nombre: s.nombreES,
+            categoria: s.esMunicipal
+                ? 'MUNICIPAL'
+                : s.esAeropuerto
+                ? 'AEROPUERTO'
+                : s.tipoTarifa === 'POR_PERSONA'
+                ? 'TOUR_PERSONA'
+                : 'SERVICIO',
+            precioDesde: s.precioDesde,
+            esMunicipal: s.esMunicipal,
+            linkReserva: s.linkReserva,
+        }));
 }
 
 export async function buildCatalogText(
