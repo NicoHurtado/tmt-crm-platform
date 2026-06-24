@@ -164,6 +164,16 @@ describe('formatServicioContext', () => {
     });
 });
 
+describe('buildFullSystemPrompt — índice liviano y 3 tools', () => {
+    it('buildFullSystemPrompt usa el índice liviano y describe las 3 tools en toolMode', () => {
+        const prompt = buildFullSystemPrompt([], 'https://www.medellintransportes.com', true);
+        expect(prompt).toContain('ÍNDICE DE SERVICIOS');
+        expect(prompt).toContain('cotizar');
+        expect(prompt).toContain('detalle_servicio');
+        expect(prompt).toContain('buscar_servicio');
+    });
+});
+
 describe('buildFullSystemPrompt', () => {
     it('incluye la persona de Nico', () => {
         const out = buildFullSystemPrompt([svcBase]);
@@ -171,10 +181,10 @@ describe('buildFullSystemPrompt', () => {
         expect(out).toContain('TMT Travel');
     });
 
-    it('incluye el catálogo de servicios', () => {
+    it('incluye el índice liviano de servicios', () => {
         const out = buildFullSystemPrompt([svcBase]);
-        expect(out).toContain('TOUR_GUATAPE');
-        expect(out).toContain('CATÁLOGO');
+        expect(out).toContain('ÍNDICE DE SERVICIOS');
+        expect(out).toContain('Tour Guatapé');
     });
 
     it('NICO_PERSONA es el mismo texto que aparece al inicio del prompt completo', () => {

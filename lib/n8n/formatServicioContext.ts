@@ -2,6 +2,14 @@ import { getConfiguracion } from '@/types/servicio-config';
 import type { DynamicField } from '@/types/dynamic-fields';
 import { NICO_PERSONA, NICO_RECORDATORIO_FINAL } from './persona';
 export { NICO_PERSONA, MIA_PERSONA } from './persona';
+import { buildLeanIndex } from './buildLeanIndex';
+
+// Bloque de instrucciones de tools (cuando toolMode). Describe las 3 tools.
+const TOOLS_INTRO = `## 🛠️ HERRAMIENTAS (úsalas SIEMPRE que apliquen)
+- **cotizar**: precio EXACTO de un servicio. Parámetros: servicioId (del índice), pax (nº personas), aeropuerto (JOSE_MARIA_CORDOVA u OLAYA_HERRERA si es aeropuerto). NUNCA des un precio sin llamar cotizar; el único precio válido es el que devuelve. Status posibles: ok, ambiguo, falta_pax, falta_aeropuerto, municipio, fuera_de_rango, no_encontrado.
+- **detalle_servicio**: info profunda de UN servicio (qué incluye, adicionales, recargo nocturno, duración). Parámetro: servicioId. Úsala cuando el cliente pregunte detalles que no están en el índice.
+- **buscar_servicio**: busca servicios/municipios por texto. Parámetro: q (texto). Úsala para confirmar si un municipio existe y obtener su id/link.
+`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -295,15 +303,15 @@ El servicio se decide por el DESTINO y el TIPO de viaje, nunca por una direcció
 }
 
 export function buildFullSystemPrompt(servicios: ServicioContextData[], appUrl?: string, toolMode?: boolean): string {
-    const recordatorioTool = toolMode
-        ? '\n- 🛠️ PRECIOS SOLO con la herramienta cotizar. NUNCA des un precio sin haberla llamado; el precio que vale es el que ella devuelve. Si responde ambiguo/falta_pax/falta_aeropuerto, pregunta eso primero.'
-        : '';
-    return (
-        NICO_PERSONA +
-        '\n\n' +
-        formatServicioContext(servicios, appUrl, toolMode) +
-        '\n\n' +
-        NICO_RECORDATORIO_FINAL +
-        recordatorioTool
-    );
+  const recordatorioTool = toolMode
+    ? '\n- 🛠️ PRECIOS SOLO con la tool cotizar. Para detalle usa detalle_servicio; para municipios usa buscar_servicio.'
+    : '';
+  return [
+    NICO_PERSONA,
+    '',
+    toolMode ? TOOLS_INTRO : '',
+    buildLeanIndex(servicios, appUrl),
+    '',
+    NICO_RECORDATORIO_FINAL + recordatorioTool,
+  ].filter(Boolean).join('\n\n');
 }
