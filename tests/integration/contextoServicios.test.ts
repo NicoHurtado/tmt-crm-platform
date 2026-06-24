@@ -100,15 +100,17 @@ describe('GET /api/n8n/contexto-servicios', () => {
         expect(data.systemPrompt).toContain('TMT Travel');
     });
 
-    it('systemPrompt contiene los servicios mockeados', async () => {
+    it('systemPrompt contiene los servicios mockeados (índice liviano por nombre)', async () => {
         const req = new Request('http://localhost/api/n8n/contexto-servicios', {
             headers: { 'x-api-key': 'test-key' },
         });
         const res = await GET(req);
         const data = await res.json();
-        expect(data.systemPrompt).toContain('TOUR_GUATAPE');
-        expect(data.systemPrompt).toContain('CITY_TOUR');
+        // El índice liviano lista los servicios por NOMBRE + categoría derivada
+        // (categoriaDeServicio), no por el enum legacy tipoServicio.
+        expect(data.systemPrompt).toContain('ÍNDICE DE SERVICIOS');
         expect(data.systemPrompt).toContain('Tour Guatapé');
+        expect(data.systemPrompt).toContain('City Tour Medellín');
     });
 
     it('devuelve serviciosCount correcto', async () => {
