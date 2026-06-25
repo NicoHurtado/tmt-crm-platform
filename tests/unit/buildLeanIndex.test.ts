@@ -31,11 +31,11 @@ describe('buildLeanIndex', () => {
     expect(out).toContain('TRASLADO');
     expect(out).toContain('Traslado Urbano');
     expect(out).toMatch(/\$\s?90\.000/);
-    expect(out).toContain('por vehículo');
+    expect(out).toContain('vehículo completo');
     expect(out).not.toContain('Sedán | ');
   });
 
-  it('tour por persona muestra "desde p1 por persona" y marca por persona', () => {
+  it('tour por persona muestra los 3 tramos (1/2/3+) y manda usar cotizar, sin un único "$X por persona" multiplicable', () => {
     const pp: ServicioContextData = {
       ...baseSvc,
       id: 'tourpp',
@@ -47,8 +47,30 @@ describe('buildLeanIndex', () => {
     };
     const out = buildLeanIndex([pp]);
     expect(out).toContain('TOUR_PERSONA');
-    expect(out).toMatch(/\$\s?350\.000/);
-    expect(out).toContain('por persona');
+    // Los 3 tramos visibles para que el modelo no multiplique la tarifa de 1 persona
+    expect(out).toMatch(/\$\s?350\.000/); // p1
+    expect(out).toMatch(/\$\s?300\.000/); // p2
+    expect(out).toMatch(/\$\s?250\.000/); // p3
+    expect(out.toLowerCase()).toContain('cotizar');
+  });
+
+  it('compartido marca el precio como POR PERSONA × pax (no por vehículo)', () => {
+    const comp: ServicioContextData = {
+      ...baseSvc,
+      id: 'comp',
+      esCompartido: true,
+      esTraslado: false,
+      nombre: { es: 'Tour compartido Guatapé', en: 'Shared Guatapé Tour' },
+      vehiculosPermitidos: [
+        { precio: 195000, precioOlaya: null, vehiculo: { nombre: 'Van', capacidadMinima: 9, capacidadMaxima: 15 } },
+      ],
+      configuracion: { camposCustom: [] },
+    };
+    const out = buildLeanIndex([comp]);
+    expect(out).toContain('COMPARTIDO');
+    expect(out).toMatch(/\$\s?195\.000/);
+    expect(out.toLowerCase()).toContain('por persona');
+    expect(out).toContain('× nº de personas');
   });
 
   it('aeropuerto incluye el aviso de preguntar JMC u Olaya', () => {

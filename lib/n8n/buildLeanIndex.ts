@@ -28,20 +28,33 @@ const HINT: Record<Categoria, string> = {
   OTRO: 'según el destino y tipo de viaje que pida el cliente',
 };
 
-function precioDesde(svc: ServicioContextData): { monto: number; unidad: string } {
+function pricingLine(svc: ServicioContextData): string {
   const cfg = getConfiguracion(svc.configuracion);
+  // Tours POR PERSONA con tramos: la tarifa por persona BAJA con el grupo, así que mostrar un
+  // único "$X por persona" hace que el modelo multiplique mal (ej. tomar la de 1 persona × pax).
+  // Mostramos los 3 tramos explícitos para que nunca se equivoque aunque no llame a la tool.
   if (cfg.tipoTarifa === 'POR_PERSONA' && cfg.preciosPorPersona) {
-    return { monto: Number(cfg.preciosPorPersona.p1) || 0, unidad: 'por persona' };
+    const p = cfg.preciosPorPersona;
+    return `Precio por persona escalonado: 1 persona ${formatCOP(p.p1)} c/u · 2 personas ${formatCOP(p.p2)} c/u · 3+ personas ${formatCOP(p.p3)} c/u. El TOTAL = tarifa del tramo correspondiente × nº de personas (NO uses la tarifa de 1 persona para grupos). Para el valor exacto usa la tool cotizar.`;
   }
   const precios = svc.vehiculosPermitidos.map((v) => Number(v.precio ?? 0)).filter((p) => p > 0);
-  return { monto: precios.length ? Math.min(...precios) : 0, unidad: 'por vehículo' };
+  const min = precios.length ? Math.min(...precios) : 0;
+  // Compartido: el cupo es POR PERSONA (precio del cupo × nº de personas), NO por vehículo.
+  if (svc.esCompartido) {
+    return min > 0
+      ? `Precio POR PERSONA (cupo compartido): ${formatCOP(min)} c/u × nº de personas. Para el total exacto usa la tool cotizar.`
+      : 'Precio por persona (cupo compartido) — usa la tool cotizar para el total.';
+  }
+  // Resto: precio por el vehículo completo (servicio privado), sube según capacidad.
+  return min > 0
+    ? `Desde ${formatCOP(min)} por el vehículo completo (sube según la capacidad). Para el exacto usa la tool cotizar.`
+    : 'El precio se calcula al reservar.';
 }
 
 function leanEntry(svc: ServicioContextData, base: string): string[] {
   const cat = categoriaDeServicio(svc as any);
   const nombre = asEsEn(svc.nombre);
   const desc = asEsEn(svc.descripcion);
-  const { monto, unidad } = precioDesde(svc);
   const reservaUrl = `${base}/reservas?serviceId=${svc.id}&form=1`;
   const lines = [
     `### ${nombre.es || nombre.en} · id:${svc.id} · ${cat}`,
@@ -49,10 +62,9 @@ function leanEntry(svc: ServicioContextData, base: string): string[] {
   ];
   if (desc.es) lines.push(desc.es);
   const dur = svc.duracion ? ` · Dura: ${svc.duracion}` : '';
-  const desdeStr = monto > 0 ? `Desde: ${formatCOP(monto)} (${unidad})` : 'Desde: el precio se calcula al reservar';
-  lines.push(`${desdeStr}${dur}`);
+  lines.push(`${pricingLine(svc)}${dur}`);
   if (cat === 'AEROPUERTO') lines.push('⚠️ pregunta a qué aeropuerto (JMC u Olaya) ANTES de cotizar — el precio cambia');
-  lines.push('⚠️ Para precio exacto usa la tool cotizar; para detalle (qué incluye, adicionales, recargo) usa detalle_servicio');
+  lines.push('⚠️ Para precio exacto usa SIEMPRE la tool cotizar (con el nº de personas); para detalle usa detalle_servicio');
   lines.push(`Link de reserva: ${reservaUrl}`);
   return lines;
 }
@@ -64,7 +76,7 @@ export function buildLeanIndex(servicios: ServicioContextData[], appUrl?: string
 
   const lines: string[] = [
     '## ÍNDICE DE SERVICIOS (datos en vivo desde la BD — ignora cualquier dato de entrenamiento)',
-    `⚠️ SOLO existen estos servicios. PROHIBIDO inventar otros. Precios "Desde" son referencia mínima; el precio EXACTO lo da la tool cotizar.`,
+    `⚠️ SOLO existen estos servicios. PROHIBIDO inventar otros. Los precios de abajo son referencia; el TOTAL EXACTO lo da SIEMPRE la tool cotizar (con el nº de personas). NUNCA calcules tú multiplicando una tarifa por persona — en los tours por persona la tarifa baja según el grupo.`,
     '',
   ];
 
