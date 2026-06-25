@@ -13,6 +13,7 @@ import {
   Truck,
   Package,
   BarChart2,
+  FileSpreadsheet,
   LogOut,
   Menu,
   X,
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { name: 'Vehículos',    href: '/admin/dashboard/vehiculos',    icon: Truck    },
   { name: 'Aliados',      href: '/admin/dashboard/aliados',      icon: Users    },
   { name: 'Conductores',  href: '/admin/dashboard/conductores',  icon: User     },
+  { name: 'Estado General', href: '/admin/dashboard/estado-general', icon: FileSpreadsheet },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
