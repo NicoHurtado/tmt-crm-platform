@@ -179,13 +179,19 @@ async function handle(params: {
         };
     }
 
-    // 5. Vehículo que cubre el grupo
+    // 5. Vehículo que cubre el grupo.
+    //    - Privado (por vehículo): el grupo debe caber en el rango [capacidadMinima, capacidadMaxima].
+    //    - Compartido (cupo POR PERSONA): el vehículo es solo el cupo máximo del tour; el precio se
+    //      cobra por persona desde 1 pax. NO se exige capacidadMinima — solo que el grupo no exceda
+    //      la capacidad del cupo. Esto refleja cómo cotiza el formulario web (precio × pax).
     const vehiculos = [...svc.vehiculosPermitidos].sort(
         (a, b) => a.vehiculo.capacidadMaxima - b.vehiculo.capacidadMaxima
     );
-    const elegido = vehiculos.find(
-        (v) => paxNum >= v.vehiculo.capacidadMinima && paxNum <= v.vehiculo.capacidadMaxima
-    );
+    const elegido = svc.esCompartido
+        ? vehiculos.find((v) => paxNum <= v.vehiculo.capacidadMaxima)
+        : vehiculos.find(
+              (v) => paxNum >= v.vehiculo.capacidadMinima && paxNum <= v.vehiculo.capacidadMaxima
+          );
     if (!elegido) {
         const maxCap = vehiculos.length ? vehiculos[vehiculos.length - 1].vehiculo.capacidadMaxima : 0;
         return {

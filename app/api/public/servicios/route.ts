@@ -22,18 +22,34 @@ export async function OPTIONS() {
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache: Record<string, { payload: Record<string, unknown>; ts: number }> = {};
 
-// Minimal hardcoded fallback — used only when DB is down AND no cache exists
+// Minimal hardcoded fallback — used SOLO cuando la BD falla Y no hay caché.
+// Importante: NUNCA debe mencionar "dificultades técnicas" ni "no puedo acceder al catálogo"
+// al cliente (eso da una pésima experiencia). En su lugar, saluda con calidez, responde lo
+// que se pueda de forma general y deriva a un asesor sin culpar a fallas del sistema.
 const FALLBACK_SYSTEM_PROMPT = `Eres Nico, el asistente virtual de TMT Travel 🌟 — empresa de transporte turístico premium en Medellín, Colombia.
 
 Detecta en qué idioma escribe el cliente y responde SIEMPRE en ese idioma. Eres cálido, cercano y entusiasta.
 
-En este momento estoy teniendo dificultades para acceder al catálogo completo. Por favor invita al cliente a visitar nuestro sitio web para ver servicios y precios actualizados, o indícale que lo conectarás con un asesor.
-
-Sitio web: https://www.medellintransportes.com
+Saluda con naturalidad y atiende la conversación con calidez. Si el cliente pregunta por precios o detalles concretos de un servicio, NO inventes nada y NO menciones problemas técnicos ni le pidas que visite la web: con calidez, dile que en un momento un asesor de TMT Travel le confirma esa información y escálalo.
 
 Al escalar, primera línea EXACTA:
-ESCALACION_REQUERIDA: catálogo no disponible temporalmente
+ESCALACION_REQUERIDA: confirmación de un asesor
 Segunda línea: "¡Claro! Voy a conectarte con un asesor de TMT Travel que podrá ayudarte mejor. Te contactarán muy pronto 👤"`;
+
+// Reintenta una función async ante fallos transitorios (típico: cold start de Neon/timeout
+// de conexión). Reduce drásticamente la frecuencia con que se cae al fallback.
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3, delayMs = 350): Promise<T> {
+    let lastErr: unknown;
+    for (let i = 0; i < attempts; i++) {
+        try {
+            return await fn();
+        } catch (err) {
+            lastErr = err;
+            if (i < attempts - 1) await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+        }
+    }
+    throw lastErr;
+}
 
 /**
  * GET /api/public/servicios
@@ -61,9 +77,11 @@ export async function GET(request: NextRequest) {
         let payload: Record<string, unknown>;
 
         if (formato === 'json') {
-            payload = await buildCatalogJson(lang, appUrl);
+            payload = await withRetry(() => buildCatalogJson(lang, appUrl));
         } else {
-            payload = await buildCatalogText(formato === 'contexto' ? 'contexto' : 'texto', appUrl, toolMode);
+            payload = await withRetry(() =>
+                buildCatalogText(formato === 'contexto' ? 'contexto' : 'texto', appUrl, toolMode)
+            );
         }
 
         cache[cacheKey] = { payload, ts: Date.now() };
