@@ -69,6 +69,31 @@ function leanEntry(svc: ServicioContextData, base: string): string[] {
   return lines;
 }
 
+/**
+ * Índice ULTRA-COMPACTO (modo `?compacto=1`): una línea por servicio (nombre · id · categoría
+ * · cuándo). Sin descripción, sin precios inline, sin link — el bot obtiene precio/link con la
+ * tool cotizar y detalle con detalle_servicio. Reduce el prompt ~5x para caber en límites de
+ * tokens/minuto bajos (Groq free).
+ */
+export function buildLeanIndexCompact(servicios: ServicioContextData[], appUrl?: string): string {
+  const municipales = servicios.filter((s) => s.esMunicipal);
+  const otros = servicios.filter((s) => !s.esMunicipal);
+  const lines: string[] = [
+    '## ÍNDICE DE SERVICIOS (datos en vivo — SOLO existen estos; PROHIBIDO inventar otros)',
+    'Para precio y link usa la tool cotizar (con el servicioId y el nº de personas); para detalles usa detalle_servicio.',
+    '',
+  ];
+  for (const svc of otros) {
+    const cat = categoriaDeServicio(svc as any);
+    const n = asEsEn(svc.nombre);
+    lines.push(`- ${n.es || n.en} · id:${svc.id} · ${cat}${cat === 'AEROPUERTO' ? ' (pregunta cuál aeropuerto antes de cotizar)' : ''}`);
+  }
+  if (municipales.length > 0) {
+    lines.push(`- Traslados a ${municipales.length} municipios de Antioquia · MUNICIPAL — usa buscar_servicio para hallar el municipio (id/link); el precio NO está aquí, va en el formulario.`);
+  }
+  return lines.join('\n');
+}
+
 export function buildLeanIndex(servicios: ServicioContextData[], appUrl?: string): string {
   const base = (appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.medellintransportes.com').replace(/\/$/, '');
   const municipales = servicios.filter((s) => s.esMunicipal);

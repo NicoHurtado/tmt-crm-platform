@@ -1,8 +1,8 @@
 import { getConfiguracion } from '@/types/servicio-config';
 import type { DynamicField } from '@/types/dynamic-fields';
-import { NICO_PERSONA, NICO_RECORDATORIO_FINAL } from './persona';
+import { NICO_PERSONA, NICO_RECORDATORIO_FINAL, NICO_PERSONA_COMPACT } from './persona';
 export { NICO_PERSONA, MIA_PERSONA } from './persona';
-import { buildLeanIndex } from './buildLeanIndex';
+import { buildLeanIndex, buildLeanIndexCompact } from './buildLeanIndex';
 
 // Bloque de instrucciones de tools (cuando toolMode). Describe las 3 tools.
 const TOOLS_INTRO = `## 🛠️ HERRAMIENTAS (úsalas SIEMPRE que apliquen)
@@ -302,7 +302,16 @@ El servicio se decide por el DESTINO y el TIPO de viaje, nunca por una direcció
     return lines.join('\n');
 }
 
-export function buildFullSystemPrompt(servicios: ServicioContextData[], appUrl?: string, toolMode?: boolean): string {
+export function buildFullSystemPrompt(servicios: ServicioContextData[], appUrl?: string, toolMode?: boolean, compact?: boolean): string {
+  // Modo compacto: prompt ~5x más pequeño (persona resumida + índice de una línea), para
+  // modelos con límite bajo de tokens/minuto. Las herramientas siguen siendo obligatorias.
+  if (compact) {
+    return [
+      NICO_PERSONA_COMPACT,
+      '',
+      buildLeanIndexCompact(servicios, appUrl),
+    ].filter(Boolean).join('\n\n');
+  }
   const recordatorioTool = toolMode
     ? '\n- 🛠️ PRECIOS SOLO con la tool cotizar. Para detalle usa detalle_servicio; para municipios usa buscar_servicio.'
     : '';

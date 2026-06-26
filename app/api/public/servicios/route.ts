@@ -70,8 +70,11 @@ export async function GET(request: NextRequest) {
     // ?tools=1 → el systemPrompt incluye instrucciones para usar la herramienta `cotizar`
     // (úsalo cuando el agente de n8n tenga conectada la tool y un modelo que la sepa usar).
     const toolMode = ['1', 'true', 'yes'].includes((searchParams.get('tools') ?? '').toLowerCase());
+    // ?compacto=1 → systemPrompt reducido ~5x (persona resumida + índice de una línea), para
+    // modelos con límite bajo de tokens/minuto (ej. tier gratis de Groq). Solo aplica a formato=contexto.
+    const compact = ['1', 'true', 'yes'].includes((searchParams.get('compacto') ?? '').toLowerCase());
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.medellintransportes.com';
-    const cacheKey = `${formato}-${lang}-${toolMode ? 'tools' : 'plain'}`;
+    const cacheKey = `${formato}-${lang}-${toolMode ? 'tools' : 'plain'}-${compact ? 'compact' : 'full'}`;
 
     try {
         let payload: Record<string, unknown>;
@@ -80,7 +83,7 @@ export async function GET(request: NextRequest) {
             payload = await withRetry(() => buildCatalogJson(lang, appUrl));
         } else {
             payload = await withRetry(() =>
-                buildCatalogText(formato === 'contexto' ? 'contexto' : 'texto', appUrl, toolMode)
+                buildCatalogText(formato === 'contexto' ? 'contexto' : 'texto', appUrl, toolMode, compact)
             );
         }
 

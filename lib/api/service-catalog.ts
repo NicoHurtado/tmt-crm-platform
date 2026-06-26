@@ -235,13 +235,14 @@ export function searchCatalogServices(servicios: CatalogService[], q: string): C
 export async function buildCatalogText(
     formato: 'contexto' | 'texto',
     appUrl?: string,
-    toolMode?: boolean
+    toolMode?: boolean,
+    compact?: boolean
 ) {
     const rawServicios = await fetchActiveCatalogServices();
     const servicios = toServicioContextData(rawServicios);
     const texto =
         formato === 'contexto'
-            ? buildFullSystemPrompt(servicios, appUrl, toolMode)
+            ? buildFullSystemPrompt(servicios, appUrl, toolMode, compact)
             : formatServicioContext(servicios, appUrl, toolMode);
 
     return {
