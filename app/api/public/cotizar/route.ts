@@ -172,8 +172,10 @@ async function handle(params: {
             vehiculo: null,
             precio: precioPP,
             precioFormateado: fmtCOP(precioPP),
+            precioTotal: precioPP,
             moneda: 'COP',
-            nota: `Precio por persona × ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'}.`,
+            nota: `${fmtCOP(precioPP)} es el TOTAL final para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'} (tarifa por persona ya multiplicada).`,
+            instruccion: `Entrega al cliente exactamente ${fmtCOP(precioPP)} como el total para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'}. NO lo multipliques ni recalcules; ese campo ya es el total.`,
             recargoNocturno: { aplica: false },
             linkReserva: link(svc.id),
         };
@@ -251,10 +253,12 @@ async function handle(params: {
         },
         precio,
         precioFormateado: fmtCOP(precio),
+        precioTotal: precio,
         moneda: 'COP',
         nota: svc.esCompartido
-            ? `Precio por persona (cupo compartido) × ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'}.`
-            : 'Precio por el vehículo completo (servicio privado).',
+            ? `${fmtCOP(precio)} es el TOTAL final para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'} (cupo compartido, tarifa por persona ya multiplicada).`
+            : `${fmtCOP(precio)} es el TOTAL por el vehículo completo (servicio privado), no por persona.`,
+        instruccion: `Entrega al cliente exactamente ${fmtCOP(precio)} como el total para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'}. NO lo multipliques ni recalcules; ese campo ya es el total final.`,
         recargoNocturno,
         linkReserva: link(svc.id),
     };
