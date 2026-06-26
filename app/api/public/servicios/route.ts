@@ -62,6 +62,7 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3, delayMs = 350): 
  *   ?formato=contexto  Full AI system prompt — ready to paste into any chatbot/LLM
  *   ?formato=texto     Human-readable catalogue text — good for docs or descriptions
  *   ?lang=ES|EN        Language for name/description fields (default ES)
+ *   ?solo=prompt       (con formato=contexto) Devuelve solo { systemPrompt } — payload ~6KB para el bot
  */
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -73,8 +74,20 @@ export async function GET(request: NextRequest) {
     // ?compacto=1 → systemPrompt reducido ~5x (persona resumida + índice de una línea), para
     // modelos con límite bajo de tokens/minuto (ej. tier gratis de Groq). Solo aplica a formato=contexto.
     const compact = ['1', 'true', 'yes'].includes((searchParams.get('compacto') ?? '').toLowerCase());
+    // ?solo=prompt → devuelve SOLO el systemPrompt (~6KB) en vez del payload completo (~190KB con
+    // catálogo + 143 servicios). Pensado para el bot de n8n, que solo consume `systemPrompt`:
+    // reduce latencia, ancho de banda y riesgo de timeout. Solo aplica a formato=contexto.
+    const soloPrompt =
+        formato === 'contexto' &&
+        ['1', 'true', 'yes', 'prompt'].includes((searchParams.get('solo') ?? '').toLowerCase());
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.medellintransportes.com';
     const cacheKey = `${formato}-${lang}-${toolMode ? 'tools' : 'plain'}-${compact ? 'compact' : 'full'}`;
+
+    // Reduce el payload a lo mínimo que consume el bot cuando se pide ?solo=prompt.
+    const slim = (p: Record<string, unknown>): Record<string, unknown> =>
+        soloPrompt
+            ? { systemPrompt: p.systemPrompt, actualizadoEn: p.actualizadoEn, ...(p._fallback ? { _fallback: true } : {}) }
+            : p;
 
     try {
         let payload: Record<string, unknown>;
@@ -89,13 +102,13 @@ export async function GET(request: NextRequest) {
 
         cache[cacheKey] = { payload, ts: Date.now() };
 
-        return NextResponse.json(payload, { headers: CORS });
+        return NextResponse.json(slim(payload), { headers: CORS });
     } catch (dbError) {
         console.error('[public/servicios] DB/build error — falling back to cache:', dbError);
         const cached = cache[cacheKey];
         if (cached) {
             console.warn('[public/servicios] Returning stale cache');
-            return NextResponse.json(cached.payload, {
+            return NextResponse.json(slim(cached.payload), {
                 headers: { ...CORS, 'X-Cache': 'STALE' },
             });
         }
@@ -110,7 +123,7 @@ export async function GET(request: NextRequest) {
             systemPrompt: FALLBACK_SYSTEM_PROMPT,
             _fallback: true,
         };
-        return NextResponse.json(fallback, {
+        return NextResponse.json(slim(fallback), {
             headers: { ...CORS, 'X-Cache': 'FALLBACK' },
         });
     }
