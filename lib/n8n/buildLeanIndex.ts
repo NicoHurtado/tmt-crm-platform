@@ -81,6 +81,7 @@ export function buildLeanIndexCompact(servicios: ServicioContextData[], appUrl?:
   const lines: string[] = [
     '## ÍNDICE DE SERVICIOS (datos en vivo — SOLO existen estos; PROHIBIDO inventar otros)',
     'Para precio y link usa la tool cotizar (con el servicioId y el nº de personas); para detalles usa detalle_servicio.',
+    '⚠️ NINGÚN precio está en este índice. Cada cifra que des DEBE venir de una llamada a cotizar hecha en este mismo turno. Si el cliente pregunta por varios servicios a la vez, llama a cotizar UNA VEZ POR CADA servicio antes de responder; NUNCA listes precios de memoria.',
     '',
   ];
   for (const svc of otros) {
