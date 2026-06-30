@@ -942,13 +942,6 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                                     readOnly
                                     className="w-full px-4 py-3 border border-gray-100 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed outline-none"
                                 />
-                            ) : isHotel ? (
-                                <input
-                                    type="text"
-                                    value={hotelName}
-                                    readOnly
-                                    className="w-full px-4 py-3 border border-gray-100 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed outline-none"
-                                />
                             ) : (
                                 <input
                                     type="text"
@@ -969,13 +962,6 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                                 <input
                                     type="text"
                                     value={t(`aeropuerto.${formData.aeropuertoNombre || 'JOSE_MARIA_CORDOVA'}`, language)}
-                                    readOnly
-                                    className="w-full px-4 py-3 border border-gray-100 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed outline-none"
-                                />
-                            ) : isHotel ? (
-                                <input
-                                    type="text"
-                                    value={hotelName}
                                     readOnly
                                     className="w-full px-4 py-3 border border-gray-100 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed outline-none"
                                 />
