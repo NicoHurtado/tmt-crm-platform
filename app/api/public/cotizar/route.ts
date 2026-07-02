@@ -114,6 +114,18 @@ async function handle(params: {
     const svc = candidatos[0];
     const nombre = getLocalizedText(svc.nombre, 'ES');
 
+    // Alcance del viaje: algunos traslados son SOLO IDA (un trayecto) y así lo dice su nombre
+    // ("( solo ida )" / "( one way )"). El precio devuelto es de UN trayecto: el bot NO debe
+    // presentarlo como "ida y vuelta". Se expone explícito para que no lo alucine.
+    const ONE_WAY_RX = /\bsolo\s*ida\b|\bone\s*way\b/i;
+    const esSoloIda =
+        ONE_WAY_RX.test(getLocalizedText(svc.nombre, 'ES')) ||
+        ONE_WAY_RX.test(getLocalizedText(svc.nombre, 'EN'));
+    const notaAlcance = esSoloIda
+        ? ' ⚠️ Este precio es SOLO IDA (un trayecto): NO incluye el regreso. Preséntalo como "solo ida", NUNCA como "ida y vuelta". Si el cliente quiere el regreso, ofrécele cotizar también el trayecto de vuelta.'
+        : '';
+    const alcance = esSoloIda ? 'SOLO_IDA' : 'UNICO';
+
     // 2. Municipal → sin precio aquí
     if (svc.esMunicipal) {
         return {
@@ -174,8 +186,10 @@ async function handle(params: {
             precioFormateado: fmtCOP(precioPP),
             precioTotal: precioPP,
             moneda: 'COP',
-            nota: `${fmtCOP(precioPP)} es el TOTAL final para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'} (tarifa por persona ya multiplicada).`,
-            instruccion: `Entrega al cliente exactamente ${fmtCOP(precioPP)} como el total para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'}. NO lo multipliques ni recalcules; ese campo ya es el total.`,
+            alcance,
+            soloIda: esSoloIda,
+            nota: `${fmtCOP(precioPP)} es el TOTAL final para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'} (tarifa por persona ya multiplicada).${notaAlcance}`,
+            instruccion: `Entrega al cliente exactamente ${fmtCOP(precioPP)} como el total para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'}. NO lo multipliques ni recalcules; ese campo ya es el total.${notaAlcance}`,
             recargoNocturno: { aplica: false },
             linkReserva: link(svc.id),
         };
@@ -255,10 +269,12 @@ async function handle(params: {
         precioFormateado: fmtCOP(precio),
         precioTotal: precio,
         moneda: 'COP',
-        nota: svc.esCompartido
+        alcance,
+        soloIda: esSoloIda,
+        nota: (svc.esCompartido
             ? `${fmtCOP(precio)} es el TOTAL final para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'} (cupo compartido, tarifa por persona ya multiplicada).`
-            : `${fmtCOP(precio)} es el TOTAL por el vehículo completo (servicio privado), no por persona.`,
-        instruccion: `Entrega al cliente exactamente ${fmtCOP(precio)} como el total para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'}. NO lo multipliques ni recalcules; ese campo ya es el total final.`,
+            : `${fmtCOP(precio)} es el TOTAL por el vehículo completo (servicio privado), no por persona.`) + notaAlcance,
+        instruccion: `Entrega al cliente exactamente ${fmtCOP(precio)} como el total para ${paxNum} ${paxNum === 1 ? 'persona' : 'personas'}. NO lo multipliques ni recalcules; ese campo ya es el total final.${notaAlcance}`,
         recargoNocturno,
         linkReserva: link(svc.id),
     };
