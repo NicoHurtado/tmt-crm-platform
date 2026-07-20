@@ -1,12 +1,50 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import crypto from 'crypto';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+/**
+ * Estos tests usan el payload y la firma REALES de Bold
+ * (https://developers.bold.co/webhook, verificado el 2026-07-20).
+ *
+ * La versión anterior de este archivo inventaba el contrato: mandaba
+ * `{order_id, payment_status}` en la raíz y firmaba el body crudo. Los tests pasaban
+ * porque el handler asumía exactamente lo mismo, pero en producción no se procesó ni
+ * un solo webhook: 0 de 1526 reservas tenían `pagoId`.
+ */
 
 const SECRET = 'test-secret-key-for-hmac-testing-only';
 
+/** Firma como Bold: HMAC-SHA256 hex sobre el cuerpo convertido a base64. */
 function buildSignature(body: string): string {
-    return crypto.createHmac('sha256', SECRET).update(body).digest('hex');
+    const enBase64 = Buffer.from(body, 'utf8').toString('base64');
+    return crypto.createHmac('sha256', SECRET).update(enBase64).digest('hex');
+}
+
+/** Evento real de Bold. `reference` es nuestro código de reserva o pedido. */
+function eventoBold(
+    reference: string | null,
+    type: string = 'SALE_APPROVED',
+    extra: { paymentId?: string; total?: number } = {}
+) {
+    return {
+        id: 'c1d4e7f0-a3b8-4c9d-8e7f-1a2b3c4d5e6f',
+        type,
+        subject: extra.paymentId ?? 'TXN-001',
+        source: '/payments/button',
+        spec_version: '1.0',
+        time: 1761065000000000000,
+        data: {
+            payment_id: extra.paymentId ?? 'TXN-001',
+            merchant_id: 'MCNT2026XYZ',
+            created_at: '2026-07-20T12:40:00-05:00',
+            amount: { currency: 'COP', total: extra.total ?? 150_000, taxes: [], tip: 0 },
+            user_id: 'user_9876543210',
+            metadata: { reference },
+            bold_code: 'B000',
+            payer_email: 'cliente@example.com',
+            payment_method: 'CARD',
+        },
+        datacontenttype: 'application/json',
+    };
 }
 
 function buildRequest(body: object, signature?: string): Request {
@@ -54,14 +92,12 @@ vi.mock('@/lib/prisma', () => ({
     prisma: mockPrismaMethods,
 }));
 
-// Mock email-service to avoid actually sending emails
 vi.mock('@/lib/email-service', () => ({
     sendPagoAprobadoEmail: vi.fn().mockResolvedValue(undefined),
     sendCambioEstadoEmail: vi.fn().mockResolvedValue(undefined),
     sendReservaConfirmadaEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Mock google calendar to avoid real API calls
 vi.mock('@/lib/google-calendar-service', () => ({
     createCalendarEvent: vi.fn().mockResolvedValue('cal-event-id-test'),
     createOrUpdateTourCompartidoEvent: vi.fn().mockResolvedValue('cal-event-id-tour'),
@@ -74,10 +110,14 @@ describe('POST /api/bold/webhook', () => {
 
     beforeEach(async () => {
         vi.clearAllMocks();
-        // Reset mocks to default happy-path state
+        process.env.BOLD_MODE = 'production';
+        process.env.BOLD_SECRET_KEY = SECRET;
         mockPrismaMethods.reserva.findUnique.mockResolvedValue({ ...mockReserva });
-        mockPrismaMethods.reserva.update.mockResolvedValue({ ...mockReserva, estadoPago: 'APROBADO', estado: 'CONFIRMED_UNASSIGNED' });
-        // Import the route handler after mocks are set up
+        mockPrismaMethods.reserva.update.mockResolvedValue({
+            ...mockReserva,
+            estadoPago: 'APROBADO',
+            estado: 'CONFIRMED_UNASSIGNED',
+        });
         const mod = await import('@/app/api/bold/webhook/route');
         POST = mod.POST;
     });
@@ -86,54 +126,73 @@ describe('POST /api/bold/webhook', () => {
         vi.resetModules();
     });
 
-    // ── Signature verification ─────────────────────────────────────────────────
+    // ── Verificación de firma ──────────────────────────────────────────────────
+
+    it('acepta la firma real de Bold y procesa el evento', async () => {
+        const res = await POST(buildRequest(eventoBold('RES-TEST-001')) as any);
+        expect(res.status).toBe(200);
+        expect(mockPrismaMethods.reserva.update).toHaveBeenCalled();
+    });
 
     it('rechaza webhook con firma inválida → 401', async () => {
-        const req = buildRequest({ order_id: 'RES-TEST-001', payment_status: 'approved' }, 'firma_incorrecta');
+        const req = buildRequest(eventoBold('RES-TEST-001'), 'firma_incorrecta');
         const res = await POST(req as any);
         expect(res.status).toBe(401);
         expect(mockPrismaMethods.reserva.update).not.toHaveBeenCalled();
     });
 
-    it('rechaza webhook sin header de firma → 401', async () => {
-        const body = JSON.stringify({ order_id: 'RES-TEST-001', payment_status: 'approved' });
+    it('rechaza una firma calculada sobre el body crudo (contrato viejo) → 401', async () => {
+        const json = JSON.stringify(eventoBold('RES-TEST-001'));
+        const firmaVieja = crypto.createHmac('sha256', SECRET).update(json).digest('hex');
         const req = new Request('http://localhost/api/bold/webhook', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body,
+            headers: { 'Content-Type': 'application/json', 'x-bold-signature': firmaVieja },
+            body: json,
         });
         const res = await POST(req as any);
         expect(res.status).toBe(401);
     });
 
-    // ── Missing fields ─────────────────────────────────────────────────────────
-
-    it('retorna 400 si no hay order_id', async () => {
-        const req = buildRequest({ payment_status: 'approved' });
+    it('rechaza webhook sin header de firma → 401', async () => {
+        const req = new Request('http://localhost/api/bold/webhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(eventoBold('RES-TEST-001')),
+        });
         const res = await POST(req as any);
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(401);
+    });
+
+    // ── Eventos sin referencia o de tipo desconocido ───────────────────────────
+
+    it('evento sin referencia (venta QR de mostrador) → 200 sin tocar nada', async () => {
+        const res = await POST(buildRequest(eventoBold(null)) as any);
+        expect(res.status).toBe(200);
+        expect(mockPrismaMethods.reserva.update).not.toHaveBeenCalled();
+    });
+
+    it('tipo de evento no manejado → 200 sin tocar nada', async () => {
+        const res = await POST(buildRequest(eventoBold('RES-TEST-001', 'ALGO_NUEVO')) as any);
+        expect(res.status).toBe(200);
+        expect(mockPrismaMethods.reserva.update).not.toHaveBeenCalled();
     });
 
     // ── Reserva no encontrada ──────────────────────────────────────────────────
 
     it('retorna 404 si la reserva no existe', async () => {
         mockPrismaMethods.reserva.findUnique.mockResolvedValue(null);
-        const req = buildRequest({ order_id: 'RES-INEXISTENTE', payment_status: 'approved' });
-        const res = await POST(req as any);
+        const res = await POST(buildRequest(eventoBold('RES-INEXISTENTE')) as any);
         expect(res.status).toBe(404);
     });
 
     // ── Pago aprobado ──────────────────────────────────────────────────────────
 
-    it('pago aprobado → actualiza estado a CONFIRMED_UNASSIGNED', async () => {
-        const req = buildRequest({
-            order_id: 'RES-TEST-001',
-            payment_status: 'approved',
-            transaction_id: 'TXN-001',
-            amount: 150_000,
-            currency: 'COP',
+    it('SALE_APPROVED → estado CONFIRMED_UNASSIGNED y pagoId guardado', async () => {
+        const evento = eventoBold('RES-TEST-001', 'SALE_APPROVED', {
+            paymentId: 'TXN-001',
+            total: 150_000,
         });
-        const res = await POST(req as any);
+        const res = await POST(buildRequest(evento) as any);
         const body = await res.json();
         expect(res.status).toBe(200);
         expect(body.success).toBe(true);
@@ -148,33 +207,20 @@ describe('POST /api/bold/webhook', () => {
         );
     });
 
-    it('pago aprobado → comisión Bold calculada (6%)', async () => {
-        const req = buildRequest({
-            order_id: 'RES-TEST-001',
-            payment_status: 'approved',
-            transaction_id: 'TXN-001',
-            amount: 150_000,
-            currency: 'COP',
-        });
-        await POST(req as any);
+    it('SALE_APPROVED → comisión Bold calculada (6%) sobre data.amount.total', async () => {
+        const evento = eventoBold('RES-TEST-001', 'SALE_APPROVED', { total: 150_000 });
+        await POST(buildRequest(evento) as any);
         expect(mockPrismaMethods.reserva.update).toHaveBeenCalledWith(
             expect.objectContaining({
-                data: expect.objectContaining({
-                    comisionBold: 150_000 * 0.06,
-                }),
+                data: expect.objectContaining({ comisionBold: 150_000 * 0.06 }),
             })
         );
     });
 
-    // ── Pago rechazado ─────────────────────────────────────────────────────────
+    // ── Pago rechazado / anulado ───────────────────────────────────────────────
 
-    it('pago rechazado → estado PAYMENT_FAILED, estadoPago RECHAZADO', async () => {
-        const req = buildRequest({
-            order_id: 'RES-TEST-001',
-            payment_status: 'rejected',
-            currency: 'COP',
-        });
-        const res = await POST(req as any);
+    it('SALE_REJECTED → estado PAYMENT_FAILED, estadoPago RECHAZADO', async () => {
+        const res = await POST(buildRequest(eventoBold('RES-TEST-001', 'SALE_REJECTED')) as any);
         expect(res.status).toBe(200);
         expect(mockPrismaMethods.reserva.update).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -186,35 +232,22 @@ describe('POST /api/bold/webhook', () => {
         );
     });
 
-    it('pago "failed" → mismo resultado que rejected', async () => {
-        const req = buildRequest({
-            order_id: 'RES-TEST-001',
-            payment_status: 'failed',
-        });
-        const res = await POST(req as any);
+    it('VOID_APPROVED → marca el pago rechazado pero NO cancela el servicio', async () => {
+        const res = await POST(buildRequest(eventoBold('RES-TEST-001', 'VOID_APPROVED')) as any);
         expect(res.status).toBe(200);
-        expect(mockPrismaMethods.reserva.update).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    estado: 'PAYMENT_FAILED',
-                    estadoPago: 'RECHAZADO',
-                }),
-            })
-        );
+        const llamada = mockPrismaMethods.reserva.update.mock.calls[0][0];
+        expect(llamada.data.estadoPago).toBe('RECHAZADO');
+        expect(llamada.data.estado).toBeUndefined();
     });
 
     // ── Idempotencia ───────────────────────────────────────────────────────────
 
-    it('reserva ya APROBADA + webhook approved → responde already_processed sin re-procesar', async () => {
+    it('reserva ya APROBADA + SALE_APPROVED → already_processed sin re-procesar', async () => {
         mockPrismaMethods.reserva.findUnique.mockResolvedValue({
             ...mockReserva,
             estadoPago: 'APROBADO',
         });
-        const req = buildRequest({
-            order_id: 'RES-TEST-001',
-            payment_status: 'approved',
-        });
-        const res = await POST(req as any);
+        const res = await POST(buildRequest(eventoBold('RES-TEST-001')) as any);
         const body = await res.json();
         expect(res.status).toBe(200);
         expect(body.already_processed).toBe(true);

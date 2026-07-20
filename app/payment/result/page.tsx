@@ -7,7 +7,17 @@ import Link from 'next/link';
 /**
  * Confirm payment with retry logic (up to 3 attempts with exponential backoff)
  */
-async function confirmPaymentWithRetry(orderId: string, maxRetries = 3): Promise<{ success: boolean; data?: any; error?: string }> {
+type ConfirmResult = {
+    success: boolean;
+    data?: any;
+    error?: string;
+    /** true = Bold todavía no expone la transacción; el webhook la confirmará. */
+    pendienteEnBold?: boolean;
+};
+
+async function confirmPaymentWithRetry(orderId: string, maxRetries = 3): Promise<ConfirmResult> {
+    let ultimoPendiente = false;
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log(`🔄 [Payment] Attempt ${attempt}/${maxRetries} to confirm payment for: ${orderId}`);
@@ -34,9 +44,19 @@ async function confirmPaymentWithRetry(orderId: string, maxRetries = 3): Promise
                 return { success: false, error: data.error || 'Reserva no encontrada' };
             }
 
-            // For other errors, retry
-            console.warn(`⚠️ [Payment] Attempt ${attempt} failed with status ${res.status}:`, data);
+            // 409 = Bold aún no reporta la transacción como aprobada. Es lo normal
+            // justo al volver del checkout: Bold puede tardar hasta 10 minutos en
+            // exponerla. El webhook confirmará la reserva en cuanto llegue, así que
+            // esto NO es un fallo que deba alarmar al cliente.
+            if (res.status === 409) {
+                ultimoPendiente = true;
+                console.log(`⏳ [Payment] Bold aún no confirma (${data.boldStatus}); el webhook lo hará`);
+            } else {
+                ultimoPendiente = false;
+                console.warn(`⚠️ [Payment] Attempt ${attempt} failed with status ${res.status}:`, data);
+            }
         } catch (error) {
+            ultimoPendiente = false;
             console.error(`❌ [Payment] Attempt ${attempt} network error:`, error);
         }
 
@@ -48,7 +68,13 @@ async function confirmPaymentWithRetry(orderId: string, maxRetries = 3): Promise
         }
     }
 
-    return { success: false, error: 'No se pudo confirmar el pago después de varios intentos' };
+    return {
+        success: false,
+        pendienteEnBold: ultimoPendiente,
+        error: ultimoPendiente
+            ? 'Bold todavía está procesando la transacción'
+            : 'No se pudo confirmar el pago después de varios intentos',
+    };
 }
 
 function PaymentResultContent() {
@@ -57,7 +83,7 @@ function PaymentResultContent() {
     const [loading, setLoading] = useState(true);
     const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
     const [orderId, setOrderId] = useState<string | null>(null);
-    const [confirmationStatus, setConfirmationStatus] = useState<'pending' | 'confirmed' | 'failed'>('pending');
+    const [confirmationStatus, setConfirmationStatus] = useState<'pending' | 'confirmed' | 'failed' | 'procesando'>('pending');
     const [confirmationError, setConfirmationError] = useState<string | null>(null);
     const hasConfirmed = useRef(false);
 
@@ -80,6 +106,9 @@ function PaymentResultContent() {
                     if (result.success) {
                         setConfirmationStatus('confirmed');
                         console.log('✅ Base de datos actualizada:', result.data);
+                    } else if (result.pendienteEnBold) {
+                        // Caso normal, no un fallo: el webhook confirmará en minutos.
+                        setConfirmationStatus('procesando');
                     } else {
                         setConfirmationStatus('failed');
                         setConfirmationError(result.error || 'Error desconocido');
@@ -189,6 +218,18 @@ function PaymentResultContent() {
                                 </svg>
                                 <p className="text-blue-800 font-medium">Confirmando tu reserva...</p>
                             </div>
+                        </div>
+                    )}
+
+                    {isApproved && confirmationStatus === 'procesando' && (
+                        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <p className="text-blue-800 font-medium mb-1">
+                                Tu pago fue exitoso y lo estamos confirmando con el banco.
+                            </p>
+                            <p className="text-blue-700 text-sm">
+                                Esto puede tardar unos minutos. Te llegará un correo apenas la
+                                reserva quede confirmada — no necesitas hacer nada más.
+                            </p>
                         </div>
                     )}
 

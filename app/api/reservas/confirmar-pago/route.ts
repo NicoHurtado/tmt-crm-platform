@@ -2,17 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { consultarTransaccionBold } from '@/lib/bold';
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic';
 
+/**
+ * Confirma el pago de una reserva o pedido.
+ *
+ * Lo llama la página pública /payment/result cuando el cliente vuelve de Bold, así
+ * que NO puede exigir sesión de admin: antes lo hacía y todo cliente o agencia
+ * recibía 401, dejando la reserva en PENDING_PAYMENT aunque hubiera pagado. Solo
+ * funcionaba si quien pagaba estaba logueado en el backoffice — por eso pasó las
+ * pruebas internas.
+ *
+ * Tampoco puede confiar en quien llama: si no hay sesión de admin, el estado del
+ * pago se verifica contra la API de Bold. Sin esa verificación, cualquiera con un
+ * código de reserva podría marcarla como pagada.
+ */
 export async function POST(req: NextRequest) {
     try {
-        // Only admins may call this endpoint directly
         const session = await getServerSession(authOptions);
-        if (!session) {
-            return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-        }
+        const esAdmin = !!session;
 
         const body = await req.json();
         const { orderId } = body;
@@ -22,6 +33,28 @@ export async function POST(req: NextRequest) {
                 { error: 'orderId es requerido' },
                 { status: 400 }
             );
+        }
+
+        // Origen público: Bold es la única fuente de verdad sobre el pago.
+        if (!esAdmin) {
+            const transaccion = await consultarTransaccionBold(orderId);
+
+            if (transaccion.status !== 'APPROVED') {
+                console.warn(
+                    `[Confirmar Pago] ${orderId} no confirmado por Bold (estado: ${transaccion.status})`
+                );
+                return NextResponse.json(
+                    {
+                        error: 'El pago aún no aparece aprobado en Bold',
+                        boldStatus: transaccion.status,
+                    },
+                    // 409: la petición es válida pero el pago todavía no está confirmado.
+                    // La página reintenta, y el webhook de Bold sirve de respaldo.
+                    { status: 409 }
+                );
+            }
+
+            console.log(`✅ [Confirmar Pago] Bold confirmó el pago de ${orderId}`);
         }
 
         // Detectar si es un pedido (PED prefix) o una reserva individual

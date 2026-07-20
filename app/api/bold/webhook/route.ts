@@ -1,29 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { validateBoldHash, calculateBoldCommission } from '@/lib/bold';
+import {
+    calculateBoldCommission,
+    verifyBoldWebhookSignature,
+    parseBoldWebhookEvent,
+} from '@/lib/bold';
 import { sendPagoAprobadoEmail, sendCambioEstadoEmail } from '@/lib/email-service';
-
-function verifyBoldSignature(rawBody: string, signatureHeader: string | null): boolean {
-    const secret = process.env.BOLD_SECRET_KEY;
-    if (!secret) {
-        console.error('[Bold] BOLD_SECRET_KEY not set — rejecting webhook');
-        return false;
-    }
-    if (!signatureHeader) return false;
-    const expected = crypto
-        .createHmac('sha256', secret)
-        .update(rawBody)
-        .digest('hex');
-    try {
-        return crypto.timingSafeEqual(
-            Buffer.from(signatureHeader, 'hex'),
-            Buffer.from(expected, 'hex')
-        );
-    } catch {
-        return false;
-    }
-}
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic';
@@ -35,30 +17,38 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
     try {
         const rawBody = await req.text();
-        const signature = req.headers.get('x-bold-signature') ?? req.headers.get('x-bold-hmac-256');
-        if (!verifyBoldSignature(rawBody, signature)) {
-            console.warn('[Bold] Webhook rejected: invalid signature');
+        const signature = req.headers.get('x-bold-signature');
+        if (!verifyBoldWebhookSignature(rawBody, signature)) {
+            console.warn('[Bold] Webhook rechazado: firma inválida');
             return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
         }
         const body = JSON.parse(rawBody);
 
-        console.log('Bold webhook received:', body);
+        console.log('[Bold] Webhook recibido:', body?.type, body?.data?.metadata?.reference);
 
-        // Extraer datos del webhook de Bold
-        const {
-            order_id,
-            payment_status,
-            transaction_id,
-            amount,
-            currency,
-            // Bold también puede enviar más campos
-        } = body;
+        // Bold envía la referencia en data.metadata.reference y el estado en `type`.
+        const evento = parseBoldWebhookEvent(body);
+        const order_id = evento.orderId;
+        const transaction_id = evento.transactionId;
+        const amount = evento.amount;
+
+        // Traducimos a los estados que ya usaba el resto del handler.
+        const payment_status =
+            evento.estado === 'APROBADO' ? 'approved'
+                : evento.estado === 'RECHAZADO' ? 'rejected'
+                    : evento.estado === 'ANULADO' ? 'voided'
+                        : 'unknown';
 
         if (!order_id) {
-            return NextResponse.json(
-                { error: 'order_id is required' },
-                { status: 400 }
-            );
+            // Pasa en ventas sin referencia (p. ej. QR de mostrador): no es un error
+            // nuestro, así que respondemos 200 para que Bold no reintente en vano.
+            console.log('[Bold] Evento sin referencia — se ignora');
+            return NextResponse.json({ success: true, ignored: 'sin referencia' });
+        }
+
+        if (payment_status === 'unknown') {
+            console.log(`[Bold] Tipo de evento no manejado: ${body?.type}`);
+            return NextResponse.json({ success: true, ignored: `tipo ${body?.type}` });
         }
 
         // Detectar si es un pedido o una reserva individual
@@ -108,12 +98,15 @@ export async function POST(req: NextRequest) {
                     nuevoEstadoPago = 'APROBADO';
                     break;
                 case 'rejected':
-                case 'failed':
                     nuevoEstadoReserva = 'PAYMENT_FAILED';
                     nuevoEstadoPago = 'RECHAZADO';
                     break;
-                case 'pending':
-                    nuevoEstadoPago = 'PROCESANDO';
+                case 'voided':
+                    // Venta anulada después de aprobada. Marcamos el pago como rechazado
+                    // pero NO cancelamos el servicio automáticamente: puede haber un
+                    // conductor ya asignado y esa decisión es del equipo.
+                    nuevoEstadoPago = 'RECHAZADO';
+                    console.warn(`[Bold] ⚠️ Venta ANULADA para ${order_id} — revisar manualmente`);
                     break;
             }
 
@@ -246,12 +239,15 @@ export async function POST(req: NextRequest) {
                     nuevoEstadoPago = 'APROBADO';
                     break;
                 case 'rejected':
-                case 'failed':
                     nuevoEstado = 'PAYMENT_FAILED';
                     nuevoEstadoPago = 'RECHAZADO';
                     break;
-                case 'pending':
-                    nuevoEstadoPago = 'PROCESANDO';
+                case 'voided':
+                    // Venta anulada después de aprobada. Marcamos el pago como rechazado
+                    // pero NO cancelamos el servicio automáticamente: puede haber un
+                    // conductor ya asignado y esa decisión es del equipo.
+                    nuevoEstadoPago = 'RECHAZADO';
+                    console.warn(`[Bold] ⚠️ Venta ANULADA para ${order_id} — revisar manualmente`);
                     break;
             }
 

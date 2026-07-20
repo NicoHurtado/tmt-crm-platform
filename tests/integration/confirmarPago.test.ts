@@ -71,6 +71,10 @@ vi.mock('@/lib/google-calendar-service', () => ({
     createOrUpdateTourCompartidoEvent: vi.fn().mockResolvedValue('cal-event-tour'),
 }));
 
+vi.mock('@/lib/bold', () => ({
+    consultarTransaccionBold: vi.fn(),
+}));
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('POST /api/reservas/confirmar-pago', () => {
@@ -90,6 +94,13 @@ describe('POST /api/reservas/confirmar-pago', () => {
         const { getServerSession } = await import('next-auth');
         (getServerSession as ReturnType<typeof vi.fn>).mockResolvedValue(mockSession);
 
+        const { consultarTransaccionBold } = await import('@/lib/bold');
+        (consultarTransaccionBold as ReturnType<typeof vi.fn>).mockResolvedValue({
+            status: 'APPROVED',
+            total: 100000,
+            referenceId: 'RES-TEST-001',
+        });
+
         mockPrismaMethods.reserva.findUnique.mockResolvedValue({ ...mockReserva });
         mockPrismaMethods.reserva.update.mockResolvedValue({
             ...mockReserva,
@@ -108,14 +119,68 @@ describe('POST /api/reservas/confirmar-pago', () => {
         vi.resetModules();
     });
 
-    // ── Auth guard ─────────────────────────────────────────────────────────────
+    // ── Origen público: Bold decide ────────────────────────────────────────────
+    //
+    // Regresión: este endpoint exigía sesión de admin y lo llama la página pública
+    // /payment/result. Todo cliente o agencia recibía 401 y la reserva se quedaba en
+    // PENDING_PAYMENT pese a haber pagado. Ahora no exige sesión, pero verifica
+    // contra Bold antes de tocar nada.
 
-    it('sin sesión → 401', async () => {
+    async function sinSesion() {
         const { getServerSession } = await import('next-auth');
         (getServerSession as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-        const req = buildRequest({ orderId: 'RES-TEST-001' });
-        const res = await POST(req as any);
-        expect(res.status).toBe(401);
+    }
+
+    async function boldResponde(status: string) {
+        const { consultarTransaccionBold } = await import('@/lib/bold');
+        (consultarTransaccionBold as ReturnType<typeof vi.fn>).mockResolvedValue({
+            status,
+            total: 100000,
+            referenceId: 'RES-TEST-001',
+        });
+    }
+
+    it('sin sesión y con pago aprobado en Bold → confirma la reserva', async () => {
+        await sinSesion();
+        await boldResponde('APPROVED');
+        const res = await POST(buildRequest({ orderId: 'RES-TEST-001' }) as any);
+        expect(res.status).toBe(200);
+        expect(mockPrismaMethods.reserva.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ estadoPago: 'APROBADO' }),
+            })
+        );
+    });
+
+    it('sin sesión y sin transacción en Bold → 409 y no toca la reserva', async () => {
+        await sinSesion();
+        await boldResponde('NO_TRANSACTION_FOUND');
+        const res = await POST(buildRequest({ orderId: 'RES-TEST-001' }) as any);
+        expect(res.status).toBe(409);
+        expect(mockPrismaMethods.reserva.update).not.toHaveBeenCalled();
+    });
+
+    it('sin sesión y pago rechazado en Bold → 409 y no toca la reserva', async () => {
+        await sinSesion();
+        await boldResponde('REJECTED');
+        const res = await POST(buildRequest({ orderId: 'RES-TEST-001' }) as any);
+        expect(res.status).toBe(409);
+        expect(mockPrismaMethods.reserva.update).not.toHaveBeenCalled();
+    });
+
+    it('sin sesión y Bold inalcanzable → 409, nunca confirma a ciegas', async () => {
+        await sinSesion();
+        await boldResponde('ERROR');
+        const res = await POST(buildRequest({ orderId: 'RES-TEST-001' }) as any);
+        expect(res.status).toBe(409);
+        expect(mockPrismaMethods.reserva.update).not.toHaveBeenCalled();
+    });
+
+    it('el admin puede confirmar manualmente sin consultar a Bold', async () => {
+        const { consultarTransaccionBold } = await import('@/lib/bold');
+        const res = await POST(buildRequest({ orderId: 'RES-TEST-001' }) as any);
+        expect(res.status).toBe(200);
+        expect(consultarTransaccionBold).not.toHaveBeenCalled();
     });
 
     // ── Reserva individual ─────────────────────────────────────────────────────
