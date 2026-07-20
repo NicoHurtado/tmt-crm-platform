@@ -35,16 +35,38 @@ function getColombiaYMD(fecha: Date): string {
     }).format(fecha); // "YYYY-MM-DD"
 }
 
+/** Hora usada cuando la reserva no trae una hora válida, para no perder el evento. */
+export const HORA_FALLBACK = '08:00';
+
+/**
+ * Normaliza la hora de la reserva a "HH:MM" 24h, o null si no es una hora válida.
+ *
+ * `Reserva.hora` es un String sin restricción de formato, y algunos formularios
+ * (tours compartidos y POR_PERSONA) la dejaban vacía. Antes eso se colaba hasta el
+ * dateTime del evento como "T00:undefined:00" y Google devolvía 400: la reserva
+ * quedaba confirmada pero sin evento, sin que nadie se enterara.
+ */
+export function parseHoraReserva(hora: string | null | undefined): string | null {
+    if (!hora) return null;
+    const match = String(hora).trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    const horas = Number(match[1]);
+    const minutos = Number(match[2]);
+    if (horas > 23 || minutos > 59) return null;
+    return `${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}`;
+}
+
 /**
  * Construye el dateTime ISO (sin offset) para un evento de Google Calendar a partir
  * de la fecha almacenada y la hora "HH:mm" de la reserva, anclado al día de Colombia.
  * El timeZone del evento ('America/Bogota') le da el offset correcto a Google.
+ *
+ * Si la hora no es válida cae a HORA_FALLBACK: es preferible un evento con hora por
+ * confirmar (el título lo advierte) a no tener evento en el calendario.
  */
-function buildColombiaDateTime(fecha: Date, hora: string): string {
-    const [horas, minutos] = hora.split(':').map(Number);
-    const hh = String(horas).padStart(2, '0');
-    const mm = String(minutos).padStart(2, '0');
-    return `${getColombiaYMD(fecha)}T${hh}:${mm}:00`;
+export function buildColombiaDateTime(fecha: Date, hora: string): string {
+    const horaNormalizada = parseHoraReserva(hora) ?? HORA_FALLBACK;
+    return `${getColombiaYMD(fecha)}T${horaNormalizada}:00`;
 }
 
 /**
@@ -102,8 +124,12 @@ function formatEventDetails(reserva: ReservaConRelaciones): {
 
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-    // Título del evento
-    const summary = `Reserva #${reserva.codigo} - ${reserva.nombreCliente}`;
+    // Título del evento. Si la reserva no trae hora válida el evento se ancla a
+    // HORA_FALLBACK, así que hay que advertirlo en el título para que el equipo la confirme.
+    const horaValida = parseHoraReserva(reserva.hora);
+    const summary = horaValida
+        ? `Reserva #${reserva.codigo} - ${reserva.nombreCliente}`
+        : `⚠️ HORA POR CONFIRMAR - Reserva #${reserva.codigo} - ${reserva.nombreCliente}`;
 
     // Determinar origen y destino según el tipo de servicio
     let origenEvento = '';

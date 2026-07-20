@@ -515,6 +515,23 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                         />
                     </div>
 
+                    {/* Hora de salida: se auto-rellena desde infoTourCompartido.salida cuando
+                        el admin la configuró, pero queda editable y es obligatoria — sin hora
+                        el evento de Google Calendar no se crea. */}
+                    <div>
+                        <label className={labelClass}>{t('tracking.hora', language)} *</label>
+                        <TimeInput
+                            value={formData.hora}
+                            onChange={(value) => updateFormData({ hora: value })}
+                            className={inputClass}
+                            required
+                        />
+                        <p className="text-xs text-gray-400 mt-1.5">
+                            {language === 'es'
+                                ? 'Hora de salida del tour'
+                                : 'Tour departure time'}
+                        </p>
+                    </div>
 
                     {/* Passengers Count */}
                     <div>
@@ -589,6 +606,22 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                             required
                             className={inputClass}
                         />
+                    </div>
+
+                    {/* Hora de recogida: obligatoria — sin ella el evento de Google Calendar no se crea. */}
+                    <div>
+                        <label className={labelClass}>{t('tracking.hora', language)} *</label>
+                        <TimeInput
+                            value={formData.hora}
+                            onChange={(value) => updateFormData({ hora: value })}
+                            className={inputClass}
+                            required
+                        />
+                        <p className="text-xs text-gray-400 mt-1.5">
+                            {language === 'es'
+                                ? 'Hora de recogida del cliente'
+                                : 'Customer pickup time'}
+                        </p>
                     </div>
 
                     {/* Pickup address */}

@@ -43,10 +43,13 @@ export interface ServiceDescriptor {
  * Custom admin fields (camposPersonalizados) are handled separately in DynamicFields.
  */
 export function getCamposBuiltin(service: ServiceDescriptor): CampoBuiltin[] {
-    // Shared tours have a minimal, fixed set of fields
+    // Shared tours have a minimal, fixed set of fields.
+    // `hora` se auto-rellena desde infoTourCompartido.salida cuando está configurada,
+    // pero sigue siendo obligatoria: sin ella el evento de Google Calendar no se crea.
     if (service.esCompartido) {
         return [
             { id: 'fecha', required: true, labelEs: 'Fecha', labelEn: 'Date' },
+            { id: 'hora', required: true, labelEs: 'Hora', labelEn: 'Time' },
             { id: 'numeroPasajeros', required: true, labelEs: 'Pasajeros', labelEn: 'Passengers' },
         ];
     }
@@ -55,6 +58,7 @@ export function getCamposBuiltin(service: ServiceDescriptor): CampoBuiltin[] {
     if (service.tipoTarifa === 'POR_PERSONA') {
         return [
             { id: 'fecha', required: true, labelEs: 'Fecha', labelEn: 'Date' },
+            { id: 'hora', required: true, labelEs: 'Hora', labelEn: 'Time' },
             { id: 'numeroPasajeros', required: true, labelEs: 'Pasajeros', labelEn: 'Passengers' },
             { id: 'lugarRecogida', required: true, labelEs: 'Dirección de recogida', labelEn: 'Pickup address' },
         ];
