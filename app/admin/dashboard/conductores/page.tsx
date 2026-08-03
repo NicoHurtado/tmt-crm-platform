@@ -524,7 +524,8 @@ export default function ConductoresPage() {
           </DialogHeader>
           <div className="py-2 space-y-3">
             <p className="text-sm text-neutral-600">
-              Envía este link al conductor por WhatsApp. Es de un solo uso y expira en 7 días.
+              Envía este link a tus conductores por WhatsApp. Lo pueden usar varios conductores
+              (cada uno se registra por separado) y expira en 30 días.
             </p>
             {inviteLoading ? (
               <div className="h-10 rounded bg-neutral-100 animate-pulse" />

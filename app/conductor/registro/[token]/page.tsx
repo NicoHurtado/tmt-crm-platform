@@ -6,19 +6,22 @@ import { FiLoader, FiCheckCircle, FiAlertTriangle, FiCamera } from 'react-icons/
 
 type Status = 'loading' | 'valid' | 'invalid' | 'submitting' | 'done';
 
+const EMPTY_FORM = {
+    nombre: '',
+    telefono: '',
+    whatsapp: '',
+    documento: '',
+    placa: '',
+    foto: '' as string,
+};
+
 export default function ConductorRegistroPage({ params }: { params: { token: string } }) {
     const { token } = params;
     const [status, setStatus] = useState<Status>('loading');
     const [error, setError] = useState<string>('');
+    const [formError, setFormError] = useState<string>('');
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
-    const [form, setForm] = useState({
-        nombre: '',
-        telefono: '',
-        whatsapp: '',
-        documento: '',
-        placa: '',
-        foto: '' as string,
-    });
+    const [form, setForm] = useState(EMPTY_FORM);
 
     useEffect(() => {
         let cancelled = false;
@@ -47,15 +50,16 @@ export default function ConductorRegistroPage({ params }: { params: { token: str
         const file = e.target.files?.[0];
         if (!file) return;
         setUploadingPhoto(true);
+        setFormError('');
         try {
             const fd = new FormData();
             fd.append('file', file);
             const res = await fetch(`/api/conductor/registro/${token}/upload`, { method: 'POST', body: fd });
             const data = await res.json();
             if (data.success) setForm((prev) => ({ ...prev, foto: data.url }));
-            else alert(data.error || 'Error al subir la foto');
+            else setFormError(data.error || 'Error al subir la foto');
         } catch {
-            alert('Error al subir la foto');
+            setFormError('Error al subir la foto');
         } finally {
             setUploadingPhoto(false);
         }
@@ -63,6 +67,7 @@ export default function ConductorRegistroPage({ params }: { params: { token: str
 
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setFormError('');
         setStatus('submitting');
         try {
             const res = await fetch(`/api/conductor/registro/${token}`, {
@@ -73,14 +78,23 @@ export default function ConductorRegistroPage({ params }: { params: { token: str
             const data = await res.json();
             if (res.ok) {
                 setStatus('done');
+            } else if (res.status === 404 || res.status === 410) {
+                setError(data.error || 'Link no válido');
+                setStatus('invalid');
             } else {
-                alert(data.error || 'Error al registrar');
+                setFormError(data.error || 'Error al registrar');
                 setStatus('valid');
             }
         } catch {
-            alert('Error de conexión');
+            setFormError('Error de conexión. Revisa tu internet e intenta de nuevo.');
             setStatus('valid');
         }
+    };
+
+    const registrarOtro = () => {
+        setForm(EMPTY_FORM);
+        setFormError('');
+        setStatus('valid');
     };
 
     if (status === 'loading') {
@@ -110,8 +124,17 @@ export default function ConductorRegistroPage({ params }: { params: { token: str
                 <div className="max-w-md w-full bg-neutral-900 border border-[#D6A75D]/30 rounded-2xl p-8 text-center">
                     <FiCheckCircle className="mx-auto text-4xl text-[#D6A75D] mb-3" />
                     <h1 className="text-xl font-bold text-white mb-2">¡Registro exitoso!</h1>
-                    <p className="text-sm text-neutral-300">Tus datos han sido enviados a Transportes Medellín Travel.</p>
+                    <p className="text-sm text-neutral-300">
+                        Quedaste registrado en Transportes Medellín Travel. Ya apareces en la plataforma.
+                    </p>
                     <p className="text-xs text-neutral-500 mt-4">Ya puedes cerrar esta ventana.</p>
+                    <button
+                        type="button"
+                        onClick={registrarOtro}
+                        className="mt-5 w-full py-2.5 text-sm font-medium text-[#D6A75D] border border-[#D6A75D]/40 rounded-lg hover:bg-[#D6A75D]/10 transition-colors"
+                    >
+                        Registrar otro conductor
+                    </button>
                 </div>
             </div>
         );
@@ -128,6 +151,13 @@ export default function ConductorRegistroPage({ params }: { params: { token: str
                 </div>
 
                 <form onSubmit={submit} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 sm:p-8 space-y-5">
+                    {formError && (
+                        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-950/40 border border-red-900/50">
+                            <FiAlertTriangle className="text-red-400 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-red-200">{formError}</p>
+                        </div>
+                    )}
+
                     <Field label="Nombre completo" required>
                         <input
                             type="text"

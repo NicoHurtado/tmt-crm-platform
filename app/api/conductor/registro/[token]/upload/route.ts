@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { uploadImageToBlob, UPLOAD_ERRORS } from '@/lib/upload';
+import { checkInvite } from '@/lib/conductor-invite';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,10 +9,10 @@ export const dynamic = 'force-dynamic';
  * Upload público gateado por token de invite válido.
  */
 export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
-    const invite = await prisma.conductorInvite.findUnique({ where: { token: params.token } });
-    if (!invite) return NextResponse.json({ success: false, error: 'Link inválido' }, { status: 404 });
-    if (invite.usedAt) return NextResponse.json({ success: false, error: 'Link ya utilizado' }, { status: 410 });
-    if (invite.expiresAt < new Date()) return NextResponse.json({ success: false, error: 'Link expirado' }, { status: 410 });
+    const invite = await checkInvite(params.token);
+    if (!invite.ok) {
+        return NextResponse.json({ success: false, error: invite.error }, { status: invite.status });
+    }
 
     try {
         const formData = await request.formData();

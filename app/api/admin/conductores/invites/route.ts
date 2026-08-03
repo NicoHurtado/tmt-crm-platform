@@ -6,11 +6,25 @@ import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-const INVITE_TTL_DAYS = 7;
+const INVITE_TTL_DAYS = 30;
+
+/** Base pública del sitio: preferimos la config explícita y caemos al origin del request. */
+function resolveBaseUrl(request: Request): string {
+    const configured = process.env.NEXT_PUBLIC_APP_URL;
+    if (configured) return configured.replace(/\/$/, '');
+
+    const origin = request.headers.get('origin');
+    if (origin) return origin.replace(/\/$/, '');
+
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+    const proto = request.headers.get('x-forwarded-proto') || (host.startsWith('localhost') ? 'http' : 'https');
+    return host ? `${proto}://${host}` : '';
+}
 
 /**
  * POST /api/admin/conductores/invites
- * Genera un link único para que un conductor se auto-registre.
+ * Genera un link de registro reutilizable: cualquier cantidad de conductores
+ * puede registrarse con el mismo link mientras no expire.
  */
 export async function POST(request: Request) {
     try {
@@ -30,12 +44,10 @@ export async function POST(request: Request) {
             },
         });
 
-        const origin = request.headers.get('origin') || request.headers.get('host') || '';
-        const baseUrl = origin.startsWith('http') ? origin : `https://${origin}`;
-        const url = `${baseUrl}/conductor/registro/${token}`;
+        const url = `${resolveBaseUrl(request)}/conductor/registro/${token}`;
 
         return NextResponse.json({
-            data: { token: invite.token, expiresAt: invite.expiresAt, url },
+            data: { token: invite.token, expiresAt: invite.expiresAt, url, ttlDays: INVITE_TTL_DAYS },
         }, { status: 201 });
     } catch (error) {
         console.error('Error creating conductor invite:', error);
