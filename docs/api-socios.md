@@ -208,6 +208,59 @@ Acordado para el piloto. Se añaden si el volumen lo justifica:
 
 Estas notas no van en la guía que se entrega al socio.
 
+### Probar en local (sin tocar producción)
+
+Levanta una base local en Docker con datos mínimos. `.env.local` apunta a producción,
+así que las variables se pasan en línea para sobrescribirla.
+
+```bash
+# 1. Base de datos local
+docker run -d --name tmt-local-db \
+  -e POSTGRES_PASSWORD=tmt -e POSTGRES_USER=tmt -e POSTGRES_DB=tmt \
+  -p 5433:5432 postgres:16-alpine
+
+export LOCAL_DB="postgresql://tmt:tmt@localhost:5433/tmt?schema=public"
+
+# 2. Crear el esquema (db push, no migrate: el historial de migraciones del repo
+#    está incompleto — ver "Deuda conocida" abajo)
+DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" npx prisma db push
+
+# 3. Datos: servicio de aeropuerto con tarifas reales, socios y usuario admin
+DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" npx tsx prisma/seed-socios-local.ts
+DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" SOCIO_HOUSY_TEST_API_KEY=llave-local \
+  npx tsx prisma/seed-socios.ts
+DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" npx tsx prisma/seed.ts
+
+# 4. Servidor. Calendario desactivado y SMTP inválido para no mandar correos reales
+#    (el correo falla, se registra en consola y la reserva se crea igual)
+DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" \
+  DISABLE_CALENDAR_SYNC=true GMAIL_APP_PASSWORD=invalida \
+  npm run dev
+```
+
+Con eso: `servicioId` = `local-aeropuerto`, `x-api-key` = `llave-local`, admin en
+`/admin/login` con usuario `admin` / clave `admin`, y `npx prisma studio` para ver las
+tablas `Socio` y `SocioReserva` en el navegador.
+
+Al terminar: `docker rm -f tmt-local-db`.
+
+### Deuda conocida: migraciones desincronizadas
+
+`prisma migrate status` reporta que la base de producción tiene 5 migraciones que **no
+están en `prisma/migrations/`**:
+
+```
+20260604151007_add_precio_olaya_aeropuerto
+20260619120000_add_aliado_imagen
+20260622164500_add_categoria_modelo_precio
+20260623120000_add_comision_por_persona_aliado
+20260624120000_remove_servicio_orden
+```
+
+La causa probable es que `.gitignore` incluye `*.sql`, así que las migraciones solo
+entran al repo si se fuerzan con `git add -f`, y esas cinco no se forzaron. Conviene
+recuperarlas antes de correr cualquier comando de migración en producción.
+
 ### Puesta en marcha
 
 ```bash
