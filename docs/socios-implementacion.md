@@ -158,12 +158,14 @@ tipeo del socio habría creado el traslado tres días después sin avisar. Se co
 comparando el ida y vuelta de la fecha (commit `c147561`). El 29 de febrero de un año
 bisiesto sigue siendo válido.
 
-### Dos comportamientos a decidir
+### Tolerancias intencionales
 
-- **Se aceptan fechas en el pasado.** Es claramente un error del socio, pero no se
-  restringió para no meter validaciones de más en el piloto. Es una línea si se quiere.
-- **`numeroPasajeros: "3"` como texto se acepta** y un `idioma` desconocido cae a `ES` en
-  silencio. Tolerancia intencional para que integrar sea fácil.
+No son descuidos: se decidieron así para el piloto.
+
+- **Se aceptan fechas en el pasado.** Decisión tomada: el socio valida de su lado. Está
+  documentado en el contrato que se le entrega.
+- **`numeroPasajeros: "3"` como texto se acepta** (se convierte a número) y un `idioma`
+  desconocido cae a `ES` en silencio, para que integrar sea fácil.
 
 ---
 
@@ -175,39 +177,92 @@ la nueva (se comprobó con `tests/unit/bold.test.ts`). El archivo
 `tests/integration/socios.test.ts` **está sin ejecutar**: correrlo con Node 20+ es lo
 primero que debería hacer quien tome esto.
 
-**Migraciones desincronizadas.** `prisma migrate status` reporta 5 migraciones aplicadas
-en producción que no están en `prisma/migrations/`:
-
-```
-20260604151007_add_precio_olaya_aeropuerto
-20260619120000_add_aliado_imagen
-20260622164500_add_categoria_modelo_precio
-20260623120000_add_comision_por_persona_aliado
-20260624120000_remove_servicio_orden
-```
-
-La causa probable: `.gitignore` incluye `*.sql`, así que las migraciones solo llegan al
-repo si se fuerzan con `git add -f`, y esas cinco no se forzaron. **Conviene recuperarlas
-antes de correr cualquier comando de migración contra producción.**
+**Faltan archivos de migraciones antiguas en el repo.** `prisma migrate status` reporta 5
+migraciones que están **aplicadas en la base** pero cuyo `.sql` no está en el repo
+(`.gitignore` incluye `*.sql`). Los cambios sí están en producción; lo perdido son los
+archivos. `prisma migrate deploy` funciona igual — se ensayó sobre una réplica del
+historial de producción y luego se aplicó de verdad, sin novedad. Para bases nuevas se usa
+`prisma db push`, que no depende del historial. Detalle completo en
+[`api-socios.md`](./api-socios.md), sección "Nota sobre las migraciones".
 
 **`prisma/seed-sandbox.ts` está roto** — llama a `prisma.reservaAdicional`, un modelo que
 ya no existe. Por eso se escribió `seed-socios-local.ts`.
 
 ---
 
-## Para desplegar
+## Estado en producción
+
+Ejecutado el **3 de agosto de 2026** sobre la base real:
+
+| | |
+|---|---|
+| Migración `20260803120000_add_socios_api` | ✅ aplicada |
+| Socios `housy` y `housy-test` | ✅ creados y activos, con sus llaves |
+| Verificación antes/después | tablas 17 → 19 · `Reserva` con sus 49 columnas y 1.645 registros intactos |
+| Cotización contra el catálogo real | ✅ JMC $140.000 · Olaya $80.000 · Camioneta $180.000 · Van $240.000 · nocturno +$20.000 |
+
+El `servicioId` de aeropuerto en producción es **`cmihxd4vy00159svu4opysoho`**.
+
+**Falta desplegar el código.** Hasta que `feat/api-socios` llegue a `main` y Vercel
+publique, las rutas no responden en el dominio de producción. La base ya está lista, así
+que el equipo puede probar desde local apuntando a producción (ver abajo).
+
+Las llaves no van en este documento. Para volver a verlas:
 
 ```bash
-npx prisma migrate deploy    # dos CREATE TABLE, no tocan datos existentes
 npx tsx -r dotenv/config prisma/seed-socios.ts dotenv_config_path=.env.local
 ```
 
-El seed imprime las llaves y **conserva la existente** si el socio ya está creado, así que
-es seguro repetirlo. Las llaves se entregan por canal seguro; no van al repositorio.
+Es idempotente y **conserva la llave existente**, así que se puede correr sin miedo a
+invalidarle el acceso a un socio ya integrado.
 
-Se crean dos socios: `housy` y `housy-test`. El segundo es para que integren sin ensuciar
-la operación: sus reservas salen con `origen = 'socio:housy-test'` y se filtran y borran
-desde el admin al terminar.
+---
 
-Antes de correr `migrate deploy` en producción, resolver lo de las migraciones
-desincronizadas.
+## Para quien retome esto (incluido otro agente de IA)
+
+Contexto mínimo para trabajar sobre esta rama sin romper nada:
+
+**Lo que NO se debe tocar.** Esta API es independiente a propósito. No modifiques
+`/api/external/*` (marketing), `/api/n8n/*` (bot de WhatsApp) ni `/api/public/*`
+(cotizador del bot): son otros consumidores con sus propios contratos y tests.
+
+**De dónde sale el precio.** De `recalcularPrecioWebDirecto()` en `lib/priceCalculator.ts`.
+Si necesitas cambiar cómo se cotiza, entiende primero que esa función la comparte
+`POST /api/reservas`: tocarla afecta el flujo web de clientes finales. Hay una trampa
+conocida — si le pasas `municipio: 'OTRO'` sin `municipioConfigId`, devuelve todo en cero.
+Por eso `lib/socios/cotizar.ts` le pasa `municipio: null`.
+
+**Cómo probar sin romper producción.** Usa el entorno local con Docker de la sección de
+arriba. `.env.local` apunta a la base **real**, así que `npm run dev` a secas crea
+reservas de verdad, manda correos y crea eventos de calendario. Todas las variables van
+por delante del comando.
+
+**Si necesitas probar contra la base de producción**, hazlo solo en lectura: llama a
+`cotizar()` de `lib/socios/cotizar.ts` desde un script con `npx tsx`, sin levantar el
+servidor. Crear reservas contra producción dispara correos reales y eventos de calendario
+reales.
+
+**Los tests no se han ejecutado nunca** (Node 18 no puede correr Vitest 4). Si tienes
+Node 20+, `npm test` es lo primero que deberías hacer.
+
+**Antes de dar por bueno un cambio**, corre lo que sí funciona en Node 18:
+
+```bash
+npx tsc --noEmit                  # tiene 16 errores preexistentes en tests, ninguno en socios/
+npx next lint --dir app --dir lib # debe salir limpio
+NODE_OPTIONS=--max-old-space-size=6144 npm run build
+```
+
+El `--max-old-space-size` es necesario: el build se queda sin memoria con el heap por
+defecto de Node 18.
+
+**Si cambias `prisma/schema.prisma`**, genera la migración sin conectarte a ninguna base:
+
+```bash
+git show main:prisma/schema.prisma > /tmp/old.prisma
+npx prisma migrate diff --from-schema-datamodel /tmp/old.prisma \
+  --to-schema-datamodel prisma/schema.prisma --script
+```
+
+Revisa el SQL antes de guardarlo. Y recuerda forzar el archivo al repo con `git add -f`,
+porque `.gitignore` ignora `*.sql`.

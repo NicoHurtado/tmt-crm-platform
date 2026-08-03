@@ -201,6 +201,8 @@ Acordado para el piloto. Se añaden si el volumen lo justifica:
 - **Catálogo de servicios.** El `servicioId` del piloto es fijo y va en esta guía.
 - **Límite de peticiones.** No hay rate limiting. Si hace falta cortar el acceso, se
   desactiva la llave.
+- **Validación de fecha futura.** No se rechazan fechas pasadas: si mandas una, la reserva
+  se crea igual. Valida del lado tuyo que la fecha tenga sentido.
 
 ---
 
@@ -221,8 +223,8 @@ docker run -d --name tmt-local-db \
 
 export LOCAL_DB="postgresql://tmt:tmt@localhost:5433/tmt?schema=public"
 
-# 2. Crear el esquema (db push, no migrate: el historial de migraciones del repo
-#    está incompleto — ver "Deuda conocida" abajo)
+# 2. Crear el esquema. Se usa db push y no migrate porque al repo le faltan
+#    archivos de migración antiguos — ver "Nota sobre las migraciones" abajo
 DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" npx prisma db push
 
 # 3. Datos: servicio de aeropuerto con tarifas reales, socios y usuario admin
@@ -244,10 +246,10 @@ tablas `Socio` y `SocioReserva` en el navegador.
 
 Al terminar: `docker rm -f tmt-local-db`.
 
-### Deuda conocida: migraciones desincronizadas
+### Nota sobre las migraciones
 
-`prisma migrate status` reporta que la base de producción tiene 5 migraciones que **no
-están en `prisma/migrations/`**:
+`prisma migrate status` reporta 5 migraciones que están **aplicadas en la base** pero cuyo
+archivo **no está en `prisma/migrations/`**:
 
 ```
 20260604151007_add_precio_olaya_aeropuerto
@@ -257,17 +259,36 @@ están en `prisma/migrations/`**:
 20260624120000_remove_servicio_orden
 ```
 
-La causa probable es que `.gitignore` incluye `*.sql`, así que las migraciones solo
-entran al repo si se fuerzan con `git add -f`, y esas cinco no se forzaron. Conviene
-recuperarlas antes de correr cualquier comando de migración en producción.
+Ojo con la dirección: **los cambios sí están en producción** (`precioOlaya`, `categoria`,
+`modeloPrecio`, etc. existen y se usan). Lo que se perdió son los archivos `.sql`, porque
+`.gitignore` incluye `*.sql` y solo llegan al repo si se fuerzan con `git add -f`.
 
-### Puesta en marcha
+Consecuencias prácticas:
+
+- `prisma migrate deploy` **funciona normal**: aplica solo las migraciones del repo que
+  falten en la base, e ignora las que sobran en la base. Se ensayó sobre una réplica del
+  historial de producción antes de aplicarlo, y luego en producción sin novedad.
+- `prisma migrate dev` **no se debe usar contra producción** — querría resetear.
+- Para bases nuevas (local, staging), usar `prisma db push`, que parte del
+  `schema.prisma` actual y no depende del historial.
+
+### Estado de la puesta en marcha
+
+Ya ejecutado en producción el **3 de agosto de 2026**:
+
+- ✅ Migración `20260803120000_add_socios_api` aplicada. Verificado antes/después: las
+  tablas pasaron de 17 a 19, `Reserva` conservó sus 49 columnas y sus 1.645 registros.
+- ✅ Socios `housy` y `housy-test` creados y activos, cada uno con su llave.
+- ✅ Cotización verificada contra el catálogo real (JMC $140.000 / Olaya $80.000 /
+  Camioneta $180.000 / Van $240.000 / recargo nocturno +$20.000).
+
+Queda pendiente **desplegar el código** (la rama `feat/api-socios` a `main`): hasta
+entonces las rutas no responden en el dominio de producción.
+
+Para repetirlo en otro entorno:
 
 ```bash
-# 1. Aplicar la migración (solo crea las tablas Socio y SocioReserva)
 npx prisma migrate deploy
-
-# 2. Sembrar los socios y obtener sus llaves
 npx tsx -r dotenv/config prisma/seed-socios.ts dotenv_config_path=.env.local
 ```
 
@@ -278,7 +299,8 @@ rotarla a propósito:
 SOCIO_HOUSY_API_KEY=nueva_llave npx tsx -r dotenv/config prisma/seed-socios.ts dotenv_config_path=.env.local
 ```
 
-Las llaves se entregan por canal seguro y no se suben al repositorio.
+Las llaves se entregan por canal seguro y no se suben al repositorio. Para revocar el
+acceso de un socio: `activo: false` en su fila de `Socio` — no hace falta desplegar nada.
 
 ### Cómo entran las reservas
 
