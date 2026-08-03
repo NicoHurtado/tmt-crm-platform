@@ -67,6 +67,12 @@ export function parseFecha(valor: unknown): Date {
     // y no se corre en el calendario ni en los correos. Misma convención del resto del proyecto.
     const fecha = new Date(`${valor}T12:00:00.000Z`);
     if (Number.isNaN(fecha.getTime())) throw new Error('fecha inválida');
+    // Una fecha que no existe (ej. 2026-02-31) NO produce NaN: JavaScript la corre al mes
+    // siguiente. Sin esta comprobación, un error de tipeo del socio crearía el traslado en
+    // otro día sin avisar a nadie.
+    if (fecha.toISOString().slice(0, 10) !== valor) {
+        throw new Error(`fecha inexistente en el calendario: ${valor}`);
+    }
     return fecha;
 }
 

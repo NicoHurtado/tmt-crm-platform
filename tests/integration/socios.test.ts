@@ -445,6 +445,22 @@ describe('API de socios', () => {
         expect(body.error).toContain('YYYY-MM-DD');
     });
 
+    it('rechaza una fecha que no existe en el calendario en vez de correrla de mes', async () => {
+        const { POST } = await import('@/app/api/socios/reservas/route');
+        const res = await POST(
+            post(
+                'http://localhost/api/socios/reservas',
+                { ...BODY_RESERVA_VALIDO, fecha: '2026-02-31' },
+                'llave-de-prueba'
+            ) as any
+        );
+        const body = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(body.error).toContain('fecha inexistente');
+        expect(prisma.reserva.create).not.toHaveBeenCalled();
+    });
+
     it('guarda la fecha al mediodía UTC para que el día no se corra', async () => {
         const { POST } = await import('@/app/api/socios/reservas/route');
         await POST(post('http://localhost/api/socios/reservas', BODY_RESERVA_VALIDO, 'llave-de-prueba') as any);
