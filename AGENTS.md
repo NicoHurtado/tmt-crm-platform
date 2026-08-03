@@ -1,7 +1,7 @@
 # Transportes Medellín Travel
 
 ## Propósito
-Plataforma de reservas de transporte y turismo en Medellín (Colombia). 3 roles: **cliente final** (reserva online), **aliado** (hotel/airbnb/agencia con página co-branded y comisiones propias), **admin** (backoffice completo).
+Plataforma de reservas de transporte y turismo en Medellín (Colombia). 3 roles: **cliente final** (reserva online), **aliado** (hotel/airbnb/agencia con página co-branded y comisiones propias), **admin** (backoffice completo). Además, **socios de API**: apps externas que venden nuestro transporte desde su plataforma (ver `docs/api-socios.md`).
 
 ## Stack
 Next.js 14 (App Router) · TypeScript · Prisma 5 · PostgreSQL (Neon/Railway) · NextAuth v4 · Tailwind · Shadcn/ui · Vercel
@@ -12,15 +12,17 @@ app/
   (público)         landing, /reservas/*, /cotizacion/[linkId], /hotel/[codigo], /tracking, /payment/result, /rate/[id]
   aliados/[codigo]/ páginas co-branded
   admin/            backoffice (dashboard, reservas, servicios, aliados, conductores, estadísticas, calendario, cotizaciones, municipios, términos)
-  api/              58 rutas REST
+  api/              72 rutas REST, agrupadas por consumidor:
+                    public/* (bot, sin auth) · n8n/* · external/* (marketing) · socios/* (apps aliadas)
 components/
   admin/    landing/    reservas/wizard/ (7 pasos)    ui/ (shadcn barrel export)
 lib/
   bold.ts · priceCalculator.ts · state-transitions.ts · email-service.ts · email-templates.ts
   google-calendar-service.ts · prisma.ts (singleton) · auth.ts · exportUtils.ts
+  socios/ (cotizar · crear-reserva)
   hooks/useAliado · hooks/useAliadoCommission · hooks/useLanguage
   i18n/es.json · i18n/en.json
-prisma/schema.prisma (20 modelos) · middleware.ts (NextAuth Edge)
+prisma/schema.prisma (18 modelos) · middleware.ts (NextAuth Edge)
 ```
 
 ## Modelos Prisma
@@ -31,8 +33,11 @@ Aliado → ServicioAliado → TarifaAliado | PrecioVehiculoAliado | TarifaMunici
 Servicio → ServicioVehiculo | ServicioAdicional | TarifaMunicipioServicio | Calificacion
 Reserva → Asistente | ReservaAdicional | Calificacion
 Pedido (agrupa reservas multi-servicio)
+Socio → SocioReserva → Reserva (app externa que consume /api/socios/*)
 Conductor · MunicipioConfig · SiteContent (CMS clave-valor) · User (admin) · BdAntigua (legacy)
 ```
+
+**Socio ≠ Aliado.** Un `Aliado` es un hotel/agencia con página co-branded y comisión sobre el precio. Un `Socio` es solo un consumidor de API: cobra por su cuenta y nos manda la reserva ya pagada (`clientePaga: false`, `estadoPago: APROBADO`, `origen: socio:<codigo>`). No lleva comisión ni `aliadoId`.
 
 **EstadoReserva:** `PENDING_PAYMENT → CONFIRMED_UNASSIGNED → CONFIRMED_ASSIGNED → IN_PROGRESS → COMPLETED / CANCELLED / PAYMENT_FAILED`
 
@@ -52,6 +57,7 @@ Conductor · MunicipioConfig · SiteContent (CMS clave-valor) · User (admin) ·
 ## Convenciones Clave
 - API mutantes (POST/PUT/DELETE): `getServerSession(authOptions)` obligatorio
 - Webhooks n8n: `checkApiKey()` de `lib/api/n8n/_auth.ts`
+- API de socios: `resolveSocio()` de `app/api/socios/_auth.ts` (llave por socio en BD, revocable con `activo: false`)
 - `'use client'` solo cuando hay estado/efectos; default Server Component
 - Prisma exclusivamente vía singleton `@/lib/prisma`
 - Campos multiidioma: `Json { es: string, en: string }`

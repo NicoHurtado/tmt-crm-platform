@@ -186,6 +186,7 @@ model Reserva {
   modeloPrecio          ModeloPrecio?
   asistentes            Asistente[]
   calificacion          Calificacion?
+  socioReserva          SocioReserva?
   aliado                Aliado?            @relation(fields: [aliadoId], references: [id])
   conductor             Conductor?         @relation(fields: [conductorId], references: [id])
   municipioConfig       MunicipioConfig?   @relation(fields: [municipioConfigId], references: [id])
@@ -323,6 +324,43 @@ model MunicipioConfig {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   reservas  Reserva[]
+}
+
+/// Aplicación externa autorizada a consumir la API de socios (`/api/socios/*`).
+/// A diferencia de `Aliado` (hotel/agencia con página co-branded y comisión), un socio
+/// es solo un consumidor de API: captura al cliente en su propia plataforma, le cobra
+/// directamente y nos envía la reserva ya pagada.
+model Socio {
+  id        String         @id @default(cuid())
+  nombre    String
+  /// Identificador estable usado en `Reserva.origen` como `socio:<codigo>`.
+  codigo    String         @unique
+  apiKey    String         @unique
+  activo    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  reservas  SocioReserva[]
+
+  @@index([apiKey])
+}
+
+/// Vincula una `Reserva` con el socio que la creó y con el identificador que esa
+/// reserva tiene del lado del socio. El par (socioId, refExterna) es único: es lo que
+/// hace idempotente la creación cuando el socio reintenta por timeout.
+model SocioReserva {
+  id         String   @id @default(cuid())
+  socioId    String
+  reservaId  String   @unique
+  /// Id de la reserva en la plataforma del socio.
+  refExterna String
+  /// Request original recibido, tal cual, para conciliación y soporte.
+  payload    Json
+  createdAt  DateTime @default(now())
+  reserva    Reserva  @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+  socio      Socio    @relation(fields: [socioId], references: [id])
+
+  @@unique([socioId, refExterna])
+  @@index([socioId])
 }
 
 model SiteContent {
