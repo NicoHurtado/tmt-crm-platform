@@ -817,6 +817,13 @@ export default function TrackingPage({ params }: { params: { codigo: string } })
 
     const metodoPago = reserva.metodoPago || 'TARJETA';
     const isEfectivo = metodoPago === 'EFECTIVO';
+    // `clientePaga: false` = el traslado ya está pagado y no se le cobra nada al cliente:
+    // reservas de socios de API, cotizaciones marcadas "no cobrar" y cortesías. Esas
+    // reservas se guardan con metodoPago EFECTIVO para no aplicarles la comisión de Bold,
+    // así que sin esto la página le pediría al cliente pagar por segunda vez.
+    // `isEfectivo` se mantiene aparte porque además define la línea de tiempo (sin el
+    // paso "pendiente de pago"), y eso sí aplica igual a las reservas ya pagadas.
+    const yaPagado = reserva.clientePaga === false;
 
     const isAgency = reserva.aliado?.tipo === 'AGENCIA';
 
@@ -910,7 +917,12 @@ export default function TrackingPage({ params }: { params: { codigo: string } })
                                 <div>
                                     <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">{t.codigoReserva}</p>
                                     <p className="text-3xl font-bold text-[#D6A75D] tracking-wider font-mono">{reserva.codigo}</p>
-                                    {isEfectivo && !isAgency && (
+                                    {yaPagado ? (
+                                        <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-green-500/20 text-green-300 rounded-full text-xs font-medium ring-1 ring-green-500/30">
+                                            <span className="w-1.5 h-1.5 bg-green-400 rounded-full" />
+                                            {lang === 'ES' ? 'Pago ya realizado' : 'Already paid'}
+                                        </div>
+                                    ) : isEfectivo && !isAgency && (
                                         <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-green-500/20 text-green-300 rounded-full text-xs font-medium ring-1 ring-green-500/30">
                                             <span className="w-1.5 h-1.5 bg-green-400 rounded-full" />
                                             {lang === 'ES' ? 'Pago en Efectivo' : 'Cash Payment'}
@@ -1172,8 +1184,34 @@ export default function TrackingPage({ params }: { params: { codigo: string } })
                             </div>
                         )}
 
+                        {/* Ya pagado — el cliente no le entrega nada al conductor */}
+                        {yaPagado && reserva.estado !== 'CANCELLED' && (
+                            <div className="bg-green-50 rounded-2xl ring-1 ring-green-200 p-6">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-11 h-11 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                        <FiCheckCircle className="text-green-600" size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-green-900 mb-1">
+                                            {lang === 'ES' ? 'Pago ya realizado' : 'Payment already completed'}
+                                        </h3>
+                                        <p className="text-green-800 text-sm">
+                                            {lang === 'ES'
+                                                ? 'Este traslado ya está pagado.'
+                                                : 'This transfer is already paid.'}
+                                        </p>
+                                        <p className="text-sm font-semibold text-green-900 mt-2">
+                                            {lang === 'ES'
+                                                ? 'No debes entregarle dinero al conductor.'
+                                                : 'You do not need to pay the driver.'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Pago en Efectivo */}
-                        {isEfectivo && reserva.estado !== 'CANCELLED' && (
+                        {isEfectivo && !yaPagado && reserva.estado !== 'CANCELLED' && (
                             <div className="bg-green-50 rounded-2xl ring-1 ring-green-200 p-6">
                                 <div className="flex items-start gap-4">
                                     <div className="w-11 h-11 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
