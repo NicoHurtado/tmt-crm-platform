@@ -62,6 +62,8 @@ Conductor · MunicipioConfig · SiteContent (CMS clave-valor) · User (admin) ·
 - Prisma exclusivamente vía singleton `@/lib/prisma`
 - Campos multiidioma: `Json { es: string, en: string }`
 - Precios: `priceCalculator.ts` — el precio base de la reserva viene de `ServicioVehiculo.precio` (por capacidad de vehículo). Se suman adicionales (`camposDinamicos`), recargo nocturno y tarifa de municipio. En modo aliado la comisión viene de `PrecioVehiculoAliado` (porcentaje o fijo) por par (servicio, vehículo)
+- **Quién paga: `clientePaga`, nunca `metodoPago`.** `metodoPago: EFECTIVO` es contable (no pasó por Bold, no se aplica la comisión del 6%), *no* una instrucción de cobro. Las reservas de socios de API, las cotizaciones marcadas "no cobrar" y las cortesías entran como `EFECTIVO` pero con `clientePaga: false`, y **no se les cobra nada al cliente**. Todo texto de cara al cliente o al conductor debe mirar `clientePaga` primero — ver `tplReservaConfirmada` (`lib/email-templates.ts`) y `formatLineaPago` (`lib/google-calendar-service.ts`)
+- Errores de la API de socios: `SocioRequestError` (`lib/socios/errors.ts`) → `400`; cualquier otro → `500`. La guía del socio le dice que reintente ante `500` y que no reintente ante `400`, así que devolver `400` ante una falla nuestra le hace perder una reserva ya cobrada
 - Estados: solo `state-transitions.ts` cambia `estado` de reserva
 - Seeds: `upsert` en todo (idempotentes)
 - Tests: Vitest (unitarios/integración) + Playwright (E2E)
