@@ -31,14 +31,20 @@ async function main() {
         const existente = await prisma.socio.findUnique({ where: { codigo } });
         const apiKey = process.env[envKey] || existente?.apiKey || generarApiKey();
 
+        // `activo` NO se toca en el update: si alguien revocó el acceso de un socio
+        // poniéndolo en false, correr el seed no debe reactivarlo por accidente.
+        // Para reactivarlo se cambia el campo a mano en la base.
         const socio = await prisma.socio.upsert({
             where: { codigo },
-            update: { nombre, apiKey, activo: true },
+            update: { nombre, apiKey },
             create: { codigo, nombre, apiKey, activo: true },
         });
 
         const estado = existente ? 'actualizado' : 'creado';
         console.log(`✅ Socio ${estado}: ${socio.nombre} (codigo: ${socio.codigo})`);
+        if (!socio.activo) {
+            console.log(`   ⚠️  Este socio está DESACTIVADO: su llave no funciona hasta reactivarlo.`);
+        }
         console.log(`   origen de sus reservas: socio:${socio.codigo}`);
         console.log(`   x-api-key: ${socio.apiKey}\n`);
     }

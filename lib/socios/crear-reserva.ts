@@ -11,6 +11,7 @@ import {
 import { prisma } from '@/lib/prisma';
 import { categoriaDeServicio, modeloPrecioDeServicio } from '@/lib/servicio-categoria';
 import { buildDatosFromBody } from '@/types/reserva-datos';
+import { badRequest } from './errors';
 import {
     cargarServicioCotizable,
     cotizarServicio,
@@ -95,16 +96,47 @@ async function generarCodigoUnico(): Promise<string> {
 
 function parseTextoRequerido(valor: unknown, campo: string): string {
     if (typeof valor !== 'string' || valor.trim() === '') {
-        throw new Error(`${campo} es requerido`);
+        badRequest(`${campo} es requerido`);
     }
-    return valor.trim();
+    return (valor as string).trim();
 }
 
 function parseAeropuertoTipo(valor: unknown): 'DESDE' | 'HACIA' {
     if (valor !== 'DESDE' && valor !== 'HACIA') {
-        throw new Error('aeropuertoTipo debe ser DESDE (del aeropuerto) o HACIA (al aeropuerto)');
+        badRequest('aeropuertoTipo debe ser DESDE (del aeropuerto) o HACIA (al aeropuerto)');
     }
-    return valor;
+    return valor as 'DESDE' | 'HACIA';
+}
+
+/**
+ * El correo es el único canal por el que el huésped recibe su código de reserva, y un
+ * fallo de envío se registra pero no tumba la reserva. Si aceptáramos una dirección mal
+ * escrita, la reserva quedaría creada y el huésped nunca se enteraría. Mejor rechazarla
+ * y que el socio la corrija antes de cobrarle.
+ */
+function parseEmail(valor: unknown): string {
+    const email = parseTextoRequerido(valor, 'emailCliente');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        badRequest(`emailCliente no es una dirección de correo válida: ${email}`);
+    }
+    return email.toLowerCase();
+}
+
+/**
+ * El conductor contacta al huésped por WhatsApp, y el link se arma quitándole todo lo que
+ * no sea dígito al número. Sin indicativo de país el link no abre ningún chat, así que se
+ * exige formato internacional. Se aceptan espacios, guiones y paréntesis y se normaliza a
+ * `+<dígitos>` para que quede uniforme en el admin y en los correos.
+ */
+function parseWhatsapp(valor: unknown): string {
+    const crudo = parseTextoRequerido(valor, 'whatsappCliente');
+    const digitos = crudo.replace(/[^\d]/g, '');
+    if (!crudo.trim().startsWith('+') || digitos.length < 10 || digitos.length > 15) {
+        badRequest(
+            `whatsappCliente debe ir en formato internacional con indicativo, ej. +573001234567 (recibido: ${crudo})`
+        );
+    }
+    return `+${digitos}`;
 }
 
 async function buscarPorRefExterna(socioId: string, refExterna: string): Promise<ReservaSocio | null> {
@@ -121,7 +153,7 @@ export async function crearReservaSocio(
 ): Promise<ResultadoCreacion> {
     const faltantes = CAMPOS_REQUERIDOS.filter((campo) => !body[campo]);
     if (faltantes.length > 0) {
-        throw new Error(`Campos requeridos: ${faltantes.join(', ')}`);
+        badRequest(`Campos requeridos: ${faltantes.join(', ')}`);
     }
 
     const refExterna = parseTextoRequerido(body.refExterna, 'refExterna');
@@ -152,8 +184,8 @@ export async function crearReservaSocio(
           : null;
 
     const nombreCliente = parseTextoRequerido(body.nombreCliente, 'nombreCliente');
-    const whatsappCliente = parseTextoRequerido(body.whatsappCliente, 'whatsappCliente');
-    const emailCliente = parseTextoRequerido(body.emailCliente, 'emailCliente');
+    const whatsappCliente = parseWhatsapp(body.whatsappCliente);
+    const emailCliente = parseEmail(body.emailCliente);
 
     const cotizacion = cotizarServicio(servicio, {
         servicioId: servicio.id,

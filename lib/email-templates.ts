@@ -280,7 +280,12 @@ const trackingCta = (r: ReservaTemplate, lang: 'ES' | 'EN', isES: boolean): stri
 
 export const tplReservaConfirmada = (r: ReservaTemplate, lang: 'ES' | 'EN'): string => {
   const total = toNum(r.precioTotal);
-  const esEfectivo = r.metodoPago === 'EFECTIVO';
+  // `clientePaga: false` = el traslado ya está pagado y NO se le cobra nada al cliente al
+  // subirse (reservas de socios de API, cotizaciones marcadas "no cobrar", cortesías).
+  // Se evalúa antes que el método de pago: esas reservas entran como EFECTIVO para no
+  // aplicar la comisión de Bold, y sin esto el correo les pediría pagar de nuevo.
+  const yaPagado = r.clientePaga === false;
+  const esEfectivo = !yaPagado && r.metodoPago === 'EFECTIVO';
 
   const section = (isES: boolean): string => {
     const l: 'ES' | 'EN' = isES ? 'ES' : 'EN';
@@ -295,8 +300,10 @@ export const tplReservaConfirmada = (r: ReservaTemplate, lang: 'ES' | 'EN'): str
       ${sectionHead(isES ? 'Detalles del Servicio' : 'Service Details')}
       ${detailsTable(serviceDetailsRows(r, isES))}
       ${sectionHead(isES ? 'Resumen de Precio' : 'Price Summary')}
-      ${priceTable(priceRows, isES ? 'Total a Pagar' : 'Total Amount', formatPrice(total))}
-      ${esEfectivo
+      ${priceTable(priceRows, yaPagado ? (isES ? 'Total' : 'Total') : (isES ? 'Total a Pagar' : 'Total Amount'), formatPrice(total))}
+      ${yaPagado
+        ? alertBox(`<strong>${isES ? 'Pago ya realizado.' : 'Payment already completed.'}</strong> ${isES ? 'Este traslado ya está pagado: <strong>no debes entregarle dinero al conductor</strong>.' : 'This transfer is already paid: <strong>you do not need to pay the driver</strong>.'}`, 'success')
+        : esEfectivo
         ? alertBox(`<strong>${isES ? 'Pago en Efectivo:' : 'Cash Payment:'}</strong> ${isES ? `Ten listos <strong>${formatPrice(total)}</strong> para pagar al conductor al inicio del servicio.` : `Please have <strong>${formatPrice(total)}</strong> ready to pay the driver at the start of the service.`}`, 'info')
         : alertBox(`<strong>${isES ? 'Pago completado con tarjeta.' : 'Card payment confirmed.'}</strong> ${isES ? 'Puedes ver tu recibo en el link de seguimiento.' : 'You can view your receipt on the tracking link.'}`, 'success')
       }

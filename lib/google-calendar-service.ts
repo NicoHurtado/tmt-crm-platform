@@ -98,6 +98,27 @@ function getCalendarClient() {
 }
 
 /**
+ * Línea de "Método de Pago" del evento, tal como la lee el conductor.
+ *
+ * `clientePaga: false` significa que el traslado ya está pagado y NO se le cobra nada al
+ * cliente al subirse — reservas de socios de API, cotizaciones marcadas "no cobrar" y
+ * cortesías. Esas reservas se guardan con `metodoPago: EFECTIVO` para que no se les
+ * aplique la comisión de Bold, así que sin esta comprobación el evento diría "EFECTIVO"
+ * y el conductor le pediría plata a un cliente que ya pagó.
+ */
+function formatLineaPago(reserva: { metodoPago: string; estadoPago: string | null; clientePaga?: boolean | null }): string {
+    if (reserva.clientePaga === false) {
+        return '💳 Método de Pago: YA PAGADO — NO COBRAR AL CLIENTE';
+    }
+    const metodoPagoLabel = reserva.metodoPago === 'EFECTIVO' ? 'EFECTIVO' : 'TARJETA';
+    const estadoPagoBold =
+        reserva.metodoPago === 'TARJETA'
+            ? (reserva.estadoPago === 'APROBADO' ? 'Pagado' : 'Pendiente')
+            : null;
+    return `💳 Método de Pago: ${metodoPagoLabel}${estadoPagoBold ? ` (${estadoPagoBold})` : ''}`;
+}
+
+/**
  * Formatea la información de la reserva para el evento de calendario
  */
 function formatEventDetails(reserva: ReservaConRelaciones): {
@@ -116,11 +137,7 @@ function formatEventDetails(reserva: ReservaConRelaciones): {
         return `${hour12}:${minutes} ${suffix}`;
     };
 
-    const metodoPagoLabel = reserva.metodoPago === 'EFECTIVO' ? 'EFECTIVO' : 'TARJETA';
-    const estadoPagoBold =
-        reserva.metodoPago === 'TARJETA'
-            ? (reserva.estadoPago === 'APROBADO' ? 'Pagado' : 'Pendiente')
-            : null;
+    const lineaPago = formatLineaPago(reserva);
 
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -234,7 +251,7 @@ function formatEventDetails(reserva: ReservaConRelaciones): {
 
     descripcionParts.push(
         `💰 Precio Total: $${Number(reserva.precioTotal).toLocaleString('es-CO')} COP`,
-        `💳 Método de Pago: ${metodoPagoLabel}${estadoPagoBold ? ` (${estadoPagoBold})` : ''}`,
+        lineaPago,
         ``,
     );
 
@@ -505,12 +522,6 @@ function formatTourCompartidoEventDetails(
 
     // Agregar detalle de cada reserva
     reservas.forEach((reserva, index) => {
-        const metodoPagoLabel = reserva.metodoPago === 'EFECTIVO' ? 'EFECTIVO' : 'TARJETA';
-        const estadoPagoBold =
-            reserva.metodoPago === 'TARJETA'
-                ? (reserva.estadoPago === 'APROBADO' ? 'Pagado' : 'Pendiente')
-                : null;
-
         descripcionParts.push(
             ``,
             `🎫 RESERVA ${index + 1}: #${reserva.codigo}`,
@@ -521,7 +532,7 @@ function formatTourCompartidoEventDetails(
             `🕒 Hora: ${formatHoraAmPm(reserva.hora)}`,
             `👥 Pasajeros: ${reserva.numeroPasajeros}`,
             `💰 Precio: $${Number(reserva.precioTotal).toLocaleString('es-CO')} COP`,
-            `💳 Método de Pago: ${metodoPagoLabel}${estadoPagoBold ? ` (${estadoPagoBold})` : ''}`,
+            formatLineaPago(reserva),
             `📊 Estado: ${reserva.estado.replace(/_/g, ' ')}`,
             `🔗 Tracking: ${APP_URL}/tracking/${reserva.codigo}`
         );

@@ -5,6 +5,7 @@ import {
     ejecutarEfectosReserva,
     formatReservaSocio,
 } from '@/lib/socios/crear-reserva';
+import { SocioRequestError } from '@/lib/socios/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,10 +37,20 @@ export async function POST(request: NextRequest) {
             { status: duplicado ? 200 : 201 }
         );
     } catch (error) {
-        console.error('[socios/reservas]', error);
+        // Petición inválida: el socio debe corregirla, reintentar no sirve.
+        if (error instanceof SocioRequestError) {
+            return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+        }
+        // Falla nuestra (base de datos, bug). Se responde 500 para que el socio SÍ
+        // reintente con la misma refExterna: la idempotencia hace que sea seguro, y así
+        // no pierde una reserva que ya le cobró al huésped. El detalle no se expone.
+        console.error('[socios/reservas] Error inesperado:', error);
         return NextResponse.json(
-            { ok: false, error: error instanceof Error ? error.message : String(error) },
-            { status: 400 }
+            {
+                ok: false,
+                error: 'Error interno al crear la reserva. Reintenta con la misma refExterna.',
+            },
+            { status: 500 }
         );
     }
 }

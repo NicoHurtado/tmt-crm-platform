@@ -1,14 +1,27 @@
 # API de Socios — TMT Travel
 
-API para que aplicaciones externas ofrezcan nuestro transporte dentro de su propia
-plataforma. El socio captura los datos del cliente, le cobra directamente y nos envía la
-reserva ya pagada. La liquidación entre el socio y TMT se hace por fuera de la API.
-
-Primer socio: **Housy**. Piloto: traslados de aeropuerto (llegada y salida).
+API para que tu plataforma ofrezca nuestro transporte a tus huéspedes. Tú capturas los
+datos, nos consultas el precio, le cobras a tu huésped y nos envías la reserva ya pagada.
+Nosotros prestamos el servicio. La liquidación entre nosotros se hace por fuera de la API.
 
 - **Base URL:** `https://www.medellintransportes.com`
 - **Moneda:** COP (pesos colombianos), siempre enteros sin decimales
 - **Formato:** JSON en request y response
+
+---
+
+## El flujo, en dos llamadas
+
+```
+1. Tu huésped llena el formulario en tu plataforma
+2. POST /api/socios/cotizar   ──▶  te devolvemos el precio
+3. Tu huésped paga en tu pasarela
+4. POST /api/socios/reservas  ──▶  creamos la reserva y te devolvemos el código
+```
+
+Entre el paso 2 y el 4 no hay estado que mantener de tu lado: la cotización no reserva
+nada ni caduca. El precio del paso 4 se vuelve a calcular con los mismos datos, así que si
+mandas lo mismo te da lo mismo.
 
 ---
 
@@ -22,10 +35,10 @@ x-api-key: <llave entregada por TMT>
 
 Sin llave, con llave desconocida o con el socio desactivado se responde `401`.
 
-Se entregan **dos llaves**: una de pruebas y una de producción. Ambas escriben en la
-misma base de datos, pero las reservas de prueba quedan marcadas aparte para que
-operaciones las distinga y las elimine al terminar la integración. **Usa la llave de
-pruebas durante todo el desarrollo.**
+Se entregan **dos llaves**: una de pruebas y una de producción. Ambas escriben en la misma
+base de datos, pero las reservas de prueba quedan marcadas aparte para que operaciones las
+distinga y las elimine al terminar la integración. **Usa la llave de pruebas durante todo
+el desarrollo.**
 
 ---
 
@@ -33,18 +46,17 @@ pruebas durante todo el desarrollo.**
 
 `POST /api/socios/cotizar`
 
-Devuelve el precio de un servicio. Es el mismo precio que vería un cliente en nuestra
-web: incluye recargo nocturno y la tarifa correspondiente al aeropuerto solicitado.
+Devuelve el precio del servicio. Es el mismo precio que vería un cliente en nuestra web:
+incluye recargo nocturno y la tarifa del aeropuerto solicitado.
 
 ### Request
 
 | Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
-| `servicioId` | string | sí | Id del servicio. Para el piloto: `cmihxd4vy00159svu4opysoho` |
+| `servicioId` | string | sí | Id del servicio. Para el traslado de aeropuerto: `cmihxd4vy00159svu4opysoho` |
 | `numeroPasajeros` | entero > 0 | sí | Define qué vehículo se asigna |
 | `hora` | `HH:MM` (24h) | sí | Define si aplica recargo nocturno |
-| `aeropuertoNombre` | `JOSE_MARIA_CORDOVA` \| `OLAYA_HERRERA` | sí (en servicios de aeropuerto) | Cada aeropuerto tiene su propia tarifa |
-| `datosDinamicos` | objeto | no | Adicionales del servicio. En el piloto no se usa |
+| `aeropuertoNombre` | `JOSE_MARIA_CORDOVA` \| `OLAYA_HERRERA` | sí | Cada aeropuerto tiene su propia tarifa |
 
 ```bash
 curl -X POST https://www.medellintransportes.com/api/socios/cotizar \
@@ -82,11 +94,23 @@ curl -X POST https://www.medellintransportes.com/api/socios/cotizar \
 }
 ```
 
-`total` es el precio **final del vehículo completo**, no por persona. Es lo que TMT le
-cobra al socio; qué le cobre el socio a su huésped es decisión suya.
+`total` es el precio **final del vehículo completo**, no por persona. Es lo que TMT te
+cobra a ti; qué le cobres tú a tu huésped es decisión tuya.
 
-**Recargo nocturno:** $20.000 entre las 22:00 y las 03:00.
-**Tarifa de municipio:** siempre `0` en traslados de aeropuerto.
+Usa siempre `total`. El `desglose` es informativo — si quieres mostrárselo a tu huésped
+puedes, pero no necesitas sumarlo tú.
+
+### Cómo se arma el precio
+
+- **El vehículo lo elegimos nosotros** a partir de `numeroPasajeros`: se asigna el más
+  económico que cubra al grupo. No tienes que escogerlo.
+- **Recargo nocturno:** $20.000 entre las 22:00 y las 03:00 (ambas incluidas).
+- **Cada aeropuerto tiene su tarifa.** José María Córdova es más caro que Olaya Herrera
+  por la distancia.
+- **Tarifa de municipio:** siempre `0` en traslados de aeropuerto.
+
+Los precios se administran de nuestro lado y pueden cambiar. **Cotiza siempre antes de
+cobrarle a tu huésped**; no guardes una tabla de precios de tu lado.
 
 ---
 
@@ -94,24 +118,28 @@ cobra al socio; qué le cobre el socio a su huésped es decisión suya.
 
 `POST /api/socios/reservas`
 
-Crea la reserva en el sistema de TMT. El precio **se recalcula en el servidor**: no se
-acepta un precio enviado por el socio. La respuesta trae el total definitivo.
+Crea la reserva en nuestro sistema, ya marcada como pagada. Llámalo **después** de que tu
+huésped pagó.
+
+El precio **se recalcula en el servidor**: no se acepta un precio enviado por ti. La
+respuesta trae el total definitivo, que será el mismo que te dio `cotizar` si los datos
+son los mismos.
 
 ### Request
 
-Además de los campos de la cotización:
+Los mismos campos de la cotización, más:
 
 | Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|
 | `refExterna` | string | sí | Id de la reserva en tu plataforma. Da idempotencia (ver abajo) |
 | `fecha` | `YYYY-MM-DD` | sí | Fecha del servicio |
-| `aeropuertoTipo` | `DESDE` \| `HACIA` | sí (en aeropuerto) | `DESDE` = del aeropuerto al alojamiento. `HACIA` = del alojamiento al aeropuerto |
-| `lugarRecogida` | string | sí (en aeropuerto) | Dirección del alojamiento, en ambos sentidos. Es la dirección que recibe el conductor |
+| `aeropuertoTipo` | `DESDE` \| `HACIA` | sí | `DESDE` = del aeropuerto al alojamiento. `HACIA` = del alojamiento al aeropuerto |
+| `lugarRecogida` | string | sí | Dirección del alojamiento, **en ambos sentidos**. Es la dirección que recibe el conductor |
 | `numeroVuelo` | string | no | Muy recomendado: permite ajustar la recogida si el vuelo se retrasa |
 | `nombreCliente` | string | sí | Nombre del huésped |
-| `whatsappCliente` | string | sí | Con indicativo, ej. `+573001234567`. El conductor lo usa para coordinar |
+| `whatsappCliente` | string | sí | **Con indicativo de país**, ej. `+573001234567`. El conductor lo usa para coordinar |
 | `emailCliente` | string | sí | Recibe la confirmación con el código de reserva |
-| `idioma` | `ES` \| `EN` | no | Idioma de los correos. Por defecto `ES` |
+| `idioma` | `ES` \| `EN` | no | Idioma de los correos al huésped. Por defecto `ES` |
 | `notas` | string | no | Cualquier cosa que deba saber el conductor |
 
 ```bash
@@ -119,7 +147,7 @@ curl -X POST https://www.medellintransportes.com/api/socios/reservas \
   -H "x-api-key: TU_LLAVE" \
   -H "Content-Type: application/json" \
   -d '{
-    "refExterna": "hsy_88213",
+    "refExterna": "res_88213",
     "servicioId": "cmihxd4vy00159svu4opysoho",
     "numeroPasajeros": 2,
     "fecha": "2026-09-14",
@@ -154,20 +182,27 @@ curl -X POST https://www.medellintransportes.com/api/socios/reservas \
 }
 ```
 
-`codigo` es el identificador de la reserva en TMT: úsalo para cualquier comunicación con
-nosotros. `tracking` es un link que puedes mostrarle al huésped para que siga el estado
-de su traslado y vea los datos del conductor cuando se asigne.
+- **`codigo`** es el identificador de la reserva en TMT. Guárdalo: es lo que usamos para
+  cualquier comunicación sobre esa reserva.
+- **`tracking`** es un link que puedes mostrarle a tu huésped para que siga el estado de
+  su traslado y vea los datos del conductor cuando se le asigne.
+- **`estado: CONFIRMED_UNASSIGNED`** significa **reserva confirmada, pendiente de asignar
+  conductor**. La asignación la hace nuestro equipo de operación. Es el estado normal de
+  una reserva recién creada; no es un error ni algo que tengas que resolver.
 
-`CONFIRMED_UNASSIGNED` significa **reserva confirmada, pendiente de asignar conductor**.
-La asignación la hace nuestro equipo de operación.
+Al crear la reserva le enviamos a tu huésped un correo de confirmación con el código y el
+link de seguimiento, en el idioma que hayas indicado. El correo le dice explícitamente que
+**el traslado ya está pagado y que no debe entregarle dinero al conductor**.
 
-### Idempotencia
+### Idempotencia — cómo manejar los fallos
 
 Si repites una petición con la misma `refExterna`, **no se crea una segunda reserva**: se
 devuelve la original con status `200` y `"duplicado": true`.
 
-Esto significa que ante un timeout o un error de red **puedes reintentar sin riesgo**.
-Es la forma correcta de manejar fallos: reintenta con la misma `refExterna`.
+Esto significa que ante un timeout, un error de red o un `500`, **puedes reintentar sin
+riesgo**. Es la forma correcta de manejarlo: reintenta con la misma `refExterna` hasta
+recibir una respuesta clara. Nunca generes una `refExterna` nueva para reintentar — eso sí
+crearía un traslado duplicado.
 
 ---
 
@@ -175,165 +210,88 @@ Es la forma correcta de manejar fallos: reintenta con la misma `refExterna`.
 
 Todos los errores devuelven `ok: false` y un mensaje en `error`.
 
-| Status | Cuándo |
-|---|---|
-| `400` | Falta un campo, el formato es inválido, el servicio no existe, o ningún vehículo cubre el grupo |
-| `401` | Llave ausente, desconocida o socio desactivado |
-| `500` | Error inesperado del servidor. Reintenta con la misma `refExterna` |
+| Status | Qué significa | Qué hacer |
+|---|---|---|
+| `400` | La petición tiene algo mal: falta un campo, el formato es inválido, el servicio no existe, o ningún vehículo cubre al grupo | **Corrige y vuelve a enviar.** Reintentar igual no sirve |
+| `401` | Llave ausente, desconocida o socio desactivado | Revisa el header `x-api-key`. Si persiste, contáctanos |
+| `500` | Falla de nuestro lado | **Reintenta con la misma `refExterna`.** La idempotencia lo hace seguro |
 
 ```json
 { "ok": false, "error": "No hay vehículo disponible para 40 pasajeros (capacidad máxima: 18)" }
 ```
 
-Los mensajes están pensados para leerse: si el grupo no cabe, el error dice la capacidad
-máxima disponible.
+Los mensajes de `400` están pensados para leerse y actuar sobre ellos: si el grupo no cabe,
+el error dice la capacidad máxima disponible; si un campo está mal, dice cuál.
+
+**La distinción entre `400` y `500` importa.** Un `400` es tuyo y reintentar no lo arregla.
+Un `500` es nuestro y reintentar es exactamente lo que debes hacer.
+
+---
+
+## Validaciones que conviene conocer
+
+Para que no te sorprendan en producción:
+
+| Campo | Regla |
+|---|---|
+| `fecha` | `YYYY-MM-DD` y **debe existir en el calendario**. `2026-02-31` se rechaza (no se corre al mes siguiente en silencio) |
+| `hora` | `HH:MM` en 24 horas. `25:00` o `10:75` se rechazan |
+| `emailCliente` | Debe tener forma de correo válida. Es el único canal por el que tu huésped recibe su código |
+| `whatsappCliente` | Debe llevar indicativo de país y empezar con `+`. Se aceptan espacios, guiones y paréntesis: `+57 (300) 123-4567` es válido y se guarda como `+573001234567` |
+| `numeroPasajeros` | Entero mayor a 0. Se acepta como número o como texto (`2` y `"2"` funcionan igual) |
+| `lugarRecogida` | Requerido en los dos sentidos. En `HACIA` es de dónde se recoge; en `DESDE` es a dónde se lleva |
+
+**No validamos que la fecha sea futura.** Si mandas una fecha pasada la reserva se crea
+igual. Valida de tu lado que la fecha tenga sentido antes de cobrarle a tu huésped.
 
 ---
 
 ## Fuera de alcance en esta versión
 
-Acordado para el piloto. Se añaden si el volumen lo justifica:
+Acordado para el arranque. Se añaden si el volumen lo justifica:
 
 - **Cancelar o consultar por API.** Avísanos por el canal acordado y lo hacemos desde el
-  panel. El huésped puede ver el estado en el link de `tracking`.
-- **Webhooks salientes.** No notificamos cambios de estado hacia el socio.
-- **Modificar una reserva.** Cancela la existente y crea una nueva.
-- **Catálogo de servicios.** El `servicioId` del piloto es fijo y va en esta guía.
+  panel. Tu huésped puede ver el estado en el link de `tracking`.
+- **Webhooks salientes.** No notificamos cambios de estado hacia tu sistema. Si tu huésped
+  cancela desde el link de tracking, tu sistema no se entera automáticamente — por eso
+  conviene que las cancelaciones pasen por ti y nos avises.
+- **Modificar una reserva.** Cancela la existente (avisándonos) y crea una nueva.
+- **Catálogo de servicios.** El `servicioId` es fijo y va en esta guía. Si algún día
+  cambia, te avisamos antes.
 - **Límite de peticiones.** No hay rate limiting. Si hace falta cortar el acceso, se
   desactiva la llave.
-- **Validación de fecha futura.** No se rechazan fechas pasadas: si mandas una, la reserva
-  se crea igual. Valida del lado tuyo que la fecha tenga sentido.
 
 ---
 
-## Notas internas (TMT)
+## Checklist de integración
 
-Estas notas no van en la guía que se entrega al socio.
+Antes de pasar a la llave de producción:
 
-### Probar en local (sin tocar producción)
+- [ ] Cotizas con la llave de **pruebas** y el precio te cuadra contra los casos de abajo
+- [ ] Creas una reserva y te llega el `codigo` y el link de `tracking`
+- [ ] Abres el link de `tracking` y ves la reserva
+- [ ] Tu huésped de prueba recibe el correo de confirmación
+- [ ] Reintentas la **misma** `refExterna` y recibes `200` con `"duplicado": true` (no se
+      creó una segunda)
+- [ ] Manejas `400` sin reintentar y `500` reintentando
+- [ ] `refExterna` es único y estable por reserva en tu sistema
+- [ ] Nos avisas para borrar las reservas de prueba
 
-Levanta una base local en Docker con datos mínimos. `.env.local` apunta a producción,
-así que las variables se pasan en línea para sobrescribirla.
+### Casos de prueba con valores esperados
 
-```bash
-# 1. Base de datos local
-docker run -d --name tmt-local-db \
-  -e POSTGRES_PASSWORD=tmt -e POSTGRES_USER=tmt -e POSTGRES_DB=tmt \
-  -p 5433:5432 postgres:16-alpine
+Con `servicioId: cmihxd4vy00159svu4opysoho`:
 
-export LOCAL_DB="postgresql://tmt:tmt@localhost:5433/tmt?schema=public"
+| Pasajeros | Hora | Aeropuerto | Vehículo esperado | Total esperado |
+|---|---|---|---|---|
+| 2 | `14:30` | `JOSE_MARIA_CORDOVA` | Auto 1 - 3 | $140.000 |
+| 2 | `23:30` | `JOSE_MARIA_CORDOVA` | Auto 1 - 3 | $160.000 (con nocturno) |
+| 2 | `21:59` | `JOSE_MARIA_CORDOVA` | Auto 1 - 3 | $140.000 (sin nocturno) |
+| 2 | `14:30` | `OLAYA_HERRERA` | Auto 1 - 3 | $80.000 |
+| 4 | `14:30` | `JOSE_MARIA_CORDOVA` | Camioneta 4 | $180.000 |
+| 7 | `14:30` | `JOSE_MARIA_CORDOVA` | Van 5 - 8 | $240.000 |
+| 12 | `14:30` | `JOSE_MARIA_CORDOVA` | Van 9 - 15 | $300.000 |
+| 45 | `14:30` | `JOSE_MARIA_CORDOVA` | — | `400`: capacidad máxima 40 |
 
-# 2. Crear el esquema. Se usa db push y no migrate porque al repo le faltan
-#    archivos de migración antiguos — ver "Nota sobre las migraciones" abajo
-DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" npx prisma db push
-
-# 3. Datos: servicio de aeropuerto con tarifas reales, socios y usuario admin
-DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" npx tsx prisma/seed-socios-local.ts
-DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" SOCIO_HOUSY_TEST_API_KEY=llave-local \
-  npx tsx prisma/seed-socios.ts
-DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" npx tsx prisma/seed.ts
-
-# 4. Servidor. Calendario desactivado y SMTP inválido para no mandar correos reales
-#    (el correo falla, se registra en consola y la reserva se crea igual)
-DATABASE_URL="$LOCAL_DB" DIRECT_URL="$LOCAL_DB" \
-  DISABLE_CALENDAR_SYNC=true GMAIL_APP_PASSWORD=invalida \
-  npm run dev
-```
-
-Con eso: `servicioId` = `local-aeropuerto`, `x-api-key` = `llave-local`, admin en
-`/admin/login` con usuario `admin` / clave `admin`, y `npx prisma studio` para ver las
-tablas `Socio` y `SocioReserva` en el navegador.
-
-Al terminar: `docker rm -f tmt-local-db`.
-
-### Nota sobre las migraciones
-
-`prisma migrate status` reporta 5 migraciones que están **aplicadas en la base** pero cuyo
-archivo **no está en `prisma/migrations/`**:
-
-```
-20260604151007_add_precio_olaya_aeropuerto
-20260619120000_add_aliado_imagen
-20260622164500_add_categoria_modelo_precio
-20260623120000_add_comision_por_persona_aliado
-20260624120000_remove_servicio_orden
-```
-
-Ojo con la dirección: **los cambios sí están en producción** (`precioOlaya`, `categoria`,
-`modeloPrecio`, etc. existen y se usan). Lo que se perdió son los archivos `.sql`, porque
-`.gitignore` incluye `*.sql` y solo llegan al repo si se fuerzan con `git add -f`.
-
-Consecuencias prácticas:
-
-- `prisma migrate deploy` **funciona normal**: aplica solo las migraciones del repo que
-  falten en la base, e ignora las que sobran en la base. Se ensayó sobre una réplica del
-  historial de producción antes de aplicarlo, y luego en producción sin novedad.
-- `prisma migrate dev` **no se debe usar contra producción** — querría resetear.
-- Para bases nuevas (local, staging), usar `prisma db push`, que parte del
-  `schema.prisma` actual y no depende del historial.
-
-### Estado de la puesta en marcha
-
-Ya ejecutado en producción el **3 de agosto de 2026**:
-
-- ✅ Migración `20260803120000_add_socios_api` aplicada. Verificado antes/después: las
-  tablas pasaron de 17 a 19, `Reserva` conservó sus 49 columnas y sus 1.645 registros.
-- ✅ Socios `housy` y `housy-test` creados y activos, cada uno con su llave.
-- ✅ Cotización verificada contra el catálogo real (JMC $140.000 / Olaya $80.000 /
-  Camioneta $180.000 / Van $240.000 / recargo nocturno +$20.000).
-
-Queda pendiente **desplegar el código** (la rama `feat/api-socios` a `main`): hasta
-entonces las rutas no responden en el dominio de producción.
-
-Para repetirlo en otro entorno:
-
-```bash
-npx prisma migrate deploy
-npx tsx -r dotenv/config prisma/seed-socios.ts dotenv_config_path=.env.local
-```
-
-El seed es idempotente: si el socio ya existe **conserva su llave**, no la rota. Para
-rotarla a propósito:
-
-```bash
-SOCIO_HOUSY_API_KEY=nueva_llave npx tsx -r dotenv/config prisma/seed-socios.ts dotenv_config_path=.env.local
-```
-
-Las llaves se entregan por canal seguro y no se suben al repositorio. Para revocar el
-acceso de un socio: `activo: false` en su fila de `Socio` — no hace falta desplegar nada.
-
-### Cómo entran las reservas
-
-| Campo | Valor | Por qué |
-|---|---|---|
-| `origen` | `socio:housy` / `socio:housy-test` | Filtrar en el admin y para la liquidación mensual |
-| `clientePaga` | `false` | El huésped ya le pagó al socio: no se le cobra al llegar |
-| `estadoPago` | `APROBADO` | Se asume pagada, según lo acordado |
-| `metodoPago` | `EFECTIVO` | No pasa por Bold, así que no se aplica la comisión del 6% |
-| `estado` | `CONFIRMED_UNASSIGNED` | Entra directo a la cola de asignación de conductor |
-| `esReservaAliado` | `false`, `aliadoId: null` | Un socio de API no es un aliado: no tiene comisión ni página co-branded |
-| `municipio` | `null` | Los traslados de aeropuerto no cobran tarifa de zona, igual que en la web |
-
-Las reservas de prueba salen con `origen = 'socio:housy-test'`. Al cerrar la integración,
-se filtran por ese valor en el admin y se borran.
-
-### Precio
-
-Sale de `recalcularPrecioWebDirecto()` en `lib/priceCalculator.ts`, la misma función que
-usa `POST /api/reservas` para recalcular precios server-side. **No hay tabla de tarifas
-paralela**: si cambia el precio del servicio en el admin, el socio lo ve al instante.
-
-### Trazabilidad
-
-Cada reserva creada por un socio tiene una fila en `SocioReserva` con el request original
-en `payload`. Para conciliar un mes:
-
-```sql
-SELECT r.codigo, r.fecha, r."precioTotal", sr."refExterna"
-FROM "Reserva" r
-JOIN "SocioReserva" sr ON sr."reservaId" = r.id
-JOIN "Socio" s ON s.id = sr."socioId"
-WHERE s.codigo = 'housy'
-  AND r.fecha >= '2026-09-01' AND r.fecha < '2026-10-01'
-  AND r.estado <> 'CANCELLED';
-```
+Estos totales son los vigentes al momento de escribir esta guía. Si alguno no cuadra,
+avísanos: puede ser que hayamos actualizado tarifas (por eso la regla de cotizar siempre
+antes de cobrar).

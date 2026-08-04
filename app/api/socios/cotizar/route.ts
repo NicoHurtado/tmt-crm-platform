@@ -8,6 +8,7 @@ import {
     parseEnteroPositivo,
     parseHora,
 } from '@/lib/socios/cotizar';
+import { SocioRequestError } from '@/lib/socios/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,9 +39,13 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ ok: true, ...cotizacion });
     } catch (error) {
+        if (error instanceof SocioRequestError) {
+            return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+        }
+        console.error('[socios/cotizar] Error inesperado:', error);
         return NextResponse.json(
-            { ok: false, error: error instanceof Error ? error.message : String(error) },
-            { status: 400 }
+            { ok: false, error: 'Error interno al cotizar. Reintenta en unos segundos.' },
+            { status: 500 }
         );
     }
 }

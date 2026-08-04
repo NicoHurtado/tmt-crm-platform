@@ -116,7 +116,7 @@ const BODY_RESERVA_VALIDO = {
     lugarRecogida: 'Cra 43A #7-50, Apto 1204, El Poblado',
     numeroVuelo: 'AV8432',
     nombreCliente: 'Juan Pérez',
-    whatsappCliente: '573001234567',
+    whatsappCliente: '+573001234567',
     emailCliente: 'juan@test.com',
 };
 
@@ -467,5 +467,118 @@ describe('API de socios', () => {
 
         const fecha: Date = prisma.reserva.create.mock.calls[0][0].data.fecha;
         expect(fecha.toISOString()).toBe('2026-09-14T12:00:00.000Z');
+    });
+
+    // ── Datos de contacto ─────────────────────────────────────────────────────
+    // El correo y el WhatsApp son los dos únicos canales con el huésped. Un fallo de
+    // envío no tumba la reserva, así que un dato malo pasaría inadvertido: se validan
+    // en la entrada para que el socio corrija antes de cobrarle al huésped.
+
+    it('rechaza un correo con formato inválido', async () => {
+        const { POST } = await import('@/app/api/socios/reservas/route');
+        const res = await POST(
+            post(
+                'http://localhost/api/socios/reservas',
+                { ...BODY_RESERVA_VALIDO, emailCliente: 'juan@test' },
+                'llave-de-prueba'
+            ) as any
+        );
+        const body = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(body.error).toContain('emailCliente');
+        expect(prisma.reserva.create).not.toHaveBeenCalled();
+    });
+
+    it('rechaza un WhatsApp sin indicativo de país', async () => {
+        const { POST } = await import('@/app/api/socios/reservas/route');
+        const res = await POST(
+            post(
+                'http://localhost/api/socios/reservas',
+                { ...BODY_RESERVA_VALIDO, whatsappCliente: '3001234567' },
+                'llave-de-prueba'
+            ) as any
+        );
+        const body = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(body.error).toContain('whatsappCliente');
+        expect(prisma.reserva.create).not.toHaveBeenCalled();
+    });
+
+    it('normaliza el WhatsApp a +<dígitos> para que el link del conductor abra', async () => {
+        const { POST } = await import('@/app/api/socios/reservas/route');
+        await POST(
+            post(
+                'http://localhost/api/socios/reservas',
+                { ...BODY_RESERVA_VALIDO, whatsappCliente: '+57 (300) 123-4567' },
+                'llave-de-prueba'
+            ) as any
+        );
+
+        expect(prisma.reserva.create.mock.calls[0][0].data.whatsappCliente).toBe('+573001234567');
+    });
+
+    it('normaliza el correo a minúsculas', async () => {
+        const { POST } = await import('@/app/api/socios/reservas/route');
+        await POST(
+            post(
+                'http://localhost/api/socios/reservas',
+                { ...BODY_RESERVA_VALIDO, emailCliente: 'Juan@Test.COM' },
+                'llave-de-prueba'
+            ) as any
+        );
+
+        expect(prisma.reserva.create.mock.calls[0][0].data.emailCliente).toBe('juan@test.com');
+    });
+
+    // ── Códigos de error ──────────────────────────────────────────────────────
+    // La guía le dice al socio que reintente ante un 500 y que NO reintente ante un 400.
+    // Si una falla nuestra saliera como 400, el socio daría por perdida una reserva que
+    // ya le cobró al huésped.
+
+    it('responde 500 y no 400 cuando la falla es nuestra', async () => {
+        prisma.$transaction.mockRejectedValue(new Error('connection terminated unexpectedly'));
+
+        const { POST } = await import('@/app/api/socios/reservas/route');
+        const res = await POST(
+            post('http://localhost/api/socios/reservas', BODY_RESERVA_VALIDO, 'llave-de-prueba') as any
+        );
+        const body = await res.json();
+
+        expect(res.status).toBe(500);
+        expect(body.ok).toBe(false);
+        expect(body.error).toContain('Reintenta con la misma refExterna');
+        // El detalle interno no se le expone al socio.
+        expect(body.error).not.toContain('connection terminated');
+    });
+
+    it('responde 500 cuando la cotización falla por un error inesperado', async () => {
+        prisma.servicio.findFirst.mockRejectedValue(new Error('pool exhausted'));
+
+        const { POST } = await import('@/app/api/socios/cotizar/route');
+        const res = await POST(
+            post(
+                'http://localhost/api/socios/cotizar',
+                { servicioId: 'svc-aeropuerto', numeroPasajeros: 2, hora: '14:30', aeropuertoNombre: 'JOSE_MARIA_CORDOVA' },
+                'llave-de-prueba'
+            ) as any
+        );
+
+        expect(res.status).toBe(500);
+        expect((await res.json()).error).not.toContain('pool exhausted');
+    });
+
+    it('sigue respondiendo 400 cuando la petición del socio es la que está mal', async () => {
+        const { POST } = await import('@/app/api/socios/reservas/route');
+        const res = await POST(
+            post(
+                'http://localhost/api/socios/reservas',
+                { ...BODY_RESERVA_VALIDO, numeroPasajeros: 0 },
+                'llave-de-prueba'
+            ) as any
+        );
+
+        expect(res.status).toBe(400);
     });
 });

@@ -48,7 +48,18 @@ interface Reserva extends ReservaDetail {
   servicio?: { nombre: string; esCompartido?: boolean }
   asistentes?: Array<{ id: string; nombre: string; tipoDocumento: string; numeroDocumento: string }>
   pagoConductor?: boolean
+  /// 'web_directa' | 'socio:<codigo>' | … — identifica por dónde entró la reserva.
+  origen?: string
 }
+
+/**
+ * Las reservas que entran por la API de socios se guardan con `origen = 'socio:<codigo>'`.
+ * Es el campo por el que se liquida con cada socio a fin de mes, así que la tabla necesita
+ * poder mostrarlo y filtrarlo — un socio no es un aliado y no aparece en esa columna.
+ */
+const PREFIJO_SOCIO = 'socio:'
+const codigoSocio = (r: Reserva): string | null =>
+  r.origen?.startsWith(PREFIJO_SOCIO) ? r.origen.slice(PREFIJO_SOCIO.length) : null
 
 const ESTADOS = [
   { value: 'ALL', label: 'Todos los estados' },
@@ -94,6 +105,7 @@ export default function ReservasPage() {
   const [clientePagaFilter, setClientePagaFilter] = useState('ALL')
   const [servicioFilter, setServicioFilter] = useState('ALL')
   const [aliadoFilter, setAliadoFilter] = useState('ALL')
+  const [socioFilter, setSocioFilter] = useState('ALL')
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
   const [page, setPage] = useState(1)
@@ -127,7 +139,7 @@ export default function ReservasPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, estado, pago, clientePagaFilter, servicioFilter, aliadoFilter, fechaDesde, fechaHasta, servicioIdParam])
+  }, [search, estado, pago, clientePagaFilter, servicioFilter, aliadoFilter, socioFilter, fechaDesde, fechaHasta, servicioIdParam])
 
   // Unique services for dropdown
   const serviciosUnicos = useMemo(() => {
@@ -157,6 +169,17 @@ export default function ReservasPage() {
       .sort((a, b) => a.nombre.localeCompare(b.nombre))
   }, [reservas])
 
+  // Socios de API presentes en los datos. Se derivan de las reservas en vez de consultar
+  // la tabla Socio: así el filtro solo ofrece socios que efectivamente tienen reservas.
+  const sociosUnicos = useMemo(() => {
+    const codigos = new Set<string>()
+    reservas.forEach((r) => {
+      const codigo = codigoSocio(r)
+      if (codigo) codigos.add(codigo)
+    })
+    return Array.from(codigos).sort()
+  }, [reservas])
+
   const filtered = useMemo(() => {
     return reservas
       .filter((r) => {
@@ -165,6 +188,7 @@ export default function ReservasPage() {
         if (pago !== 'ALL' && r.metodoPago !== pago) return false
         if (servicioFilter !== 'ALL' && r.servicioId !== servicioFilter) return false
         if (aliadoFilter !== 'ALL' && r.aliado?.codigo !== aliadoFilter) return false
+        if (socioFilter !== 'ALL' && codigoSocio(r) !== socioFilter) return false
         if (clientePagaFilter === 'paga' && r.clientePaga === false) return false
         if (clientePagaFilter === 'no-paga' && r.clientePaga !== false) return false
         const fechaISO = r.fecha.split('T')[0]
@@ -183,7 +207,7 @@ export default function ReservasPage() {
         return true
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [reservas, search, estado, pago, clientePagaFilter, servicioFilter, aliadoFilter, fechaDesde, fechaHasta, servicioIdParam])
+  }, [reservas, search, estado, pago, clientePagaFilter, servicioFilter, aliadoFilter, socioFilter, fechaDesde, fechaHasta, servicioIdParam])
 
   const tourCompartidoReservas = useMemo(
     () => reservas.filter((r) => (r.servicio as any)?.esCompartido),
@@ -193,7 +217,7 @@ export default function ReservasPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
-  const hasFilters = !!(search || estado !== 'ALL' || pago !== 'ALL' || clientePagaFilter !== 'ALL' || servicioFilter !== 'ALL' || aliadoFilter !== 'ALL' || fechaDesde || fechaHasta || servicioIdParam)
+  const hasFilters = !!(search || estado !== 'ALL' || pago !== 'ALL' || clientePagaFilter !== 'ALL' || servicioFilter !== 'ALL' || aliadoFilter !== 'ALL' || socioFilter !== 'ALL' || fechaDesde || fechaHasta || servicioIdParam)
 
   const clearFilters = () => {
     setSearch('')
@@ -202,6 +226,7 @@ export default function ReservasPage() {
     setClientePagaFilter('ALL')
     setServicioFilter('ALL')
     setAliadoFilter('ALL')
+    setSocioFilter('ALL')
     setFechaDesde('')
     setFechaHasta('')
   }
@@ -440,6 +465,24 @@ export default function ReservasPage() {
           </SelectContent>
         </Select>
 
+        {/* Solo aparece cuando hay reservas entradas por la API de socios, para no
+            agregar un filtro vacío a la barra mientras no exista ninguna. */}
+        {sociosUnicos.length > 0 && (
+          <Select value={socioFilter} onValueChange={setSocioFilter}>
+            <SelectTrigger className="w-[200px] h-9 text-sm border-neutral-200 bg-white">
+              <SelectValue placeholder="Todos los socios" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL" className="text-sm">Todos los socios</SelectItem>
+              {sociosUnicos.map((codigo) => (
+                <SelectItem key={codigo} value={codigo} className="text-sm">
+                  {codigo}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-neutral-500 whitespace-nowrap">Desde</span>
           <input
@@ -490,7 +533,7 @@ export default function ReservasPage() {
         <Table>
           <TableHeader>
             <TableRow className="bg-neutral-50 hover:bg-neutral-50">
-              {['Creada', 'Código', 'Cliente', 'Servicio', 'Fecha', 'Estado', 'Pago', 'Pago cliente', 'Aliado', 'Total', 'Comisión', 'Pago conductor'].map(
+              {['Creada', 'Código', 'Cliente', 'Servicio', 'Fecha', 'Estado', 'Pago', 'Pago cliente', 'Aliado / Socio', 'Total', 'Comisión', 'Pago conductor'].map(
                 (h) => (
                   <TableHead
                     key={h}
@@ -585,7 +628,10 @@ export default function ReservasPage() {
                     </span>
                   </TableCell>
                   <TableCell className="py-3">
-                    {(r.esReservaAliado || r.esCotizacion) ? (
+                    {/* `clientePaga === false` también cubre las reservas de socios de API,
+                        que no son ni aliado ni cotización pero sí entran ya pagadas: sin
+                        esto la columna mostraría "—" y el conductor cobraría de más. */}
+                    {(r.esReservaAliado || r.esCotizacion || r.clientePaga === false) ? (
                       <span
                         className={`text-[11px] font-medium px-2 py-0.5 rounded border whitespace-nowrap ${
                           r.clientePaga !== false
@@ -603,6 +649,10 @@ export default function ReservasPage() {
                     {r.esReservaAliado && r.aliado ? (
                       <span className="text-xs text-neutral-700 whitespace-nowrap">
                         {r.aliado.nombre}
+                      </span>
+                    ) : codigoSocio(r) ? (
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded border whitespace-nowrap bg-amber-50 text-amber-700 border-amber-200">
+                        {codigoSocio(r)}
                       </span>
                     ) : (
                       <span className="text-neutral-300 text-xs">—</span>

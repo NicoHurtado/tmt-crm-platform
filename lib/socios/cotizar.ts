@@ -4,6 +4,7 @@ import { recalcularPrecioWebDirecto, type AeropuertoNombreInput } from '@/lib/pr
 import { selectVehicleForPassengers } from '@/lib/vehicle-selector';
 import { getConfiguracion } from '@/types/servicio-config';
 import { getLocalizedText } from '@/types/multi-language';
+import { badRequest } from './errors';
 
 /**
  * Cotización para socios de API (`/api/socios/*`).
@@ -61,38 +62,38 @@ const AEROPUERTOS: AeropuertoNombreInput[] = ['JOSE_MARIA_CORDOVA', 'OLAYA_HERRE
 
 export function parseFecha(valor: unknown): Date {
     if (typeof valor !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
-        throw new Error('fecha debe usar formato YYYY-MM-DD');
+        badRequest('fecha debe usar formato YYYY-MM-DD');
     }
     // Mediodía UTC: así el día calendario es el mismo en UTC y en America/Bogota (UTC-5)
     // y no se corre en el calendario ni en los correos. Misma convención del resto del proyecto.
     const fecha = new Date(`${valor}T12:00:00.000Z`);
-    if (Number.isNaN(fecha.getTime())) throw new Error('fecha inválida');
+    if (Number.isNaN(fecha.getTime())) badRequest('fecha inválida');
     // Una fecha que no existe (ej. 2026-02-31) NO produce NaN: JavaScript la corre al mes
     // siguiente. Sin esta comprobación, un error de tipeo del socio crearía el traslado en
     // otro día sin avisar a nadie.
     if (fecha.toISOString().slice(0, 10) !== valor) {
-        throw new Error(`fecha inexistente en el calendario: ${valor}`);
+        badRequest(`fecha inexistente en el calendario: ${valor}`);
     }
     return fecha;
 }
 
 export function parseHora(valor: unknown): string {
     if (typeof valor !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(valor)) {
-        throw new Error('hora debe usar formato HH:MM (24 horas)');
+        badRequest('hora debe usar formato HH:MM (24 horas)');
     }
-    return valor;
+    return valor as string;
 }
 
 export function parseEnteroPositivo(valor: unknown, campo: string): number {
     const n = typeof valor === 'number' ? valor : Number(valor);
-    if (!Number.isInteger(n) || n < 1) throw new Error(`${campo} debe ser un entero mayor a 0`);
+    if (!Number.isInteger(n) || n < 1) badRequest(`${campo} debe ser un entero mayor a 0`);
     return n;
 }
 
 export function parseAeropuerto(valor: unknown): AeropuertoNombreInput | null {
     if (valor === undefined || valor === null || valor === '') return null;
     if (typeof valor !== 'string' || !AEROPUERTOS.includes(valor as AeropuertoNombreInput)) {
-        throw new Error(`aeropuertoNombre inválido. Valores válidos: ${AEROPUERTOS.join(', ')}`);
+        badRequest(`aeropuertoNombre inválido. Valores válidos: ${AEROPUERTOS.join(', ')}`);
     }
     return valor as AeropuertoNombreInput;
 }
@@ -100,7 +101,7 @@ export function parseAeropuerto(valor: unknown): AeropuertoNombreInput | null {
 export function parseDatosDinamicos(valor: unknown): Record<string, unknown> {
     if (valor === undefined || valor === null) return {};
     if (typeof valor !== 'object' || Array.isArray(valor)) {
-        throw new Error('datosDinamicos debe ser un objeto');
+        badRequest('datosDinamicos debe ser un objeto');
     }
     return valor as Record<string, unknown>;
 }
@@ -109,20 +110,20 @@ export function parseDatosDinamicos(valor: unknown): Record<string, unknown> {
 
 export async function cargarServicioCotizable(servicioId: unknown): Promise<ServicioCotizable> {
     if (typeof servicioId !== 'string' || !servicioId) {
-        throw new Error('servicioId es requerido');
+        badRequest('servicioId es requerido');
     }
 
     const servicio = await prisma.servicio.findFirst({
-        where: { id: servicioId, activo: true },
+        where: { id: servicioId as string, activo: true },
         include: SERVICIO_INCLUDE,
     });
-    if (!servicio) throw new Error('Servicio no encontrado o inactivo');
+    if (!servicio) badRequest('Servicio no encontrado o inactivo');
 
     // Los tours con tarifa por persona (tramos 1/2/3+) usan otro modelo de precio que
     // `recalcularPrecioWebDirecto` no cubre. Se rechazan en vez de devolver un precio
     // silenciosamente equivocado.
     if (getConfiguracion(servicio.configuracion).tipoTarifa === 'POR_PERSONA') {
-        throw new Error('Este servicio no está disponible por la API de socios');
+        badRequest('Este servicio no está disponible por la API de socios');
     }
 
     return servicio;
@@ -130,7 +131,7 @@ export async function cargarServicioCotizable(servicioId: unknown): Promise<Serv
 
 export function cotizarServicio(servicio: ServicioCotizable, input: CotizacionInput): Cotizacion {
     if (servicio.esAeropuerto && !input.aeropuertoNombre) {
-        throw new Error(
+        badRequest(
             `aeropuertoNombre es requerido para este servicio. Valores válidos: ${AEROPUERTOS.join(', ')}`
         );
     }
@@ -142,7 +143,7 @@ export function cotizarServicio(servicio: ServicioCotizable, input: CotizacionIn
     if (!vehiculo) {
         const capacidades = servicio.vehiculosPermitidos.map((sv) => sv.vehiculo.capacidadMaxima);
         const maxima = capacidades.length > 0 ? Math.max(...capacidades) : 0;
-        throw new Error(
+        badRequest(
             `No hay vehículo disponible para ${input.numeroPasajeros} pasajeros (capacidad máxima: ${maxima})`
         );
     }
@@ -170,8 +171,13 @@ export function cotizarServicio(servicio: ServicioCotizable, input: CotizacionIn
         desglose.recargoNocturno +
         desglose.tarifaMunicipio;
 
+    // Falta de configuración de nuestro lado, no un error del socio. Aun así se responde
+    // 400 y no 500: reintentar no lo arregla, hace falta que alguien cargue el precio en
+    // el admin. El mensaje lo dice para que el socio sepa que debe avisarnos.
     if (!Number.isFinite(total) || total <= 0) {
-        throw new Error('Este servicio no tiene precio configurado para el vehículo requerido');
+        badRequest(
+            `El servicio no tiene precio configurado para el vehículo de ${input.numeroPasajeros} pasajeros. Avísanos para corregirlo.`
+        );
     }
 
     return {

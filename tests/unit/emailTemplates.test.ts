@@ -179,6 +179,50 @@ describe('tplReservaConfirmada', () => {
         expect(html).toContain('/tracking/RES-TEST-001');
     });
 
+    // `clientePaga: false` = el traslado ya está pagado (reservas de socios de API,
+    // cotizaciones marcadas "no cobrar", cortesías). Esas reservas se guardan con
+    // metodoPago EFECTIVO para no aplicarles la comisión de Bold, así que sin la
+    // comprobación de clientePaga el correo le pediría al cliente pagar por segunda vez.
+    describe('cuando la reserva ya está pagada (clientePaga: false)', () => {
+        const yaPagada: ReservaTemplate = {
+            ...mockReservaBase,
+            metodoPago: 'EFECTIVO',
+            clientePaga: false,
+        };
+
+        it('no le pide al cliente pagarle al conductor', () => {
+            const html = tplReservaConfirmada(yaPagada, 'ES');
+            expect(html).not.toContain('Pago en Efectivo');
+            expect(html).not.toContain('pagar al conductor');
+        });
+
+        it('le confirma que el traslado ya está pagado', () => {
+            const html = tplReservaConfirmada(yaPagada, 'ES');
+            expect(html).toContain('Pago ya realizado');
+            expect(html).toContain('no debes entregarle dinero al conductor');
+        });
+
+        // Con lang EN el layout es bilingüe: trae la sección en inglés y la de español.
+        it('lo dice también en inglés cuando el idioma de la reserva es EN', () => {
+            const html = tplReservaConfirmada(yaPagada, 'EN');
+            expect(html).toContain('Payment already completed');
+            expect(html).toContain('you do not need to pay the driver');
+            expect(html).not.toContain('ready to pay the driver at the start');
+        });
+    });
+
+    it('sigue pidiendo el efectivo cuando el cliente sí paga al conductor', () => {
+        const efectivo: ReservaTemplate = {
+            ...mockReservaBase,
+            metodoPago: 'EFECTIVO',
+            clientePaga: true,
+        };
+        const html = tplReservaConfirmada(efectivo, 'ES');
+        expect(html).toContain('Pago en Efectivo');
+        expect(html).toContain('pagar al conductor');
+        expect(html).not.toContain('Pago ya realizado');
+    });
+
     it('no tiene campos null o undefined visibles', () => {
         const html = tplReservaConfirmada(mockReservaBase, 'ES');
         hasNoNullsOrUndefined(html);

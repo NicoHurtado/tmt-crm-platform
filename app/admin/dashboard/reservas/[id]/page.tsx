@@ -362,6 +362,12 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
         return (rd.lugarRecogida as string) || '—';
     })();
 
+    // Reservas que entraron por la API de socios (`origen = 'socio:<codigo>'`). El campo
+    // `origen` de la reserva no es el "Origen" del trayecto de arriba: es por dónde entró.
+    const socioCodigo: string | null = typeof reserva.origen === 'string' && reserva.origen.startsWith('socio:')
+        ? reserva.origen.slice('socio:'.length)
+        : null;
+
     return (
         <div className="min-h-screen bg-[#F0F2F5]">
             {/* Top bar */}
@@ -638,6 +644,16 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                                         )}
                                         {getDatos(reserva.datos).cantidadHoras && (
                                             <Field label="Duración" value={`${getDatos(reserva.datos).cantidadHoras} horas`} />
+                                        )}
+                                        {socioCodigo && (
+                                            <Field label="Reservada por" value={
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    <span className="text-[11px] font-medium px-2 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
+                                                        {socioCodigo}
+                                                    </span>
+                                                    <span className="text-xs text-gray-500">vía API · ya pagada</span>
+                                                </span>
+                                            } />
                                         )}
                                     </div>
                                     {reserva.notas && (
