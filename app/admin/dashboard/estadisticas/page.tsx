@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { AliadoDrawer } from '@/components/admin/AliadoDrawer';
+import { SociosStatsPanel } from '@/components/admin/SociosStatsPanel';
 import {
   FiCalendar,
   FiDollarSign,
@@ -10,6 +11,7 @@ import {
   FiTrendingUp,
   FiBarChart2,
   FiGrid,
+  FiLink,
 } from 'react-icons/fi';
 import {
   AreaChart,
@@ -91,6 +93,7 @@ const TABS = [
   { name: 'Servicios',  icon: FiBarChart2  },
   { name: 'Financiero', icon: FiDollarSign },
   { name: 'Aliados',    icon: FiUsers      },
+  { name: 'Socios API', icon: FiLink       },
 ] as const;
 type TabName = (typeof TABS)[number]['name'];
 
@@ -838,6 +841,7 @@ export default function EstadisticasPage() {
             )}
           </div>
         )}
+        {activeTab === 'Socios API' && <SociosStatsPanel />}
       </main>
 
       <AliadoDrawer
