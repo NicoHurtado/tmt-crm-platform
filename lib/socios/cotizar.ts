@@ -85,6 +85,12 @@ export function parseHora(valor: unknown): string {
 }
 
 export function parseEnteroPositivo(valor: unknown, campo: string): number {
+    // Solo número o cadena numérica. Sin este filtro, `Number()` convierte `true` en 1 y
+    // `[2]` en 2, así que un bug del socio se colaría como una reserva silenciosamente
+    // equivocada en vez de dar un error que pueda corregir.
+    if (typeof valor !== 'number' && typeof valor !== 'string') {
+        badRequest(`${campo} debe ser un entero mayor a 0`);
+    }
     const n = typeof valor === 'number' ? valor : Number(valor);
     if (!Number.isInteger(n) || n < 1) badRequest(`${campo} debe ser un entero mayor a 0`);
     return n;

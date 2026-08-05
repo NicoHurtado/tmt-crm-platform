@@ -130,8 +130,12 @@ function parseEmail(valor: unknown): string {
  */
 function parseWhatsapp(valor: unknown): string {
     const crudo = parseTextoRequerido(valor, 'whatsappCliente');
+    // Se permiten separadores de escritura habituales, pero nada más: si llegara texto
+    // mezclado con el número, quitarlo en silencio dejaría un teléfono distinto al que
+    // el socio quiso mandar y el conductor no podría contactar al huésped.
+    const formaValida = /^\+[\d\s()-]+$/.test(crudo);
     const digitos = crudo.replace(/[^\d]/g, '');
-    if (!crudo.trim().startsWith('+') || digitos.length < 10 || digitos.length > 15) {
+    if (!formaValida || digitos.length < 10 || digitos.length > 15) {
         badRequest(
             `whatsappCliente debe ir en formato internacional con indicativo, ej. +573001234567 (recibido: ${crudo})`
         );

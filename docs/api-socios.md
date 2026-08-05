@@ -1,5 +1,10 @@
 # API de Socios — TMT Travel
 
+> **El documento que se le entrega al socio es
+> [`documentacion-api-tmt.md`](./documentacion-api-tmt.md)** — más completo, con los
+> formatos exactos de cada campo y las llaves incluidas. Este archivo se conserva como
+> referencia resumida del contrato.
+
 API para que tu plataforma ofrezca nuestro transporte a tus huéspedes. Tú capturas los
 datos, nos consultas el precio, le cobras a tu huésped y nos envías la reserva ya pagada.
 Nosotros prestamos el servicio. La liquidación entre nosotros se hace por fuera de la API.

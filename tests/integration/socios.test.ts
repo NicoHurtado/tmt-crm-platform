@@ -506,6 +506,41 @@ describe('API de socios', () => {
         expect(prisma.reserva.create).not.toHaveBeenCalled();
     });
 
+    it('rechaza un WhatsApp con letras mezcladas en vez de limpiarlas en silencio', async () => {
+        const { POST } = await import('@/app/api/socios/reservas/route');
+        const res = await POST(
+            post(
+                'http://localhost/api/socios/reservas',
+                { ...BODY_RESERVA_VALIDO, whatsappCliente: '+57abc3001234567' },
+                'llave-de-prueba'
+            ) as any
+        );
+
+        expect(res.status).toBe(400);
+        expect(prisma.reserva.create).not.toHaveBeenCalled();
+    });
+
+    it('rechaza numeroPasajeros que no sea número ni cadena numérica', async () => {
+        const { POST } = await import('@/app/api/socios/reservas/route');
+        for (const valor of [true, [2], { n: 2 }]) {
+            vi.clearAllMocks();
+            prisma.socio.findUnique.mockResolvedValue(SOCIO);
+            prisma.servicio.findFirst.mockResolvedValue(SERVICIO_AEROPUERTO);
+            prisma.socioReserva.findUnique.mockResolvedValue(null);
+
+            const res = await POST(
+                post(
+                    'http://localhost/api/socios/reservas',
+                    { ...BODY_RESERVA_VALIDO, numeroPasajeros: valor },
+                    'llave-de-prueba'
+                ) as any
+            );
+
+            expect(res.status, `numeroPasajeros: ${JSON.stringify(valor)}`).toBe(400);
+            expect(prisma.reserva.create).not.toHaveBeenCalled();
+        }
+    });
+
     it('normaliza el WhatsApp a +<dígitos> para que el link del conductor abra', async () => {
         const { POST } = await import('@/app/api/socios/reservas/route');
         await POST(
