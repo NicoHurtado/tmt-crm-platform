@@ -483,21 +483,30 @@ export default function ReservasPage() {
           </Select>
         )}
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-neutral-500 whitespace-nowrap">Desde</span>
-          <input
-            type="date"
-            value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="h-9 border border-neutral-200 rounded-md px-3 text-sm bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400"
-          />
-          <span className="text-xs text-neutral-500 whitespace-nowrap">Hasta</span>
-          <input
-            type="date"
-            value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="h-9 border border-neutral-200 rounded-md px-3 text-sm bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400"
-          />
+        {/* El grupo de fechas mide ~457px: en un teléfono no cabe en una línea y antes
+            se salía de la pantalla. Con flex-wrap se parte en dos renglones. En pantallas
+            grandes cabe entero, así que no cambia nada. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Cada etiqueta va junto a su campo dentro de un grupo que NO se parte, para
+              que al pasar a dos renglones en móvil no quede una etiqueta huérfana. */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-neutral-500 whitespace-nowrap">Desde</span>
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              className="h-9 border border-neutral-200 rounded-md px-3 text-sm bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-neutral-500 whitespace-nowrap">Hasta</span>
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              className="h-9 border border-neutral-200 rounded-md px-3 text-sm bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400"
+            />
+          </div>
           <Button
             variant="outline"
             size="sm"
