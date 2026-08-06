@@ -68,7 +68,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     pathname === item.href || pathname.startsWith(item.href + '/')
 
   return (
-    <div className="min-h-screen bg-white font-[family-name:var(--font-sans)] flex">
+    // Móvil: columna — la barra superior va ENCIMA del contenido.
+    // Escritorio (lg): fila — el espaciador del sidebar va al lado del contenido.
+    // Sin `flex-col` en móvil la barra superior quedaba como hermana en la fila, es decir
+    // AL LADO del contenido, empujándolo fuera de la pantalla.
+    <div className="min-h-screen bg-white font-[family-name:var(--font-sans)] flex flex-col lg:flex-row">
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
@@ -260,7 +264,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="hidden lg:block flex-shrink-0 w-16" />
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 min-h-screen pt-14 lg:pt-0">
+      {/* En móvil la barra superior ya ocupa su espacio en la columna, así que no hace
+          falta compensarla con padding. `min-h-screen` solo en escritorio: en móvil el
+          contenido ya llena la altura restante con flex-1. */}
+      <main className="flex-1 min-w-0 lg:min-h-screen">
         {children}
       </main>
     </div>
