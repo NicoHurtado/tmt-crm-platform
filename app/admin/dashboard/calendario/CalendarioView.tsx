@@ -66,6 +66,22 @@ export default function CalendarioView({ events, onEventClick, onDatesSet }: Pro
                 .fc .fc-button:hover { background: #f3f4f6; }
                 .fc .fc-button-active, .fc .fc-button-primary:not(:disabled):active { background: #f59e0b !important; border-color: #f59e0b !important; color: white !important; box-shadow: none !important; }
                 .fc .fc-button-primary:disabled { opacity: 0.5; }
+                /* En pantallas táctiles los botones de la barra (anterior, siguiente, Hoy,
+                   Mes, Semana, Día) suben de 32 a 44px de alto, el mínimo recomendado por
+                   Apple y Google. Se limita a (pointer: coarse) para que con ratón sigan
+                   exactamente igual. El ancho ya superaba los 44px en todos. */
+                @media (pointer: coarse) {
+                    .fc .fc-button { min-height: 44px; }
+                }
+                /* La barra de FullCalendar reparte sus tres bloques en una fila y no envuelve:
+                   en un teléfono el botón "Hoy" se montaba sobre el título, el título se
+                   partía en tres líneas y los botones de vista lo pisaban. En pantalla
+                   pequeña se apilan y se centran. Desde 640px queda la fila original. */
+                @media (max-width: 640px) {
+                    .fc .fc-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+                    .fc .fc-toolbar-chunk { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 8px; }
+                    .fc .fc-toolbar-title { text-align: center; }
+                }
                 .fc .fc-col-header-cell { background: #f9fafb; padding: 8px 0; font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid #d1d5db; border-right: 1px solid #d1d5db; }
                 .fc .fc-scrollgrid { border-color: #d1d5db !important; }
                 .fc .fc-scrollgrid-section > td { border-color: #d1d5db !important; }
