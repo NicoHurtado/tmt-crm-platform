@@ -227,3 +227,12 @@ select {
 /* Oculta la barra de scroll en filtros horizontales (barra de categorías de /reservas) */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Área mínima para tocar con el dedo.
+   44px es el mínimo que recomiendan tanto Apple como Google; por debajo de eso el
+   dedo falla seguido. Solo aplica en pantallas táctiles (pointer: coarse), así que
+   con ratón los controles conservan su tamaño original. */
+@media (pointer: coarse) {
+  .area-tactil { min-height: 44px; }
+  .area-tactil-completa { min-height: 44px; min-width: 44px; }
+}
