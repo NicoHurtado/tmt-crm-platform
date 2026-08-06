@@ -42,10 +42,13 @@ los diálogos sigan abriendo, etc). Escritorio no debería haber cambiado en
 nada — todo el trabajo usa clases `sm:`/`lg:`/`pointer: coarse` para no tocar
 el layout de escritorio.
 
-**Pendiente:** la última corrida completa de la suite tuvo varios timeouts por
-presión de memoria en la máquina de desarrollo (no por desbordes reales — cero
-errores de "desborda" en los logs). Vale la pena correr la suite una vez más
-en un entorno descansado antes de mergear.
+**Estado de la suite:** una corrida anterior tuvo timeouts por presión de
+memoria en la máquina de desarrollo (el servidor `next dev` llevaba horas
+corriendo y acumuló ~3.3GB de RAM). Se reinició el servidor de dev y se corrió
+la suite completa de nuevo en limpio: **27/27 pasando, 2.8 minutos** (antes
+tardaba 18-19 min con varios timeouts). Confirma que los timeouts eran del
+entorno, no de la app — en ninguna corrida, ni la lenta ni la limpia, hubo un
+solo error real de desborde.
 
 ## Falta por hacer
 
@@ -53,4 +56,3 @@ en un entorno descansado antes de mergear.
 - Landing y `/reservas` públicos también tienen controles bajo 44px
 - Limpiar los scripts `tmp-*.ts` de la raíz (son de diagnóstico, no se
   commitearon, pero conviene borrarlos del working tree)
-- Confirmar la suite completa en verde una vez más
