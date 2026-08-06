@@ -208,7 +208,11 @@ export default function ConductoresPage() {
   return (
     <div className="flex flex-col gap-4 p-6 w-full">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* En móvil el título y las acciones se apilan; desde sm vuelven a la fila de
+          siempre. Los dos botones juntos miden más que el ancho de un teléfono, así que
+          en pantalla pequeña ocupan todo el ancho: además de caber, son más fáciles de
+          tocar. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-neutral-900">Conductores</h1>
           <p className="text-sm text-neutral-500 mt-0.5">
@@ -216,12 +220,17 @@ export default function ConductoresPage() {
             {conductores.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="gap-1.5 text-sm" onClick={handleGenerateInvite}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 text-sm w-full sm:w-auto"
+            onClick={handleGenerateInvite}
+          >
             <Link2 size={14} />
             Generar link de registro
           </Button>
-          <Button size="sm" className="gap-1.5 text-sm" onClick={openCreate}>
+          <Button size="sm" className="gap-1.5 text-sm w-full sm:w-auto" onClick={openCreate}>
             <Plus size={14} />
             Nuevo conductor
           </Button>
