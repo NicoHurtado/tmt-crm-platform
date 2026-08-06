@@ -684,7 +684,7 @@ export default function ReservasPage() {
                   <TableCell className="py-3 pr-5" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={(e) => handleTogglePagoConductor(r.id, r.pagoConductor ?? false, e)}
-                      className={`inline-flex items-center justify-center w-7 h-7 rounded border transition-colors ${
+                      className={`area-tactil-completa inline-flex items-center justify-center w-7 h-7 rounded border transition-colors ${
                         r.pagoConductor
                           ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
                           : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-100'

@@ -361,7 +361,7 @@ export default function AliadosPage() {
                       <span className="font-mono text-xs font-semibold text-neutral-800">{aliado.codigo}</span>
                       <button
                         onClick={() => copyCode(aliado.codigo)}
-                        className="p-1 rounded hover:bg-neutral-100 transition-colors"
+                        className="area-tactil-completa p-1 rounded hover:bg-neutral-100 transition-colors"
                         title="Copiar código"
                       >
                         {copiedCodigo === aliado.codigo
@@ -401,7 +401,7 @@ export default function AliadosPage() {
                           setConfiguringAliadoId(aliado.id)
                           setConfigDialogOpen(true)
                         }}
-                        className="p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
                         title="Configurar precios"
                       >
                         <Settings size={13} />
@@ -409,21 +409,21 @@ export default function AliadosPage() {
                       <button
                         onClick={() => handleGenerarLink(aliado.id)}
                         disabled={generatingLinkId === aliado.id}
-                        className="p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
                         title="Generar link de aliado"
                       >
                         <Link size={13} />
                       </button>
                       <button
                         onClick={() => setQrAliado(aliado)}
-                        className="p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
                         title="QR de referido"
                       >
                         <QrCode size={13} />
                       </button>
                       <button
                         onClick={() => copyLink(aliado.codigo)}
-                        className="p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
                         title="Copiar link público"
                       >
                         {copiedCodigo === `LINK-${aliado.codigo}`
@@ -432,7 +432,7 @@ export default function AliadosPage() {
                       </button>
                       <button
                         onClick={() => handleToggleActivo(aliado)}
-                        className={`p-1.5 rounded transition-colors ${
+                        className={`area-tactil-completa p-1.5 rounded transition-colors ${
                           aliado.activo
                             ? 'text-green-600 hover:bg-green-50'
                             : 'text-red-400 hover:bg-red-50'
@@ -443,7 +443,7 @@ export default function AliadosPage() {
                       </button>
                       <button
                         onClick={() => setDeleteTarget(aliado)}
-                        className="p-1.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                         title="Eliminar"
                       >
                         <Trash2 size={13} />

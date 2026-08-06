@@ -228,7 +228,7 @@ export default function CalificacionesPage() {
                                                     </button>
                                                     <button
                                                         onClick={() => eliminarCalificacion(cal.id)}
-                                                        className="p-2 text-red-600 hover:bg-red-50 rounded"
+                                                        className="area-tactil-completa p-2 text-red-600 hover:bg-red-50 rounded"
                                                         title="Eliminar"
                                                     >
                                                         <FiTrash2 size={18} />

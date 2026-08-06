@@ -201,7 +201,7 @@ export default function TourCompartidoView({ reservas, onReservationDeleted }: T
           <div className="flex items-center justify-between mb-3">
             <button
               onClick={prevMonth}
-              className="p-1 rounded hover:bg-neutral-100 transition-colors"
+              className="area-tactil-completa p-1 rounded hover:bg-neutral-100 transition-colors"
             >
               <ChevronLeft size={13} className="text-neutral-500" />
             </button>
@@ -210,7 +210,7 @@ export default function TourCompartidoView({ reservas, onReservationDeleted }: T
             </span>
             <button
               onClick={nextMonth}
-              className="p-1 rounded hover:bg-neutral-100 transition-colors"
+              className="area-tactil-completa p-1 rounded hover:bg-neutral-100 transition-colors"
             >
               <ChevronRight size={13} className="text-neutral-500" />
             </button>

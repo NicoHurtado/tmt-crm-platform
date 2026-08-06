@@ -615,7 +615,7 @@ export default function ServiciosPage() {
                       <button
                         onClick={() => handleToggleActive(s.id)}
                         title={s.activo ? 'Desactivar' : 'Activar'}
-                        className={`p-2 rounded-md transition-colors ${s.activo ? 'text-green-500 hover:bg-green-50' : 'text-neutral-300 hover:bg-neutral-100'}`}
+                        className={`area-tactil-completa p-2 rounded-md transition-colors ${s.activo ? 'text-green-500 hover:bg-green-50' : 'text-neutral-300 hover:bg-neutral-100'}`}
                       >
                         {s.activo ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
                       </button>
@@ -627,7 +627,7 @@ export default function ServiciosPage() {
                       </Link>
                       <button
                         onClick={() => handleDelete(s.id, s.nombre)}
-                        className="p-2 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="area-tactil-completa p-2 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                         title="Eliminar"
                       >
                         <Trash2 size={15} />
@@ -699,7 +699,7 @@ function SortableMunicipioRow({
           </button>
           <button
             onClick={() => onDelete(m)}
-            className="p-1.5 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="area-tactil-completa p-1.5 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
             title="Eliminar"
           >
             <Trash2 size={14} />
