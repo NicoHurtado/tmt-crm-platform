@@ -250,13 +250,17 @@ export default function AliadosPage() {
       </div>
 
       {/* Tabs + filters row */}
-      <div className="flex items-center justify-between gap-4 border-b border-neutral-200">
-        <div className="flex">
+      {/* Pestañas y filtros van en una fila desde lg; en móvil se apilan porque juntos
+          miden más del doble del ancho de un teléfono. La línea inferior pasa a las
+          pestañas cuando están apiladas, para que el subrayado de la pestaña activa
+          siga alineado con su base y no quede una raya suelta bajo los filtros. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:border-b lg:border-neutral-200">
+        <div className="flex overflow-x-auto border-b border-neutral-200 lg:border-b-0">
           {TABS.map((t) => (
             <button
               key={t.value}
               onClick={() => setTipoTab(t.value)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px shrink-0 whitespace-nowrap ${
                 tipoTab === t.value
                   ? 'border-amber-500 text-amber-600'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700'
@@ -266,14 +270,14 @@ export default function AliadosPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 pb-1">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-2 pb-2 lg:pb-1">
+          <div className="relative flex-1 min-w-[9rem] lg:flex-none">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" size={13} />
             <Input
               placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 h-8 text-sm border-neutral-200 bg-white w-44"
+              className="pl-8 h-8 text-sm border-neutral-200 bg-white w-full lg:w-44"
             />
           </div>
           <div className="flex gap-1">
