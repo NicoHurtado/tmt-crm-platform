@@ -64,7 +64,13 @@ export default function ReservaDetailSheet({
 
   return (
     <Sheet open={!!reservaId} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-[560px] sm:max-w-[560px] overflow-y-auto p-0">
+      {/* El ancho base del panel es `w-3/4`, definido con un selector de atributo que gana
+          en especificidad: por eso el `w-[560px]` que había aquí nunca llegó a aplicarse
+          (en escritorio mandaba el tope de `sm:max-w-sm`). En un teléfono ese 3/4 dejaba
+          el panel en 293px y recortaba textos como el correo del cliente. Se sobrescribe
+          con la misma especificidad para que ocupe todo el ancho en móvil; desde `sm` el
+          tope de la clase base lo sigue limitando igual que antes. */}
+      <SheetContent className="data-[side=right]:w-full overflow-y-auto p-0">
         {reserva && (
           <div className="flex flex-col h-full">
             {/* Header */}

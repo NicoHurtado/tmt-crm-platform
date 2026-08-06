@@ -81,9 +81,10 @@ export default function TerminosAdminPage() {
     return (
         <div className="min-h-screen bg-[#F0F2F5] p-6">
             <div className="max-w-4xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                {/* Header — apilado en móvil, fila desde sm: el título con su icono más los
+                    dos botones no caben juntos en el ancho de un teléfono. */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
                         <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
                             <ScrollText size={20} className="text-amber-500" />
                         </div>
@@ -96,7 +97,7 @@ export default function TerminosAdminPage() {
                             )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:shrink-0">
                         <button
                             onClick={() => setPreview((v) => !v)}
                             className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 text-sm font-medium transition-colors"

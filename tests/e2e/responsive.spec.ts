@@ -124,24 +124,51 @@ test.describe('Responsive — sin desborde horizontal en móvil', () => {
             });
         }
 
-        // El detalle no tiene URL fija: se entra por la primera reserva de la lista.
-        // Si la base no tiene reservas, la prueba se salta en vez de fallar.
+        // El detalle no tiene URL fija: se llega haciendo clic en una fila, que abre un
+        // panel lateral, y desde ahí "Abrir completo" lleva a la página entera. Se revisan
+        // los dos, porque el panel es lo que usa el equipo a diario.
         test('el detalle de una reserva cabe en la pantalla', async ({ page }) => {
+            // Recorre dos vistas y en desarrollo la segunda se compila al vuelo, así que
+            // necesita más margen que el resto de pruebas.
+            test.setTimeout(90_000);
+
             await esperarPagina(page, '/admin/dashboard/reservas');
 
-            const primeraFila = page.locator('a[href*="/admin/dashboard/reservas/"]').first();
+            const primeraFila = page.locator('tbody tr').first();
             const hayReservas = (await primeraFila.count()) > 0;
             test.skip(!hayReservas, 'No hay reservas en la base para abrir el detalle');
 
+            // 1. El panel lateral
             await primeraFila.click();
+            await page.waitForTimeout(1_500);
+
+            const panel = page.locator('[data-slot="sheet-content"], [role="dialog"]').first();
+            await expect(panel).toBeVisible();
+
+            const panelCabe = await panel.evaluate((el) => {
+                const caja = el.getBoundingClientRect();
+                return caja.left >= -2 && caja.right <= document.documentElement.clientWidth + 2;
+            });
+            expect(panelCabe, 'El panel lateral de la reserva se sale de la pantalla').toBe(true);
+
+            const trasAbrirPanel = await medirDesborde(page);
+            expect(
+                trasAbrirPanel.desborde,
+                trasAbrirPanel.desborde > TOLERANCIA
+                    ? `Con el panel de reserva abierto la página desborda ${trasAbrirPanel.desborde}px:\n  - ${trasAbrirPanel.culpables.join('\n  - ')}`
+                    : '',
+            ).toBeLessThanOrEqual(TOLERANCIA);
+
+            // 2. La página completa
+            await page.getByRole('button', { name: /Abrir completo/i }).click();
             await page.waitForURL(/\/admin\/dashboard\/reservas\/.+/, { timeout: 20_000 });
-            await page.waitForTimeout(1_000);
+            await page.waitForTimeout(1_500);
 
             const { desborde, culpables } = await medirDesborde(page);
             expect(
                 desborde,
                 desborde > TOLERANCIA
-                    ? `El detalle de reserva desborda ${desborde}px en móvil. Elementos que se salen:\n  - ${culpables.join('\n  - ')}`
+                    ? `La página de detalle desborda ${desborde}px en móvil. Elementos que se salen:\n  - ${culpables.join('\n  - ')}`
                     : '',
             ).toBeLessThanOrEqual(TOLERANCIA);
         });

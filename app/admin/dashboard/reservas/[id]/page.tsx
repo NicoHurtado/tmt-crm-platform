@@ -372,16 +372,19 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
         <div className="min-h-screen bg-[#F0F2F5]">
             {/* Top bar */}
             <div className="bg-white border-b border-gray-200 px-6 py-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                {/* El título con sus dos insignias mide unos 397px y los botones otros 200:
+                    en un teléfono no caben en la misma fila. Se apila hasta sm y las
+                    insignias pueden bajar de renglón. Desde sm queda la fila de siempre. */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
                         <button
                             onClick={() => router.back()}
-                            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
                         >
                             <FiArrowLeft size={18} className="text-gray-500" />
                         </button>
-                        <div>
-                            <div className="flex items-center gap-2.5">
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2.5">
                                 <h1 className="text-lg font-bold text-gray-900">Reserva #{reserva.codigo}</h1>
                                 <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium ${getStateBadge(reserva.estado)}`}>
                                     {getStateLabel(reserva.estado)}
@@ -397,7 +400,7 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:shrink-0">
                         <a
                             href={`/tracking/${reserva.codigo}`}
                             target="_blank"
