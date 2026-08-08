@@ -43,6 +43,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { getLocalizedText } from '@/types/multi-language'
 import { categoriaDeServicio } from '@/lib/servicio-categoria'
+import { FilterShell, FilterField } from '@/components/admin/responsive'
 import MunicipalServicesGroup from './MunicipalServicesGroup'
 
 interface MunicipioConfig {
@@ -276,14 +277,14 @@ export default function ServiciosPage() {
     : nonMunicipal.filter((s) => categorizar(s) === catFilter)
 
   return (
-    <div className="flex flex-col gap-4 p-6 w-full">
+    <div className="flex flex-col gap-4 p-4 sm:p-6 w-full min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Servicios</h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-neutral-900">Servicios</h1>
           <p className="text-sm text-neutral-500 mt-0.5">Gestiona los servicios disponibles para reserva</p>
         </div>
-        <Button size="sm" className="gap-1.5 text-sm" asChild>
+        <Button className="gap-1.5 text-sm h-11 sm:h-9 w-full sm:w-auto" asChild>
           <Link href="/admin/dashboard/servicios/crear">
             <Plus size={14} />
             Crear servicio
@@ -291,8 +292,10 @@ export default function ServiciosPage() {
         </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-neutral-200">
+      {/* Tabs — se desplazan en horizontal en móvil: "Tarifas por Ubicación"
+          sola ya mide más de media pantalla y partirlas en dos renglones deja
+          el subrayado activo a media altura. */}
+      <div className="flex border-b border-neutral-200 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
         {([
           { key: 'servicios', label: 'Servicios' },
           { key: 'municipal', label: 'Transporte Municipal' },
@@ -301,7 +304,7 @@ export default function ServiciosPage() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`px-3 sm:px-4 py-2.5 min-h-[44px] text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap flex-shrink-0 ${
               tab === key
                 ? 'border-amber-500 text-amber-600'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700'
@@ -313,32 +316,54 @@ export default function ServiciosPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
-          <Input
-            placeholder="Buscar servicios..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-9 text-sm border-neutral-200 bg-white"
-          />
-        </div>
+      <FilterShell
+        chips={
+          activoFilter !== 'ALL'
+            ? [
+                {
+                  label: `Estado: ${activoFilter === 'true' ? 'Activos' : 'Inactivos'}`,
+                  onRemove: () => setActivoFilter('ALL'),
+                },
+              ]
+            : []
+        }
+        onClearAll={() => {
+          setSearch('')
+          setActivoFilter('ALL')
+        }}
+        search={
+          <div className="relative lg:flex-1 lg:min-w-[200px] lg:max-w-xs">
+            <Search
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 z-10"
+              size={14}
+            />
+            <Input
+              placeholder="Buscar servicios..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-11 lg:h-9 text-sm border-neutral-200 bg-white"
+            />
+          </div>
+        }
+      >
+        <FilterField label="Estado">
+          <Select value={activoFilter} onValueChange={setActivoFilter}>
+            <SelectTrigger className="lg:w-[160px] h-11 lg:h-9 text-sm border-neutral-200 bg-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL" className="text-sm">Todos los estados</SelectItem>
+              <SelectItem value="true" className="text-sm">Activos</SelectItem>
+              <SelectItem value="false" className="text-sm">Inactivos</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+      </FilterShell>
 
-        <Select value={activoFilter} onValueChange={setActivoFilter}>
-          <SelectTrigger className="w-[160px] h-9 text-sm border-neutral-200 bg-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL" className="text-sm">Todos los estados</SelectItem>
-            <SelectItem value="true" className="text-sm">Activos</SelectItem>
-            <SelectItem value="false" className="text-sm">Inactivos</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Franja de categorías (solo tab Servicios) */}
+      {/* Franja de categorías (solo tab Servicios).
+          En móvil se desplaza en horizontal en vez de envolverse en 4 renglones. */}
       {tab === 'servicios' && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar sm:flex-wrap sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0">
           {categorias.map(({ key, label }) => {
             const active = catFilter === key
             const count = catCounts[key]
@@ -346,7 +371,7 @@ export default function ServiciosPage() {
               <button
                 key={key}
                 onClick={() => setCatFilter(key)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] flex-shrink-0 whitespace-nowrap rounded-full text-xs font-medium border transition-colors ${
                   active
                     ? 'bg-amber-500 text-white border-amber-500'
                     : 'bg-white text-neutral-600 border-neutral-200 hover:border-amber-400 hover:text-neutral-900'
@@ -615,7 +640,7 @@ export default function ServiciosPage() {
                       <button
                         onClick={() => handleToggleActive(s.id)}
                         title={s.activo ? 'Desactivar' : 'Activar'}
-                        className={`p-2 rounded-md transition-colors ${s.activo ? 'text-green-500 hover:bg-green-50' : 'text-neutral-300 hover:bg-neutral-100'}`}
+                        className={`area-tactil-completa p-2 rounded-md transition-colors ${s.activo ? 'text-green-500 hover:bg-green-50' : 'text-neutral-300 hover:bg-neutral-100'}`}
                       >
                         {s.activo ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
                       </button>
@@ -627,7 +652,7 @@ export default function ServiciosPage() {
                       </Link>
                       <button
                         onClick={() => handleDelete(s.id, s.nombre)}
-                        className="p-2 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="area-tactil-completa p-2 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                         title="Eliminar"
                       >
                         <Trash2 size={15} />
@@ -699,7 +724,7 @@ function SortableMunicipioRow({
           </button>
           <button
             onClick={() => onDelete(m)}
-            className="p-1.5 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="area-tactil-completa p-1.5 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
             title="Eliminar"
           >
             <Trash2 size={14} />

@@ -206,22 +206,31 @@ export default function ConductoresPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6 w-full">
+    <div className="flex flex-col gap-4 p-4 sm:p-6 w-full min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* En móvil el título y las acciones se apilan; desde sm vuelven a la fila de
+          siempre. Los dos botones juntos miden más que el ancho de un teléfono, así que
+          en pantalla pequeña ocupan todo el ancho: además de caber, son más fáciles de
+          tocar. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Conductores</h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-neutral-900">Conductores</h1>
           <p className="text-sm text-neutral-500 mt-0.5">
             {conductores.length} conductor{conductores.length !== 1 ? 'es' : ''} registrado
             {conductores.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="gap-1.5 text-sm" onClick={handleGenerateInvite}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 text-sm w-full sm:w-auto"
+            onClick={handleGenerateInvite}
+          >
             <Link2 size={14} />
             Generar link de registro
           </Button>
-          <Button size="sm" className="gap-1.5 text-sm" onClick={openCreate}>
+          <Button size="sm" className="gap-1.5 text-sm w-full sm:w-auto" onClick={openCreate}>
             <Plus size={14} />
             Nuevo conductor
           </Button>
@@ -255,7 +264,114 @@ export default function ConductoresPage() {
           </Button>
         </div>
       ) : (
-        <div className="border border-neutral-200 rounded-lg overflow-hidden bg-white">
+        <>
+        {/* Móvil: una tarjeta por conductor.
+            Lo que se consulta desde el teléfono es a quién llamar y con qué placa
+            va, así que la foto, el nombre y la placa mandan, y WhatsApp queda como
+            botón propio en vez de un enlace de 11px dentro de una celda. */}
+        <div className="flex flex-col gap-2 lg:hidden">
+          {filteredConductores.map((c) => (
+            <div key={c.id} className="rounded-xl border border-neutral-200 bg-white p-3.5">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-full overflow-hidden border border-neutral-200 flex-shrink-0 bg-neutral-100 flex items-center justify-center">
+                  {c.foto ? (
+                    <Image
+                      src={c.foto}
+                      alt={c.nombre}
+                      width={44}
+                      height={44}
+                      className="object-cover w-full h-full"
+                      unoptimized
+                    />
+                  ) : (
+                    <span className="text-sm font-bold text-neutral-400">
+                      {c.nombre.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-neutral-900 break-words">{c.nombre}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                    <span className="font-mono text-xs font-semibold text-neutral-800 bg-neutral-100 border border-neutral-200 px-1.5 py-0.5 rounded">
+                      {c.placa}
+                    </span>
+                    <span
+                      className={`text-[11px] font-medium px-2 py-0.5 rounded border ${
+                        c.disponible
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-neutral-100 text-neutral-500 border-neutral-200'
+                      }`}
+                    >
+                      {c.disponible ? 'Disponible' : 'Ocupado'}
+                    </span>
+                    <span
+                      className={`text-[11px] font-medium px-2 py-0.5 rounded border ${
+                        c.activo
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-neutral-100 text-neutral-500 border-neutral-200'
+                      }`}
+                    >
+                      {c.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                    {c.selfRegistered && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                        Auto-registrado
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                    Documento
+                  </div>
+                  <div className="text-[13px] text-neutral-800 mt-0.5 break-words">
+                    {c.documento}
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                    Teléfono
+                  </div>
+                  <div className="text-[13px] text-neutral-800 mt-0.5 break-words">
+                    {c.telefono}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-neutral-100">
+                <a
+                  href={`https://wa.me/${c.whatsapp.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-11 flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-green-200 bg-green-50 text-sm font-medium text-green-700 active:bg-green-100"
+                >
+                  <Phone size={14} />
+                  WhatsApp
+                </a>
+                <Button
+                  variant="outline"
+                  className="h-11 flex-1 text-sm border-neutral-200 font-normal"
+                  onClick={() => openEdit(c)}
+                >
+                  Editar
+                </Button>
+                <button
+                  onClick={() => setDeleteId(c.id)}
+                  aria-label="Eliminar conductor"
+                  className="w-11 h-11 flex-shrink-0 inline-flex items-center justify-center rounded-lg border border-neutral-200 text-red-500 active:bg-red-50"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Escritorio: la tabla de siempre */}
+        <div className="hidden lg:block border border-neutral-200 rounded-lg overflow-hidden bg-white">
           <Table>
             <TableHeader>
               <TableRow className="bg-neutral-50 hover:bg-neutral-50">
@@ -360,6 +476,7 @@ export default function ConductoresPage() {
             </TableBody>
           </Table>
         </div>
+        </>
       )}
 
       {/* Create/Edit Dialog */}

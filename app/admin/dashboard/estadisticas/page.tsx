@@ -143,10 +143,12 @@ function KpiCard({
   const trend = prev > 0 ? Math.round(((curr - prev) / prev) * 100) : null;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center justify-between gap-4">
-      <div className="flex flex-col gap-2 min-w-0">
-        <p className="text-xs font-medium text-gray-400 leading-none">{label}</p>
-        <p className="text-2xl font-bold text-gray-900 tracking-tight leading-none">{value}</p>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-1.5 sm:gap-2 min-w-0">
+        <p className="text-[11px] sm:text-xs font-medium text-gray-400 leading-tight">{label}</p>
+        <p className="text-lg sm:text-2xl font-bold text-gray-900 tracking-tight leading-none break-words">
+          {value}
+        </p>
         {trend !== null && (
           <span
             className={`text-xs font-semibold px-2 py-0.5 rounded-full w-fit ${
@@ -157,7 +159,10 @@ function KpiCard({
           </span>
         )}
       </div>
-      <div className="flex-shrink-0 w-[110px] h-[60px]">
+      {/* La sparkline se va en móvil: con dos KPIs por fila quedaría de ~60px de
+          ancho, donde la línea no comunica nada, y le roba el espacio al número,
+          que es lo que sí se lee de un vistazo. El % de tendencia se queda. */}
+      <div className="hidden sm:block flex-shrink-0 w-[110px] h-[60px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={sparklineData} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
             <defs>
@@ -187,7 +192,7 @@ function CapacidadSection({ data }: { data: CapacidadPoint[] }) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
         <div className="px-0 pt-0 pb-3">
           <h3 className="text-sm font-semibold text-gray-700">
             Personas transportadas por capacidad de vehículo
@@ -203,7 +208,7 @@ function CapacidadSection({ data }: { data: CapacidadPoint[] }) {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-6 pt-5 pb-3 border-b border-gray-50">
+      <div className="px-4 sm:px-6 pt-5 pb-3 border-b border-gray-50">
         <h3 className="text-sm font-semibold text-gray-700">
           Personas transportadas por capacidad de vehículo
         </h3>
@@ -213,27 +218,36 @@ function CapacidadSection({ data }: { data: CapacidadPoint[] }) {
         {data.map((row) => {
           const pct = Math.round((row.personas / totalPersonas) * 100);
           return (
-            <div key={row.capacidad} className="px-6 py-4 flex items-center gap-4">
-              <span className="bg-amber-50 text-[#D6A75D] rounded-full px-3 py-1 text-xs font-semibold w-24 text-center flex-shrink-0">
-                {row.capacidad}
-              </span>
-              <div className="flex items-center gap-5 text-sm flex-shrink-0">
-                <span className="flex items-center gap-1.5 text-gray-500">
-                  <FiCalendar size={12} className="text-gray-400" />
-                  <span className="font-semibold text-gray-700">
-                    {row.reservas.toLocaleString('es-CO')}
-                  </span>
-                  <span className="text-xs text-gray-400">reservas</span>
+            /* La fila tiene tres bloques que en escritorio van en línea. En móvil
+               los dos primeros suman más de 375px y, como el contenedor de la
+               tarjeta recorta, "personas" quedaba cortado a media palabra. En
+               pantalla pequeña se apila: pastilla + cifras arriba, barra abajo. */
+            <div
+              key={row.capacidad}
+              className="px-4 sm:px-6 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="bg-amber-50 text-[#D6A75D] rounded-full px-3 py-1 text-xs font-semibold w-24 text-center flex-shrink-0">
+                  {row.capacidad}
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <FiUsers size={12} className="text-[#D6A75D]" />
-                  <span className="font-bold text-gray-900">
-                    {row.personas.toLocaleString('es-CO')}
+                <div className="flex items-center gap-3 sm:gap-5 text-sm min-w-0 flex-wrap">
+                  <span className="flex items-center gap-1.5 text-gray-500">
+                    <FiCalendar size={12} className="text-gray-400 flex-shrink-0" />
+                    <span className="font-semibold text-gray-700">
+                      {row.reservas.toLocaleString('es-CO')}
+                    </span>
+                    <span className="text-xs text-gray-400">reservas</span>
                   </span>
-                  <span className="text-xs text-gray-400">personas</span>
-                </span>
+                  <span className="flex items-center gap-1.5">
+                    <FiUsers size={12} className="text-[#D6A75D] flex-shrink-0" />
+                    <span className="font-bold text-gray-900">
+                      {row.personas.toLocaleString('es-CO')}
+                    </span>
+                    <span className="text-xs text-gray-400">personas</span>
+                  </span>
+                </div>
               </div>
-              <div className="flex-1 flex items-center gap-2">
+              <div className="flex-1 flex items-center gap-2 min-w-0">
                 <div className="flex-1 bg-gray-100 rounded-full h-1.5">
                   <div
                     className="h-1.5 rounded-full bg-[#D6A75D] transition-all duration-500"
@@ -261,7 +275,7 @@ function ChartCard({
 }) {
   return (
     <div className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${className}`}>
-      <div className="px-6 pt-5 pb-3">
+      <div className="px-4 sm:px-6 pt-5 pb-3">
         <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
       </div>
       <div className="px-4 pb-5">{children}</div>
@@ -357,7 +371,7 @@ export default function EstadisticasPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-        <div className="px-6 py-4">
+        <div className="px-4 sm:px-6 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-gray-900">Estadísticas</h1>
@@ -382,8 +396,8 @@ export default function EstadisticasPage() {
       </header>
 
       {/* Tab nav */}
-      <div className="bg-white border-b border-gray-200 px-6">
-        <div className="flex gap-0 overflow-x-auto">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6">
+        <div className="flex gap-0 overflow-x-auto no-scrollbar">
           {TABS.map(({ name, icon: Icon }) => (
             <button
               key={name}
@@ -402,11 +416,11 @@ export default function EstadisticasPage() {
         </div>
       </div>
 
-      <main className="px-6 py-6 space-y-5">
+      <main className="px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-5">
         {/* ── TAB: RESUMEN ─────────────────────────────────── */}
         {activeTab === 'Resumen' && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <KpiCard
                 label="Reservas Totales"
                 value={stats.totalReservas.toLocaleString('es-CO')}
@@ -642,7 +656,7 @@ export default function EstadisticasPage() {
         {/* ── TAB: FINANCIERO ──────────────────────────────── */}
         {activeTab === 'Financiero' && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <KpiCard
                 label="Pagos Bold (online)"
                 value={formatCOP(stats.pagosBold)}

@@ -128,20 +128,6 @@ select {
   transition: all 200ms ease-in-out;
 }
 
-/* Marquee Animation */
-@keyframes marquee {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
-}
-
-.animate-marquee {
-  animation: marquee 80s linear infinite;
-}
-
 @layer base {
   .theme {
     --font-heading: var(--font-sans);
@@ -227,3 +213,39 @@ select {
 /* Oculta la barra de scroll en filtros horizontales (barra de categorías de /reservas) */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Área mínima para tocar con el dedo.
+   44px es el mínimo que recomiendan tanto Apple como Google; por debajo de eso el
+   dedo falla seguido. Solo aplica en pantallas táctiles (pointer: coarse), así que
+   con ratón los controles conservan su tamaño original. */
+@media (pointer: coarse) {
+  .area-tactil { min-height: 44px; }
+  .area-tactil-completa { min-height: 44px; min-width: 44px; }
+}
+
+/* Filtros dentro del bottom sheet del admin (FilterShell).
+   Los controles de la barra de escritorio traen anchos fijos (w-[190px],
+   w-[220px]…) que ahí tienen sentido pero dentro del sheet dejan huecos y se
+   ven desalineados. En vez de duplicar cada control con otro className, se
+   estiran desde aquí: así el sheet no obliga a tocar ni un filtro existente y
+   cualquier filtro nuevo entra ya bien formateado.
+   `:where()` mantiene la especificidad en 0 para que un className puntual del
+   control siga ganando si hace falta. */
+.filtros-movil :where(button[role="combobox"], input, select, textarea, .filtro-ancho) {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: 44px;
+}
+.filtros-movil :where(textarea) {
+  height: auto;
+}
+/* Los grupos que en escritorio van en línea (ej. "Desde [fecha] Hasta [fecha]")
+   se apilan, si no los campos de fecha quedan de 80px. */
+.filtros-movil :where(.filtro-grupo) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+  width: 100%;
+}

@@ -249,7 +249,7 @@ export default function CrearServicioPage() {
             <div className="flex items-center gap-4 mb-8">
                 <Link
                     href="/admin/dashboard/servicios"
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="area-tactil-completa inline-flex items-center justify-center p-2 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                     <ArrowLeft size={20} />
                 </Link>
@@ -288,7 +288,7 @@ export default function CrearServicioPage() {
                                         value={nombreES}
                                         onChange={(e) => setNombreES(e.target.value)}
                                         required
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                        className="area-tactil w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
                                         placeholder="ej: Tour Guatape Premium"
                                     />
                                 </div>
@@ -301,7 +301,7 @@ export default function CrearServicioPage() {
                                         value={nombreEN}
                                         onChange={(e) => setNombreEN(e.target.value)}
                                         required
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                        className="area-tactil w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
                                         placeholder="ex: Guatape Premium Tour"
                                     />
                                 </div>
@@ -323,7 +323,7 @@ export default function CrearServicioPage() {
                                         onChange={(e) => setDescripcionES(e.target.value)}
                                         required
                                         rows={4}
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors resize-none"
+                                        className="area-tactil w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors resize-none"
                                         placeholder="Describe el servicio..."
                                     />
                                 </div>
@@ -336,7 +336,7 @@ export default function CrearServicioPage() {
                                         onChange={(e) => setDescripcionEN(e.target.value)}
                                         required
                                         rows={4}
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors resize-none"
+                                        className="area-tactil w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors resize-none"
                                         placeholder="Describe the service..."
                                     />
                                 </div>
@@ -359,7 +359,7 @@ export default function CrearServicioPage() {
                                         type="text"
                                         value={duracion}
                                         onChange={(e) => setDuracion(e.target.value)}
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                        className="area-tactil w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
                                         placeholder="ej: 8 horas"
                                     />
                                 </div>
@@ -371,7 +371,7 @@ export default function CrearServicioPage() {
                                         type="text"
                                         value={destinoAutoFill}
                                         onChange={(e) => setDestinoAutoFill(e.target.value)}
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                        className="area-tactil w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
                                         placeholder="ej: Guatape"
                                     />
                                 </div>
@@ -395,7 +395,7 @@ export default function CrearServicioPage() {
                                                     type="text"
                                                     value={item}
                                                     onChange={(e) => handleIncluyeChangeES(index, e.target.value)}
-                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                                    className="area-tactil flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
                                                     placeholder="ej: Transporte privado"
                                                 />
                                                 {incluyeES.length > 1 && (
@@ -412,7 +412,7 @@ export default function CrearServicioPage() {
                                         <button
                                             type="button"
                                             onClick={handleAddIncluyeES}
-                                            className="inline-flex items-center gap-1 text-xs font-medium text-[#D6A75D] hover:text-[#C5964A] transition-colors"
+                                            className="area-tactil inline-flex items-center gap-1 text-xs font-medium text-[#D6A75D] hover:text-[#C5964A] transition-colors"
                                         >
                                             <Plus size={14} /> Agregar item
                                         </button>
@@ -429,7 +429,7 @@ export default function CrearServicioPage() {
                                                     type="text"
                                                     value={item}
                                                     onChange={(e) => handleIncluyeChangeEN(index, e.target.value)}
-                                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                                    className="area-tactil flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
                                                     placeholder="ex: Private transport"
                                                 />
                                                 {incluyeEN.length > 1 && (
@@ -446,7 +446,7 @@ export default function CrearServicioPage() {
                                         <button
                                             type="button"
                                             onClick={handleAddIncluyeEN}
-                                            className="inline-flex items-center gap-1 text-xs font-medium text-[#D6A75D] hover:text-[#C5964A] transition-colors"
+                                            className="area-tactil inline-flex items-center gap-1 text-xs font-medium text-[#D6A75D] hover:text-[#C5964A] transition-colors"
                                         >
                                             <Plus size={14} /> Add item
                                         </button>
@@ -611,7 +611,7 @@ export default function CrearServicioPage() {
 
                     <div className="p-6">
                         <div
-                            className="flex items-center gap-3 cursor-pointer w-fit"
+                            className="area-tactil flex items-center gap-3 cursor-pointer w-fit"
                             onClick={() => setAplicaRecargoNocturno(!aplicaRecargoNocturno)}
                         >
                             <Switch
@@ -631,7 +631,7 @@ export default function CrearServicioPage() {
                                     <TimeInput
                                         value={recargoNocturnoInicio}
                                         onChange={(value) => setRecargoNocturnoInicio(value)}
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D]"
+                                        className="area-tactil w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D]"
                                     />
                                 </div>
                                 <div>
@@ -641,7 +641,7 @@ export default function CrearServicioPage() {
                                     <TimeInput
                                         value={recargoNocturnoFin}
                                         onChange={(value) => setRecargoNocturnoFin(value)}
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D]"
+                                        className="area-tactil w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D]"
                                     />
                                 </div>
                                 <div>
@@ -653,7 +653,7 @@ export default function CrearServicioPage() {
                                         value={montoRecargoNocturno}
                                         onChange={(e) => setMontoRecargoNocturno(Number(e.target.value))}
                                         min="0"
-                                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
+                                        className="area-tactil w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#D6A75D]/40 focus:border-[#D6A75D] transition-colors"
                                     />
                                 </div>
                             </div>
@@ -680,7 +680,7 @@ export default function CrearServicioPage() {
                         }`}>
                             <div className="flex items-center justify-between">
                                 <div
-                                    className="flex items-center gap-3 cursor-pointer flex-1"
+                                    className="area-tactil flex items-center gap-3 cursor-pointer flex-1"
                                     onClick={() => setGuiaEspanolDisponible(!guiaEspanolDisponible)}
                                 >
                                     <Switch
@@ -715,7 +715,7 @@ export default function CrearServicioPage() {
                         }`}>
                             <div className="flex items-center justify-between">
                                 <div
-                                    className="flex items-center gap-3 cursor-pointer flex-1"
+                                    className="area-tactil flex items-center gap-3 cursor-pointer flex-1"
                                     onClick={() => setGuiaInglesDisponible(!guiaInglesDisponible)}
                                 >
                                     <Switch
@@ -784,12 +784,19 @@ export default function CrearServicioPage() {
                                             }`}
                                         >
                                             <div className="flex items-center gap-4">
+                                                {/* La casilla mide 16px: imposible de acertar con el dedo. Se envuelve
+                                                    junto a la foto y el nombre en un label, así toda esa zona selecciona
+                                                    el vehículo. Los campos de precio quedan FUERA del label a propósito:
+                                                    dentro, tocarlos desmarcaría el vehículo. */}
+                                                <label
+                                                    className={`flex flex-1 min-w-0 items-center gap-4 ${blocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                                                >
                                                 <input
                                                     type="checkbox"
                                                     checked={!!isSelected}
                                                     disabled={blocked}
                                                     onChange={() => handleVehiculoToggle(vehiculo.id)}
-                                                    className={`w-4 h-4 text-[#D6A75D] border-gray-300 rounded focus:ring-[#D6A75D] ${blocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                                                    className={`w-4 h-4 flex-shrink-0 text-[#D6A75D] border-gray-300 rounded focus:ring-[#D6A75D] ${blocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                                                 />
 
                                                 <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
@@ -814,6 +821,7 @@ export default function CrearServicioPage() {
                                                         Capacidad: {vehiculo.capacidadMinima} - {vehiculo.capacidadMaxima} pasajeros
                                                     </p>
                                                 </div>
+                                                </label>
 
                                                 {isSelected && (
                                                     <div className={esAeropuerto ? 'flex gap-3 flex-shrink-0' : 'w-40 flex-shrink-0'}>
@@ -879,14 +887,14 @@ export default function CrearServicioPage() {
                 <div className="flex items-center justify-between pt-2 pb-8">
                     <Link
                         href="/admin/dashboard/servicios"
-                        className="px-5 py-2.5 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
+                        className="area-tactil inline-flex items-center px-5 py-2.5 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
                     >
                         Cancelar
                     </Link>
                     <button
                         type="submit"
                         disabled={loading}
-                        className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#D6A75D] text-black text-sm font-semibold rounded-lg hover:bg-[#C5964A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="area-tactil inline-flex items-center gap-2 px-6 py-2.5 bg-[#D6A75D] text-black text-sm font-semibold rounded-lg hover:bg-[#C5964A] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {loading ? (
                             <>

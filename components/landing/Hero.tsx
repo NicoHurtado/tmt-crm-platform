@@ -53,18 +53,12 @@ export default function Hero() {
                     {t('landing.hero_subtitulo', language)}
                 </p>
 
-                <div className="flex flex-col sm:flex-row items-center md:items-start justify-center md:justify-start gap-4 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
-                    <Link
-                        href="#servicios"
-                        className="w-full sm:w-auto bg-[#D6A75D] hover:bg-[#C5964A] text-black font-bold py-4 px-8 rounded-lg transition-all transform hover:scale-105 active:scale-95 text-lg shadow-lg shadow-[#D6A75D]/20"
-                    >
-                        {t('landing.hero_cta', language)}
-                    </Link>
+                <div className="flex items-center md:items-start justify-center md:justify-start animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
                     <Link
                         href="/reservas"
-                        className="w-full sm:w-auto bg-transparent border-2 border-white hover:bg-white hover:text-black text-white font-bold py-3.5 px-8 rounded-lg transition-all text-lg backdrop-blur-sm"
+                        className="w-full sm:w-auto text-center bg-[#D6A75D] hover:bg-[#C5964A] text-black font-bold py-4 px-8 rounded-lg transition-all transform hover:scale-105 active:scale-95 text-lg shadow-lg shadow-[#D6A75D]/20"
                     >
-                        {t('header.reservar', language)}
+                        {t('landing.hero_cta', language)}
                     </Link>
                 </div>
             </div>

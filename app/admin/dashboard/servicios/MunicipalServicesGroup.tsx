@@ -134,7 +134,7 @@ export default function MunicipalServicesGroup({
                                                         e.stopPropagation();
                                                         onToggle(servicio.id);
                                                     }}
-                                                    className={`p-1.5 rounded transition-colors ${servicio.activo
+                                                    className={`area-tactil-completa p-1.5 rounded transition-colors ${servicio.activo
                                                         ? 'text-green-600 hover:bg-green-50'
                                                         : 'text-gray-400 hover:bg-gray-50'
                                                         }`}
@@ -158,7 +158,7 @@ export default function MunicipalServicesGroup({
                                                         e.stopPropagation();
                                                         onDelete(servicio.id, servicio.nombre);
                                                     }}
-                                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                    className="area-tactil-completa p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
                                                     title="Eliminar"
                                                 >
                                                     <FiTrash2 size={16} />

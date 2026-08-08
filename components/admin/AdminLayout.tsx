@@ -68,7 +68,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     pathname === item.href || pathname.startsWith(item.href + '/')
 
   return (
-    <div className="min-h-screen bg-white font-[family-name:var(--font-sans)] flex">
+    // Móvil: columna — la barra superior va ENCIMA del contenido.
+    // Escritorio (lg): fila — el espaciador del sidebar va al lado del contenido.
+    // Sin `flex-col` en móvil la barra superior quedaba como hermana en la fila, es decir
+    // AL LADO del contenido, empujándolo fuera de la pantalla.
+    <div className="min-h-screen bg-white font-[family-name:var(--font-sans)] flex flex-col lg:flex-row">
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
@@ -194,9 +198,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span className="text-sm font-semibold text-amber-400 leading-tight">TMT Admin</span>
             <span className="text-[10px] text-neutral-500">Transportes Medellín</span>
           </div>
+          {/* 44px es el mínimo táctil recomendado por Apple y Google: por debajo de eso
+              el dedo falla seguido. El icono no cambia de tamaño, solo el área que
+              responde al toque. */}
           <button
+            aria-label="Cerrar menú"
             onClick={() => setMobileOpen(false)}
-            className="p-1.5 rounded-md hover:bg-neutral-800 text-neutral-500 hover:text-neutral-200"
+            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center -mr-2 rounded-md hover:bg-neutral-800 text-neutral-500 hover:text-neutral-200"
           >
             <X size={16} />
           </button>
@@ -210,7 +218,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors',
+                  'flex items-center gap-2.5 px-2.5 py-2 min-h-[44px] rounded-md text-sm transition-colors',
                   active
                     ? 'bg-amber-500/10 text-amber-400 font-medium'
                     : 'text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800',
@@ -226,7 +234,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link
             href="/admin/dashboard/terminos"
             className={cn(
-              'flex items-center gap-2.5 px-2.5 py-2 w-full rounded-md text-sm transition-colors',
+              'flex items-center gap-2.5 px-2.5 py-2 min-h-[44px] w-full rounded-md text-sm transition-colors',
               pathname.startsWith('/admin/dashboard/terminos')
                 ? 'bg-amber-500/10 text-amber-400 font-medium'
                 : 'text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800',
@@ -237,7 +245,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
           <button
             onClick={() => signOut({ callbackUrl: '/admin/login' })}
-            className="flex items-center gap-2.5 px-2.5 py-2 w-full rounded-md text-sm text-neutral-500 hover:text-red-400 hover:bg-red-950/30 transition-colors"
+            className="flex items-center gap-2.5 px-2.5 py-2 min-h-[44px] w-full rounded-md text-sm text-neutral-500 hover:text-red-400 hover:bg-red-950/30 transition-colors"
           >
             <LogOut size={16} />
             <span>Cerrar Sesión</span>
@@ -248,8 +256,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Mobile top bar */}
       <div className="sticky top-0 z-30 h-14 bg-white border-b border-neutral-200 flex items-center px-4 lg:hidden flex-shrink-0">
         <button
+          aria-label="Abrir menú"
           onClick={() => setMobileOpen(true)}
-          className="p-2 rounded-md hover:bg-neutral-100 text-neutral-600 transition-colors"
+          className="min-h-[44px] min-w-[44px] -ml-2 inline-flex items-center justify-center rounded-md hover:bg-neutral-100 text-neutral-600 transition-colors"
         >
           <Menu size={18} />
         </button>
@@ -260,7 +269,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="hidden lg:block flex-shrink-0 w-16" />
 
       {/* Main content */}
-      <main className="flex-1 min-w-0 min-h-screen pt-14 lg:pt-0">
+      {/* En móvil la barra superior ya ocupa su espacio en la columna, así que no hace
+          falta compensarla con padding. `min-h-screen` solo en escritorio: en móvil el
+          contenido ya llena la altura restante con flex-1. */}
+      <main className="flex-1 min-w-0 lg:min-h-screen">
         {children}
       </main>
     </div>

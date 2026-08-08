@@ -236,27 +236,31 @@ export default function AliadosPage() {
   ]
 
   return (
-    <div className="flex flex-col gap-4 p-6 w-full">
+    <div className="flex flex-col gap-4 p-4 sm:p-6 w-full min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Aliados</h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-neutral-900">Aliados</h1>
           <p className="text-sm text-neutral-500 mt-0.5">Hoteles, agencias y Airbnbs</p>
         </div>
-        <Button size="sm" className="gap-1.5 text-sm" onClick={openCreate}>
+        <Button className="gap-1.5 text-sm h-11 sm:h-9 w-full sm:w-auto" onClick={openCreate}>
           <Plus size={14} />
           Nuevo aliado
         </Button>
       </div>
 
       {/* Tabs + filters row */}
-      <div className="flex items-center justify-between gap-4 border-b border-neutral-200">
-        <div className="flex">
+      {/* Pestañas y filtros van en una fila desde lg; en móvil se apilan porque juntos
+          miden más del doble del ancho de un teléfono. La línea inferior pasa a las
+          pestañas cuando están apiladas, para que el subrayado de la pestaña activa
+          siga alineado con su base y no quede una raya suelta bajo los filtros. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:border-b lg:border-neutral-200">
+        <div className="flex overflow-x-auto border-b border-neutral-200 lg:border-b-0">
           {TABS.map((t) => (
             <button
               key={t.value}
               onClick={() => setTipoTab(t.value)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px shrink-0 whitespace-nowrap ${
                 tipoTab === t.value
                   ? 'border-amber-500 text-amber-600'
                   : 'border-transparent text-neutral-500 hover:text-neutral-700'
@@ -266,14 +270,14 @@ export default function AliadosPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 pb-1">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-2 pb-2 lg:pb-1">
+          <div className="relative flex-1 min-w-[9rem] lg:flex-none">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" size={13} />
             <Input
               placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 h-8 text-sm border-neutral-200 bg-white w-44"
+              className="pl-8 h-8 text-sm border-neutral-200 bg-white w-full lg:w-44"
             />
           </div>
           <div className="flex gap-1">
@@ -310,7 +314,147 @@ export default function AliadosPage() {
           </Button>
         </div>
       ) : (
-        <div className="border border-neutral-200 rounded-lg overflow-hidden bg-white">
+        <>
+        {/* Móvil: una tarjeta por aliado.
+            La tabla trae 8 columnas y la última son 7 iconos de 26px pegados —
+            imposible de acertar con el dedo. Aquí los datos van etiquetados y las
+            acciones se reparten en una fila de botones de 44px, con "Editar" como
+            acción principal y el resto como iconos con su etiqueta accesible. */}
+        <div className="flex flex-col gap-2 lg:hidden">
+          {filtered.map((aliado) => (
+            <div key={aliado.id} className="rounded-xl border border-neutral-200 bg-white p-3.5">
+              <div className="flex items-start gap-3">
+                {aliado.imagen ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={aliado.imagen}
+                    alt={aliado.nombre}
+                    className="w-11 h-11 rounded-md object-cover border border-neutral-200 shrink-0"
+                  />
+                ) : (
+                  <div className="w-11 h-11 rounded-md bg-neutral-100 border border-dashed border-neutral-300 flex items-center justify-center shrink-0">
+                    <ImageIcon size={16} className="text-neutral-300" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-neutral-900 break-words">
+                    {aliado.nombre}
+                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] font-medium h-5 ${TIPO_BADGE[aliado.tipo]}`}
+                    >
+                      {aliado.tipo}
+                    </Badge>
+                    <span
+                      className={`text-[11px] font-medium px-2 py-0.5 rounded border ${
+                        aliado.activo
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-neutral-100 text-neutral-500 border-neutral-200'
+                      }`}
+                    >
+                      {aliado.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                    Código
+                  </div>
+                  <button
+                    onClick={() => copyCode(aliado.codigo)}
+                    className="inline-flex items-center gap-1.5 mt-0.5"
+                  >
+                    <span className="font-mono text-[13px] font-semibold text-neutral-800">
+                      {aliado.codigo}
+                    </span>
+                    {copiedCodigo === aliado.codigo ? (
+                      <Check size={13} className="text-green-600" />
+                    ) : (
+                      <Copy size={13} className="text-neutral-400" />
+                    )}
+                  </button>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                    Reservas
+                  </div>
+                  <div className="text-[13px] text-neutral-800 mt-0.5">
+                    {aliado._count?.reservas ?? 0}
+                  </div>
+                </div>
+                <div className="col-span-2 min-w-0">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                    Email
+                  </div>
+                  <div className="text-[13px] text-neutral-800 mt-0.5 break-all">
+                    {aliado.email}
+                  </div>
+                </div>
+                <div className="col-span-2 min-w-0">
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                    Contacto
+                  </div>
+                  <div className="text-[13px] text-neutral-800 mt-0.5 break-words">
+                    {aliado.contacto}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-neutral-100">
+                <Button
+                  variant="outline"
+                  className="h-11 flex-1 text-sm border-neutral-200 font-normal"
+                  onClick={() => openEdit(aliado)}
+                >
+                  Editar
+                </Button>
+                <button
+                  onClick={() => {
+                    setConfiguringAliadoId(aliado.id)
+                    setConfigDialogOpen(true)
+                  }}
+                  aria-label="Configurar precios"
+                  className="w-11 h-11 flex-shrink-0 inline-flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 active:bg-neutral-100"
+                >
+                  <Settings size={16} />
+                </button>
+                <button
+                  onClick={() => setQrAliado(aliado)}
+                  aria-label="QR de referido"
+                  className="w-11 h-11 flex-shrink-0 inline-flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 active:bg-neutral-100"
+                >
+                  <QrCode size={16} />
+                </button>
+                <button
+                  onClick={() => copyLink(aliado.codigo)}
+                  aria-label="Copiar link público"
+                  className="w-11 h-11 flex-shrink-0 inline-flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 active:bg-neutral-100"
+                >
+                  {copiedCodigo === `LINK-${aliado.codigo}` ? (
+                    <Check size={16} className="text-green-600" />
+                  ) : (
+                    <Copy size={16} />
+                  )}
+                </button>
+                <button
+                  onClick={() => setDeleteTarget(aliado)}
+                  aria-label="Eliminar aliado"
+                  className="w-11 h-11 flex-shrink-0 inline-flex items-center justify-center rounded-lg border border-neutral-200 text-red-500 active:bg-red-50"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Escritorio: la tabla de siempre */}
+        <div className="hidden lg:block border border-neutral-200 rounded-lg overflow-hidden bg-white">
           <Table>
             <TableHeader>
               <TableRow className="bg-neutral-50 hover:bg-neutral-50">
@@ -357,7 +501,7 @@ export default function AliadosPage() {
                       <span className="font-mono text-xs font-semibold text-neutral-800">{aliado.codigo}</span>
                       <button
                         onClick={() => copyCode(aliado.codigo)}
-                        className="p-1 rounded hover:bg-neutral-100 transition-colors"
+                        className="area-tactil-completa p-1 rounded hover:bg-neutral-100 transition-colors"
                         title="Copiar código"
                       >
                         {copiedCodigo === aliado.codigo
@@ -397,7 +541,7 @@ export default function AliadosPage() {
                           setConfiguringAliadoId(aliado.id)
                           setConfigDialogOpen(true)
                         }}
-                        className="p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
                         title="Configurar precios"
                       >
                         <Settings size={13} />
@@ -405,21 +549,21 @@ export default function AliadosPage() {
                       <button
                         onClick={() => handleGenerarLink(aliado.id)}
                         disabled={generatingLinkId === aliado.id}
-                        className="p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
                         title="Generar link de aliado"
                       >
                         <Link size={13} />
                       </button>
                       <button
                         onClick={() => setQrAliado(aliado)}
-                        className="p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
                         title="QR de referido"
                       >
                         <QrCode size={13} />
                       </button>
                       <button
                         onClick={() => copyLink(aliado.codigo)}
-                        className="p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
                         title="Copiar link público"
                       >
                         {copiedCodigo === `LINK-${aliado.codigo}`
@@ -428,7 +572,7 @@ export default function AliadosPage() {
                       </button>
                       <button
                         onClick={() => handleToggleActivo(aliado)}
-                        className={`p-1.5 rounded transition-colors ${
+                        className={`area-tactil-completa p-1.5 rounded transition-colors ${
                           aliado.activo
                             ? 'text-green-600 hover:bg-green-50'
                             : 'text-red-400 hover:bg-red-50'
@@ -439,7 +583,7 @@ export default function AliadosPage() {
                       </button>
                       <button
                         onClick={() => setDeleteTarget(aliado)}
-                        className="p-1.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                         title="Eliminar"
                       >
                         <Trash2 size={13} />
@@ -451,6 +595,7 @@ export default function AliadosPage() {
             </TableBody>
           </Table>
         </div>
+        </>
       )}
 
       {/* Create/Edit Dialog */}
