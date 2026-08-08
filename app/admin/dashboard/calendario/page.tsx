@@ -270,58 +270,35 @@ export default function CalendarioPage() {
     }
 
     return (
-        <div className="flex flex-col gap-4 p-6 w-full">
+        <div className="flex flex-col gap-4 p-4 sm:p-6 w-full min-w-0">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-xl font-semibold text-neutral-900">Calendario</h1>
+                    <h1 className="text-lg sm:text-xl font-semibold text-neutral-900">Calendario</h1>
                     <p className="text-sm text-neutral-500 mt-0.5">Vista de reservas</p>
                 </div>
                 <Button
                     variant="outline"
-                    size="sm"
                     onClick={handleExportExcel}
-                    className="gap-1.5 text-sm border-neutral-200"
+                    className="gap-1.5 text-sm border-neutral-200 h-11 sm:h-9 w-full sm:w-auto"
                 >
                     <Download size={14} />
                     Exportar Excel
                 </Button>
             </div>
 
-            {/* Status legend */}
-            <div className="flex flex-wrap gap-2">
-              {[
-                { key: 'PENDING_PAYMENT',    label: 'Pendiente de pago'    },
-                { key: 'CONFIRMED_UNASSIGNED', label: 'Confirmada · Sin asignar' },
-                { key: 'CONFIRMED_ASSIGNED',  label: 'Confirmada · Asignada' },
-                { key: 'IN_PROGRESS',         label: 'En curso'             },
-                { key: 'COMPLETED',           label: 'Completada'           },
-                { key: 'CANCELLED',           label: 'Cancelada'            },
-                { key: 'PAYMENT_FAILED',      label: 'Pago fallido'         },
-              ].map(({ key, label }) => {
-                const c = estadoColors[key];
-                return (
-                  <span
-                    key={key}
-                    className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border"
-                    style={{ backgroundColor: c.bg + '18', borderColor: c.bg + '55', color: '#374151' }}
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: c.bg }}
-                    />
-                    {label}
-                  </span>
-                );
-              })}
-              <span
-                className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border"
-                style={{ backgroundColor: '#f59e0b18', borderColor: '#f59e0b55', color: '#374151' }}
-              >
-                <span className="text-[10px] leading-none">★</span>
-                Vía aliado
-              </span>
-            </div>
+            {/* Leyenda de estados.
+                En móvil son 8 pastillas que ocupaban media pantalla antes de llegar
+                al calendario, que es lo que uno viene a ver. Se van a un
+                desplegable cerrado por defecto; en escritorio siguen a la vista. */}
+            <details className="sm:hidden group">
+                <summary className="list-none cursor-pointer inline-flex items-center gap-1.5 h-9 text-xs font-medium text-neutral-500">
+                    <span className="w-2 h-2 rounded-full bg-neutral-300" />
+                    Ver leyenda de estados
+                </summary>
+                <div className="flex flex-wrap gap-2 mt-2">{leyenda}</div>
+            </details>
+            <div className="hidden sm:flex flex-wrap gap-2">{leyenda}</div>
 
             {/* Full-width calendar — lazy loaded */}
             <CalendarioView
@@ -339,3 +316,40 @@ export default function CalendarioPage() {
         </div>
     );
 }
+
+/** Pastillas de la leyenda de estados, compartidas por móvil y escritorio. */
+const leyenda = (
+    <>
+      {[
+        { key: 'PENDING_PAYMENT',      label: 'Pendiente de pago'        },
+        { key: 'CONFIRMED_UNASSIGNED', label: 'Confirmada · Sin asignar' },
+        { key: 'CONFIRMED_ASSIGNED',   label: 'Confirmada · Asignada'    },
+        { key: 'IN_PROGRESS',          label: 'En curso'                 },
+        { key: 'COMPLETED',            label: 'Completada'               },
+        { key: 'CANCELLED',            label: 'Cancelada'                },
+        { key: 'PAYMENT_FAILED',       label: 'Pago fallido'             },
+      ].map(({ key, label }) => {
+        const c = estadoColors[key];
+        return (
+          <span
+            key={key}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border"
+            style={{ backgroundColor: c.bg + '18', borderColor: c.bg + '55', color: '#374151' }}
+          >
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: c.bg }}
+            />
+            {label}
+          </span>
+        );
+      })}
+      <span
+        className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border"
+        style={{ backgroundColor: '#f59e0b18', borderColor: '#f59e0b55', color: '#374151' }}
+      >
+        <span className="text-[10px] leading-none">★</span>
+        Vía aliado
+      </span>
+    </>
+);

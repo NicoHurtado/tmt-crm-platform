@@ -134,12 +134,17 @@ test.describe('Responsive — sin desborde horizontal en móvil', () => {
 
             await esperarPagina(page, '/admin/dashboard/reservas');
 
-            const primeraFila = page.locator('tbody tr').first();
-            const hayReservas = (await primeraFila.count()) > 0;
+            // En móvil la tabla está oculta y cada reserva es una tarjeta; en
+            // escritorio sigue siendo una fila. Se busca lo que esté visible.
+            const primeraReserva = page
+                .locator('[role="button"].rounded-xl, tbody tr')
+                .filter({ has: page.locator('text=/./') })
+                .first();
+            const hayReservas = (await primeraReserva.count()) > 0;
             test.skip(!hayReservas, 'No hay reservas en la base para abrir el detalle');
 
             // 1. El panel lateral
-            await primeraFila.click();
+            await primeraReserva.click();
             await page.waitForTimeout(1_500);
 
             const panel = page.locator('[data-slot="sheet-content"], [role="dialog"]').first();

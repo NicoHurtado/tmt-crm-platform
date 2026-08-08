@@ -30,6 +30,20 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
+import {
+  FilterShell,
+  FilterField,
+  DataCardList,
+  DataCard,
+  DataCardHeader,
+  DataCardFields,
+  DataCardField,
+  DataCardFooter,
+  EmptyState,
+  TableWrap,
+  Pagination,
+  type FilterChip,
+} from '@/components/admin/responsive'
 import QuoteWizard from '@/components/admin/QuoteWizard'
 import { getLocalizedText } from '@/types/multi-language'
 import { getStateLabel, getStateBadge } from '@/lib/state-transitions'
@@ -175,6 +189,22 @@ export default function CotizacionesPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
 
+  /** Filtros activos como chips (solo se ven en móvil, donde el sheet los tapa). */
+  const chips = useMemo<FilterChip[]>(() => {
+    const out: FilterChip[] = []
+    if (estadoFilter !== 'ALL')
+      out.push({
+        label: `Estado: ${ESTADOS.find((e) => e.value === estadoFilter)?.label ?? estadoFilter}`,
+        onRemove: () => setEstadoFilter('ALL'),
+      })
+    if (metodoPagoFilter !== 'ALL')
+      out.push({
+        label: `Pago: ${metodoPagoFilter === 'EFECTIVO' ? 'Efectivo' : 'Tarjeta'}`,
+        onRemove: () => setMetodoPagoFilter('ALL'),
+      })
+    return out
+  }, [estadoFilter, metodoPagoFilter])
+
   const municipalServices = services.filter((s) => s.esMunicipal)
   const nonMunicipalServices = services.filter((s) => !s.esMunicipal)
 
@@ -200,11 +230,13 @@ export default function CotizacionesPage() {
   return (
     <div className="flex flex-col gap-0 w-full">
       {/* Header with tabs */}
-      <div className="sticky top-0 z-30 bg-white border-b border-neutral-200 px-6 pt-5 pb-0">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold text-neutral-900">Cotizaciones</h1>
+      {/* `top-14` en móvil: la barra superior del admin ya ocupa esos 56px, y sin
+          esto las pestañas se le pegan encima al hacer scroll. */}
+      <div className="sticky top-14 lg:top-0 z-30 bg-white border-b border-neutral-200 px-4 sm:px-6 pt-4 sm:pt-5 pb-0">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h1 className="text-lg sm:text-xl font-semibold text-neutral-900">Cotizaciones</h1>
         </div>
-        <div className="flex gap-0">
+        <div className="flex gap-0 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
           <TabBtn
             active={activeTab === 'crear'}
             icon={<Plus size={14} />}
@@ -220,7 +252,7 @@ export default function CotizacionesPage() {
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {/* ── TAB CREAR ── */}
         {activeTab === 'crear' && (
           <div>
@@ -303,42 +335,185 @@ export default function CotizacionesPage() {
         {activeTab === 'historial' && (
           <div className="flex flex-col gap-4">
             {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 min-w-[220px] max-w-xs">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
-                <Input
-                  placeholder="Código, cliente, email..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-8 h-9 text-sm border-neutral-200 bg-white"
+            <FilterShell
+              chips={chips}
+              onClearAll={() => {
+                setSearch('')
+                setEstadoFilter('ALL')
+                setMetodoPagoFilter('ALL')
+              }}
+              resultCount={filtered.length}
+              search={
+                <div className="relative lg:flex-1 lg:min-w-[220px] lg:max-w-xs">
+                  <Search
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 z-10"
+                    size={14}
+                  />
+                  <Input
+                    placeholder="Código, cliente, email..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-8 h-11 lg:h-9 text-sm border-neutral-200 bg-white"
+                  />
+                </div>
+              }
+            >
+              <FilterField label="Estado">
+                <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+                  <SelectTrigger className="lg:w-[200px] h-11 lg:h-9 text-sm border-neutral-200 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ESTADOS.map((e) => (
+                      <SelectItem key={e.value} value={e.value} className="text-sm">
+                        {e.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label="Método de pago">
+                <Select value={metodoPagoFilter} onValueChange={setMetodoPagoFilter}>
+                  <SelectTrigger className="lg:w-[160px] h-11 lg:h-9 text-sm border-neutral-200 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL" className="text-sm">Todos los métodos</SelectItem>
+                    <SelectItem value="TARJETA" className="text-sm">Tarjeta</SelectItem>
+                    <SelectItem value="EFECTIVO" className="text-sm">Efectivo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            </FilterShell>
+
+            {/* Móvil: una tarjeta por cotización */}
+            {loadingHistory ? (
+              <DataCardList>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <DataCard key={i}>
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-40 mt-2" />
+                    <Skeleton className="h-14 w-full mt-3" />
+                  </DataCard>
+                ))}
+              </DataCardList>
+            ) : paginated.length === 0 ? (
+              <EmptyState>
+                {cotizaciones.length === 0
+                  ? 'No hay cotizaciones creadas aún'
+                  : 'Sin resultados para estos filtros'}
+              </EmptyState>
+            ) : (
+              <DataCardList>
+                {paginated.map((cot) => (
+                  <DataCard key={cot.id}>
+                    <DataCardHeader
+                      title={
+                        <span className="font-mono text-sm font-bold text-amber-600">
+                          {cot.codigo}
+                        </span>
+                      }
+                      subtitle={
+                        <>
+                          <span className="text-neutral-800">{cot.nombreCliente}</span>
+                          {cot.emailCliente && (
+                            <span className="text-neutral-400"> · {cot.emailCliente}</span>
+                          )}
+                        </>
+                      }
+                      badge={
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${getStateBadge(cot.estado)}`}
+                        >
+                          {getStateLabel(cot.estado)}
+                        </span>
+                      }
+                    />
+                    <DataCardFields>
+                      <DataCardField label="Servicio" className="col-span-2">
+                        {cot.servicio?.nombre
+                          ? getLocalizedText(cot.servicio.nombre, 'ES')
+                          : '—'}
+                      </DataCardField>
+                      <DataCardField label="Fecha">
+                        {fmtDate(cot.fecha)}
+                        <span className="text-neutral-400"> · {cot.hora}</span>
+                      </DataCardField>
+                      <DataCardField label="Creada">{fmtDate(cot.createdAt)}</DataCardField>
+                      <DataCardField label="Aliado" className="col-span-2">
+                        <span className={cot.aliado ? '' : 'text-neutral-400 italic'}>
+                          {cot.aliado?.nombre ?? 'Transportes Medellín Travel'}
+                        </span>
+                      </DataCardField>
+                      <DataCardField label="Pago">
+                        <span
+                          className={`inline-flex text-[11px] font-medium px-2 py-0.5 rounded border ${cot.metodoPago === 'EFECTIVO' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}
+                        >
+                          {cot.metodoPago === 'EFECTIVO' ? 'Efectivo' : 'Tarjeta'}
+                        </span>
+                      </DataCardField>
+                    </DataCardFields>
+                    <DataCardFooter>
+                      <div>
+                        <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                          Total
+                        </div>
+                        <div className="text-base font-semibold text-neutral-900">
+                          ${Number(cot.precioTotal).toLocaleString('es-CO')}
+                        </div>
+                      </div>
+                      {/* Los tres iconos de 28px de la tabla, aquí como botones de
+                          44px: son las acciones que se usan desde el teléfono al
+                          mandarle la cotización a un cliente por WhatsApp. */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => router.push(`/admin/dashboard/reservas/${cot.id}`)}
+                          aria-label="Ver detalle"
+                          className="w-11 h-11 inline-flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 active:bg-neutral-100"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          onClick={() => copyTrackingLink(cot.codigo)}
+                          aria-label="Copiar link de tracking"
+                          className="w-11 h-11 inline-flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 active:bg-neutral-100"
+                        >
+                          {copiedCode === cot.codigo ? (
+                            <Check size={16} className="text-emerald-600" />
+                          ) : (
+                            <Copy size={16} />
+                          )}
+                        </button>
+                        <a
+                          href={`/tracking/${cot.codigo}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label="Abrir tracking"
+                          className="w-11 h-11 inline-flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 active:bg-neutral-100"
+                        >
+                          <ExternalLink size={16} />
+                        </a>
+                      </div>
+                    </DataCardFooter>
+                  </DataCard>
+                ))}
+              </DataCardList>
+            )}
+
+            {!loadingHistory && filtered.length > PER_PAGE && (
+              <div className="lg:hidden rounded-xl border border-neutral-200 bg-white">
+                <Pagination
+                  page={page}
+                  perPage={PER_PAGE}
+                  total={filtered.length}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
                 />
               </div>
-              <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-                <SelectTrigger className="w-[200px] h-9 text-sm border-neutral-200 bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ESTADOS.map((e) => (
-                    <SelectItem key={e.value} value={e.value} className="text-sm">
-                      {e.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={metodoPagoFilter} onValueChange={setMetodoPagoFilter}>
-                <SelectTrigger className="w-[160px] h-9 text-sm border-neutral-200 bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL" className="text-sm">Todos los métodos</SelectItem>
-                  <SelectItem value="TARJETA" className="text-sm">Tarjeta</SelectItem>
-                  <SelectItem value="EFECTIVO" className="text-sm">Efectivo</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            )}
 
-            {/* Table */}
-            <div className="border border-neutral-200 rounded-lg overflow-hidden bg-white">
+            {/* Escritorio: la tabla de siempre */}
+            <TableWrap>
               <Table>
                 <TableHeader>
                   <TableRow className="bg-neutral-50 hover:bg-neutral-50">
@@ -476,34 +651,17 @@ export default function CotizacionesPage() {
               </Table>
 
               {!loadingHistory && filtered.length > PER_PAGE && (
-                <div className="border-t border-neutral-100 px-5 py-3 flex items-center justify-between">
-                  <span className="text-xs text-neutral-500">
-                    {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, filtered.length)} de{' '}
-                    {filtered.length}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7 border-neutral-200"
-                      disabled={page === 1}
-                      onClick={() => setPage((p) => p - 1)}
-                    >
-                      <ChevronLeft size={13} />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-7 w-7 border-neutral-200"
-                      disabled={page === totalPages}
-                      onClick={() => setPage((p) => p + 1)}
-                    >
-                      <ChevronRight size={13} />
-                    </Button>
-                  </div>
+                <div className="border-t border-neutral-100">
+                  <Pagination
+                    page={page}
+                    perPage={PER_PAGE}
+                    total={filtered.length}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                  />
                 </div>
               )}
-            </div>
+            </TableWrap>
           </div>
         )}
       </div>

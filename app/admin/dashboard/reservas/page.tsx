@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Search, ChevronLeft, ChevronRight, RefreshCw, ChevronsUpDown, Check, FileDown, X } from 'lucide-react'
+import { Search, RefreshCw, Check, FileDown, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -15,18 +15,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from '@/components/ui/command'
-import {
   Table,
   TableBody,
   TableCell,
@@ -34,6 +22,25 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  AdminPage,
+  AdminPageHeader,
+  AdminTabs,
+  AdminTab,
+  FilterShell,
+  FilterField,
+  ComboboxFilter,
+  DataCardList,
+  DataCard,
+  DataCardHeader,
+  DataCardFields,
+  DataCardField,
+  DataCardFooter,
+  EmptyState,
+  TableWrap,
+  Pagination,
+  type FilterChip,
+} from '@/components/admin/responsive'
 import { getStateLabel, getStateBadge } from '@/lib/state-transitions'
 import { getLocalizedText } from '@/types/multi-language'
 import ReservaDetailSheet, { type ReservaDetail } from '@/components/admin/ReservaDetailSheet'
@@ -111,7 +118,6 @@ export default function ReservasPage() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(20)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [servicioOpen, setServicioOpen] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/admin/login')
@@ -243,6 +249,72 @@ export default function ReservasPage() {
     return `${day}/${m}/${y}`
   }
 
+  /**
+   * Filtros aplicados, para pintarlos como chips en móvil. Con el sheet cerrado
+   * no hay forma de saber qué está filtrado, y una lista de 1700 reservas
+   * mostrando 3 es exactamente el caso donde uno cree que "no hay datos".
+   * La búsqueda no entra: su input está siempre a la vista.
+   */
+  const chips = useMemo<FilterChip[]>(() => {
+    const out: FilterChip[] = []
+    if (estado !== 'ALL')
+      out.push({
+        label: `Estado: ${ESTADOS.find((e) => e.value === estado)?.label ?? estado}`,
+        onRemove: () => setEstado('ALL'),
+      })
+    if (pago !== 'ALL')
+      out.push({
+        label: `Pago: ${PAGOS.find((p) => p.value === pago)?.label ?? pago}`,
+        onRemove: () => setPago('ALL'),
+      })
+    if (clientePagaFilter !== 'ALL')
+      out.push({
+        label: CLIENTE_PAGA_OPTS.find((o) => o.value === clientePagaFilter)?.label ?? '',
+        onRemove: () => setClientePagaFilter('ALL'),
+      })
+    if (servicioFilter !== 'ALL')
+      out.push({
+        label: `Servicio: ${serviciosUnicos.find((s) => s.id === servicioFilter)?.nombre ?? ''}`,
+        onRemove: () => setServicioFilter('ALL'),
+      })
+    if (aliadoFilter !== 'ALL')
+      out.push({
+        label: `Aliado: ${aliadosUnicos.find((a) => a.codigo === aliadoFilter)?.nombre ?? ''}`,
+        onRemove: () => setAliadoFilter('ALL'),
+      })
+    if (socioFilter !== 'ALL')
+      out.push({ label: `Socio: ${socioFilter}`, onRemove: () => setSocioFilter('ALL') })
+    if (fechaDesde || fechaHasta) {
+      const label =
+        fechaDesde && fechaHasta
+          ? fechaDesde === fechaHasta
+            ? `Fecha: ${fmtDate(fechaDesde)}`
+            : `${fmtDate(fechaDesde)} – ${fmtDate(fechaHasta)}`
+          : fechaDesde
+            ? `Desde ${fmtDate(fechaDesde)}`
+            : `Hasta ${fmtDate(fechaHasta)}`
+      out.push({
+        label,
+        onRemove: () => {
+          setFechaDesde('')
+          setFechaHasta('')
+        },
+      })
+    }
+    return out
+  }, [
+    estado,
+    pago,
+    clientePagaFilter,
+    servicioFilter,
+    aliadoFilter,
+    socioFilter,
+    fechaDesde,
+    fechaHasta,
+    serviciosUnicos,
+    aliadosUnicos,
+  ])
+
   const handleTogglePagoConductor = async (reservaId: string, currentValue: boolean, e: React.MouseEvent) => {
     e.stopPropagation()
     setReservas(prev => prev.map(r => r.id === reservaId ? { ...r, pagoConductor: !currentValue } : r))
@@ -258,74 +330,63 @@ export default function ReservasPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6 w-full">
+    <AdminPage>
       {/* Service filter banner */}
       {servicioIdParam && (
-        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-sm text-blue-700">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-sm text-blue-700">
           <span>Mostrando solo reservas del servicio seleccionado</span>
           <button
             onClick={() => router.push('/admin/dashboard/reservas')}
-            className="text-blue-500 hover:text-blue-700 font-medium underline ml-4"
+            className="text-blue-500 hover:text-blue-700 font-medium underline text-left sm:ml-4 whitespace-nowrap"
           >
             Ver todas las reservas
           </button>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Reservas</h1>
-          {!loading && (
-            <p className="text-sm text-neutral-500 mt-0.5">
-              {activeTab === 'todas'
-                ? `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''}`
-                : `${tourCompartidoReservas.length} reserva${tourCompartidoReservas.length !== 1 ? 's' : ''} de tour compartido`}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchReservas(true)}
-            disabled={refreshing}
-            className="gap-1.5 text-sm border-neutral-200 h-9"
-          >
-            <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-            {refreshing ? 'Actualizando...' : 'Actualizar'}
-          </Button>
-          {activeTab === 'todas' && !loading && filtered.length > 0 && (
-            <button
-              onClick={() => exportarReservasExcel(filtered, 'nueva')}
-              className="flex items-center gap-1.5 text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors"
+      <AdminPageHeader
+        title="Reservas"
+        subtitle={
+          !loading &&
+          (activeTab === 'todas'
+            ? `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''}`
+            : `${tourCompartidoReservas.length} reserva${tourCompartidoReservas.length !== 1 ? 's' : ''} de tour compartido`)
+        }
+        actions={
+          <>
+            {activeTab === 'todas' && !loading && filtered.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => exportarReservasExcel(filtered, 'nueva')}
+                className="h-11 sm:h-9 gap-1.5 border-neutral-200 font-normal text-neutral-500 hover:text-neutral-700 text-sm sm:text-[11px] sm:border-0 sm:shadow-none sm:px-0 sm:hover:bg-transparent"
+              >
+                <FileDown size={13} />
+                <span className="sm:hidden">Excel ({filtered.length})</span>
+                <span className="hidden sm:inline">
+                  Descargar resultados ({filtered.length})
+                </span>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => fetchReservas(true)}
+              disabled={refreshing}
+              className="gap-1.5 text-sm border-neutral-200 h-11 sm:h-9"
             >
-              <FileDown size={12} />
-              Descargar resultados ({filtered.length})
-            </button>
-          )}
-        </div>
-      </div>
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
+          </>
+        }
+      />
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-neutral-200">
-        <button
-          onClick={() => setActiveTab('todas')}
-          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-            activeTab === 'todas'
-              ? 'border-amber-500 text-amber-700'
-              : 'border-transparent text-neutral-500 hover:text-neutral-800'
-          }`}
-        >
+      <AdminTabs>
+        <AdminTab active={activeTab === 'todas'} onClick={() => setActiveTab('todas')}>
           Todas las reservas
-        </button>
-        <button
+        </AdminTab>
+        <AdminTab
+          active={activeTab === 'tour-compartido'}
           onClick={() => setActiveTab('tour-compartido')}
-          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px flex items-center gap-1.5 ${
-            activeTab === 'tour-compartido'
-              ? 'border-amber-500 text-amber-700'
-              : 'border-transparent text-neutral-500 hover:text-neutral-800'
-          }`}
         >
           Tour Compartido
           {!loading && tourCompartidoReservas.length > 0 && (
@@ -333,8 +394,8 @@ export default function ReservasPage() {
               {tourCompartidoReservas.length}
             </span>
           )}
-        </button>
-      </div>
+        </AdminTab>
+      </AdminTabs>
 
       {activeTab === 'tour-compartido' && (
         <TourCompartidoView
@@ -344,173 +405,145 @@ export default function ReservasPage() {
       )}
 
       {activeTab === 'todas' && <>
-      {/* Filters — row 1: search, estado, pago, pago cliente */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" size={14} />
-          <Input
-            placeholder="Código, cliente, email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-9 text-sm border-neutral-200 bg-white"
-          />
-        </div>
-
-        <Select value={estado} onValueChange={setEstado}>
-          <SelectTrigger className="w-[190px] h-9 text-sm border-neutral-200 bg-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ESTADOS.map((e) => (
-              <SelectItem key={e.value} value={e.value} className="text-sm">
-                {e.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={pago} onValueChange={setPago}>
-          <SelectTrigger className="w-[140px] h-9 text-sm border-neutral-200 bg-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PAGOS.map((p) => (
-              <SelectItem key={p.value} value={p.value} className="text-sm">
-                {p.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={clientePagaFilter} onValueChange={setClientePagaFilter}>
-          <SelectTrigger className="w-[165px] h-9 text-sm border-neutral-200 bg-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CLIENTE_PAGA_OPTS.map((o) => (
-              <SelectItem key={o.value} value={o.value} className="text-sm">
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Filters — row 2: servicio, aliado, rango fechas */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Popover open={servicioOpen} onOpenChange={setServicioOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={servicioOpen}
-              className="w-[220px] h-9 text-sm border-neutral-200 bg-white font-normal justify-between px-3"
-            >
-              <span className="truncate text-left">
-                {servicioFilter !== 'ALL'
-                  ? (serviciosUnicos.find((s) => s.id === servicioFilter)?.nombre ?? 'Todos los servicios')
-                  : 'Todos los servicios'}
-              </span>
-              <ChevronsUpDown size={13} className="ml-2 shrink-0 text-neutral-400" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[280px] p-0" align="start">
-            <Command>
-              <CommandInput placeholder="Buscar servicio..." className="h-9 text-sm" />
-              <CommandEmpty className="py-4 text-center text-xs text-neutral-400">
-                Sin resultados
-              </CommandEmpty>
-              <CommandGroup>
-                <CommandItem
-                  value="ALL"
-                  onSelect={() => { setServicioFilter('ALL'); setServicioOpen(false) }}
-                  className="text-sm"
-                >
-                  <Check
-                    size={13}
-                    className={`mr-2 ${servicioFilter === 'ALL' ? 'opacity-100' : 'opacity-0'}`}
-                  />
-                  Todos los servicios
-                </CommandItem>
-                {serviciosUnicos.map((s) => (
-                  <CommandItem
-                    key={s.id}
-                    value={s.nombre}
-                    onSelect={() => { setServicioFilter(s.id); setServicioOpen(false) }}
-                    className="text-sm"
-                  >
-                    <Check
-                      size={13}
-                      className={`mr-2 shrink-0 ${servicioFilter === s.id ? 'opacity-100' : 'opacity-0'}`}
-                    />
-                    {s.nombre}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </Command>
-          </PopoverContent>
-        </Popover>
-
-        <Select value={aliadoFilter} onValueChange={setAliadoFilter}>
-          <SelectTrigger className="w-[200px] h-9 text-sm border-neutral-200 bg-white">
-            <SelectValue placeholder="Todos los aliados" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL" className="text-sm">Todos los aliados</SelectItem>
-            {aliadosUnicos.map((a) => (
-              <SelectItem key={a.codigo} value={a.codigo} className="text-sm">
-                {a.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Solo aparece cuando hay reservas entradas por la API de socios, para no
-            agregar un filtro vacío a la barra mientras no exista ninguna. */}
-        {sociosUnicos.length > 0 && (
-          <Select value={socioFilter} onValueChange={setSocioFilter}>
-            <SelectTrigger className="w-[200px] h-9 text-sm border-neutral-200 bg-white">
-              <SelectValue placeholder="Todos los socios" />
+      <FilterShell
+        chips={chips}
+        onClearAll={clearFilters}
+        resultCount={filtered.length}
+        search={
+          <div className="relative lg:flex-1 lg:min-w-[180px] lg:max-w-xs">
+            <Search
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 z-10"
+              size={14}
+            />
+            <Input
+              placeholder="Código, cliente, email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-11 lg:h-9 text-sm border-neutral-200 bg-white"
+            />
+          </div>
+        }
+      >
+        <FilterField label="Estado">
+          <Select value={estado} onValueChange={setEstado}>
+            <SelectTrigger className="lg:w-[190px] h-11 lg:h-9 text-sm border-neutral-200 bg-white">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL" className="text-sm">Todos los socios</SelectItem>
-              {sociosUnicos.map((codigo) => (
-                <SelectItem key={codigo} value={codigo} className="text-sm">
-                  {codigo}
+              {ESTADOS.map((e) => (
+                <SelectItem key={e.value} value={e.value} className="text-sm">
+                  {e.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+        </FilterField>
+
+        <FilterField label="Método de pago">
+          <Select value={pago} onValueChange={setPago}>
+            <SelectTrigger className="lg:w-[140px] h-11 lg:h-9 text-sm border-neutral-200 bg-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGOS.map((p) => (
+                <SelectItem key={p.value} value={p.value} className="text-sm">
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField label="Pago del cliente">
+          <Select value={clientePagaFilter} onValueChange={setClientePagaFilter}>
+            <SelectTrigger className="lg:w-[165px] h-11 lg:h-9 text-sm border-neutral-200 bg-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CLIENTE_PAGA_OPTS.map((o) => (
+                <SelectItem key={o.value} value={o.value} className="text-sm">
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        <FilterField label="Servicio">
+          <ComboboxFilter
+            value={servicioFilter}
+            onChange={setServicioFilter}
+            options={serviciosUnicos.map((s) => ({ value: s.id, label: s.nombre }))}
+            allLabel="Todos los servicios"
+            searchPlaceholder="Buscar servicio..."
+            className="lg:w-[220px]"
+          />
+        </FilterField>
+
+        <FilterField label="Aliado">
+          <Select value={aliadoFilter} onValueChange={setAliadoFilter}>
+            <SelectTrigger className="lg:w-[200px] h-11 lg:h-9 text-sm border-neutral-200 bg-white">
+              <SelectValue placeholder="Todos los aliados" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL" className="text-sm">Todos los aliados</SelectItem>
+              {aliadosUnicos.map((a) => (
+                <SelectItem key={a.codigo} value={a.codigo} className="text-sm">
+                  {a.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FilterField>
+
+        {/* Solo aparece cuando hay reservas entradas por la API de socios, para no
+            agregar un filtro vacío a la barra mientras no exista ninguna. */}
+        {sociosUnicos.length > 0 && (
+          <FilterField label="Socio">
+            <Select value={socioFilter} onValueChange={setSocioFilter}>
+              <SelectTrigger className="lg:w-[200px] h-11 lg:h-9 text-sm border-neutral-200 bg-white">
+                <SelectValue placeholder="Todos los socios" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL" className="text-sm">Todos los socios</SelectItem>
+                {sociosUnicos.map((codigo) => (
+                  <SelectItem key={codigo} value={codigo} className="text-sm">
+                    {codigo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
         )}
 
-        {/* El grupo de fechas mide ~457px: en un teléfono no cabe en una línea y antes
-            se salía de la pantalla. Con flex-wrap se parte en dos renglones. En pantallas
-            grandes cabe entero, así que no cambia nada. */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {/* Cada etiqueta va junto a su campo dentro de un grupo que NO se parte, para
-              que al pasar a dos renglones en móvil no quede una etiqueta huérfana. */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-neutral-500 whitespace-nowrap">Desde</span>
+        {/* `filtro-grupo` hace que dentro del sheet este bloque se apile en vez de
+            quedar en línea; en escritorio conserva la fila de siempre. */}
+        <div className="filtro-grupo flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-1.5 w-full lg:w-auto">
+            <span className="text-xs text-neutral-500 whitespace-nowrap w-12 lg:w-auto">
+              Desde
+            </span>
             <input
               type="date"
               value={fechaDesde}
               onChange={(e) => setFechaDesde(e.target.value)}
-              className="h-9 border border-neutral-200 rounded-md px-3 text-sm bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400"
+              className="h-11 lg:h-9 flex-1 lg:flex-none border border-neutral-200 rounded-md px-3 text-sm bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400"
             />
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-neutral-500 whitespace-nowrap">Hasta</span>
+          <div className="flex items-center gap-1.5 w-full lg:w-auto">
+            <span className="text-xs text-neutral-500 whitespace-nowrap w-12 lg:w-auto">
+              Hasta
+            </span>
             <input
               type="date"
               value={fechaHasta}
               onChange={(e) => setFechaHasta(e.target.value)}
-              className="h-9 border border-neutral-200 rounded-md px-3 text-sm bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400"
+              className="h-11 lg:h-9 flex-1 lg:flex-none border border-neutral-200 rounded-md px-3 text-sm bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400"
             />
           </div>
           <Button
             variant="outline"
-            size="sm"
-            className="h-9 text-sm border-neutral-200 bg-white px-3 whitespace-nowrap"
+            className="h-11 lg:h-9 w-full lg:w-auto text-sm border-neutral-200 bg-white px-3 whitespace-nowrap font-normal"
             onClick={() => {
               const hoy = todayISO()
               if (fechaDesde === hoy && fechaHasta === hoy) {
@@ -524,21 +557,172 @@ export default function ReservasPage() {
             {fechaDesde === todayISO() && fechaHasta === todayISO() ? 'Todos' : 'Hoy'}
           </Button>
         </div>
+      </FilterShell>
 
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-9 text-sm text-neutral-500"
-            onClick={clearFilters}
-          >
-            Limpiar filtros
-          </Button>
-        )}
-      </div>
+      {/* Móvil: una tarjeta por reserva.
+          La tabla tiene 12 columnas; a 375px no hay forma de mostrarla sin
+          encogerla hasta lo ilegible o esconder la mitad tras un scroll
+          horizontal donde uno pierde de vista de qué fila viene cada dato. La
+          tarjeta jerarquiza: identidad arriba (código + estado), cliente
+          debajo, el resto como pares etiqueta/valor, y el dinero y la acción
+          de pago al conductor en el pie. */}
+      {loading ? (
+        <DataCardList>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <DataCard key={i}>
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-44 mt-2" />
+              <Skeleton className="h-16 w-full mt-3" />
+            </DataCard>
+          ))}
+        </DataCardList>
+      ) : paginated.length === 0 ? (
+        <EmptyState>No se encontraron reservas</EmptyState>
+      ) : (
+        <DataCardList>
+          {paginated.map((r) => (
+            <DataCard key={r.id} onClick={() => setSelectedId(r.id)}>
+              <DataCardHeader
+                chevron
+                title={
+                  <>
+                    <span className="font-mono text-sm font-bold text-neutral-900">
+                      {r.codigo}
+                    </span>
+                    {r.esCotizacion && (
+                      <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 rounded font-medium">
+                        Cotización
+                      </span>
+                    )}
+                  </>
+                }
+                subtitle={
+                  <>
+                    <span className="text-neutral-800">{r.nombreCliente}</span>
+                    {r.emailCliente && (
+                      <span className="text-neutral-400"> · {r.emailCliente}</span>
+                    )}
+                  </>
+                }
+                badge={
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border text-center ${getStateBadge(r.estado)}`}
+                  >
+                    {getStateLabel(r.estado as EstadoReserva)}
+                  </span>
+                }
+              />
 
-      {/* Table */}
-      <div className="border border-neutral-200 rounded-lg overflow-hidden bg-white">
+              <DataCardFields>
+                <DataCardField label="Servicio" className="col-span-2">
+                  {r.servicio?.nombre ? getLocalizedText(r.servicio.nombre, 'ES') : '—'}
+                </DataCardField>
+
+                <DataCardField label="Fecha del servicio">
+                  {fmtDate(r.fecha)}
+                  <span className="text-neutral-400"> · {r.hora}</span>
+                </DataCardField>
+
+                <DataCardField label="Creada">
+                  {fmtDate(r.createdAt)}
+                  <span className="text-neutral-400">
+                    {' · '}
+                    {new Date(r.createdAt).toLocaleTimeString('es-CO', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </DataCardField>
+
+                <DataCardField label="Pago">
+                  <span
+                    className={`inline-flex text-[11px] font-medium px-2 py-0.5 rounded border ${r.metodoPago === 'EFECTIVO' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}
+                  >
+                    {r.metodoPago === 'EFECTIVO' ? 'Efectivo' : 'Tarjeta'}
+                  </span>
+                </DataCardField>
+
+                <DataCardField label="Pago cliente">
+                  {r.esReservaAliado || r.esCotizacion || r.clientePaga === false ? (
+                    <span
+                      className={`inline-flex text-[11px] font-medium px-2 py-0.5 rounded border ${
+                        r.clientePaga !== false
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-red-50 text-red-700 border-red-200'
+                      }`}
+                    >
+                      {r.clientePaga !== false ? 'Cliente paga' : 'No paga'}
+                    </span>
+                  ) : (
+                    <span className="text-neutral-300">—</span>
+                  )}
+                </DataCardField>
+
+                {(r.esReservaAliado && r.aliado) || codigoSocio(r) ? (
+                  <DataCardField label={codigoSocio(r) ? 'Socio' : 'Aliado'}>
+                    {r.esReservaAliado && r.aliado ? (
+                      r.aliado.nombre
+                    ) : (
+                      <span className="inline-flex text-[11px] font-medium px-2 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">
+                        {codigoSocio(r)}
+                      </span>
+                    )}
+                  </DataCardField>
+                ) : null}
+
+                {r.esReservaAliado && r.comisionAliado && Number(r.comisionAliado) > 0 ? (
+                  <DataCardField label="Comisión">
+                    <span className="font-medium text-purple-700">
+                      ${Number(r.comisionAliado).toLocaleString('es-CO')}
+                    </span>
+                  </DataCardField>
+                ) : null}
+              </DataCardFields>
+
+              <DataCardFooter>
+                <div>
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                    Total
+                  </div>
+                  <div className="text-base font-semibold text-neutral-900">
+                    ${Number(r.precioTotal).toLocaleString('es-CO')}
+                  </div>
+                </div>
+                {/* Marcar el pago al conductor es la acción que más se hace desde
+                    el teléfono (en ruta), así que aquí es un botón con etiqueta y
+                    no el cuadrito de 28px de la tabla. */}
+                <button
+                  onClick={(e) => handleTogglePagoConductor(r.id, r.pagoConductor ?? false, e)}
+                  className={`inline-flex items-center gap-1.5 h-11 px-3 rounded-lg border text-xs font-medium transition-colors ${
+                    r.pagoConductor
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 active:bg-emerald-100'
+                      : 'bg-red-50 text-red-600 border-red-200 active:bg-red-100'
+                  }`}
+                >
+                  {r.pagoConductor ? <Check size={14} /> : <X size={14} />}
+                  {r.pagoConductor ? 'Conductor pagado' : 'Conductor sin pagar'}
+                </button>
+              </DataCardFooter>
+            </DataCard>
+          ))}
+        </DataCardList>
+      )}
+
+      {/* Móvil: paginación bajo las tarjetas */}
+      {!loading && filtered.length > 0 && (
+        <div className="lg:hidden rounded-xl border border-neutral-200 bg-white">
+          <Pagination
+            page={page}
+            perPage={perPage}
+            total={filtered.length}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
+
+      {/* Escritorio: la tabla de siempre, sin cambios */}
+      <TableWrap>
         <Table>
           <TableHeader>
             <TableRow className="bg-neutral-50 hover:bg-neutral-50">
@@ -702,56 +886,19 @@ export default function ReservasPage() {
 
         {/* Pagination */}
         {!loading && filtered.length > 0 && (
-          <div className="border-t border-neutral-100 px-5 py-3 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-neutral-500">Mostrar</span>
-              <Select
-                value={String(perPage)}
-                onValueChange={(v) => {
-                  setPerPage(Number(v))
-                  setPage(1)
-                }}
-              >
-                <SelectTrigger className="h-7 w-16 text-xs border-neutral-200">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PER_PAGE_OPTIONS.map((n) => (
-                    <SelectItem key={n} value={String(n)} className="text-xs">
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-xs text-neutral-500">por página</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-neutral-500 mr-2">
-                {(page - 1) * perPage + 1}–{Math.min(page * perPage, filtered.length)} de{' '}
-                {filtered.length}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7 border-neutral-200"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft size={13} />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7 border-neutral-200"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight size={13} />
-              </Button>
-            </div>
+          <div className="border-t border-neutral-100">
+            <Pagination
+              page={page}
+              perPage={perPage}
+              total={filtered.length}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              onPerPageChange={setPerPage}
+              perPageOptions={PER_PAGE_OPTIONS}
+            />
           </div>
         )}
-      </div>
+      </TableWrap>
 
       </>}
 
@@ -760,6 +907,6 @@ export default function ReservasPage() {
         reservas={reservas}
         onClose={() => setSelectedId(null)}
       />
-    </div>
+    </AdminPage>
   )
 }

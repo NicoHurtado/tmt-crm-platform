@@ -1,9 +1,10 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 
 export interface CalendarEvent {
     id: string;
@@ -35,9 +36,56 @@ interface Props {
     onDatesSet: (dateInfo: any) => void;
 }
 
+/** Agrupa por día y ordena, para la agenda de móvil. */
+function agruparPorDia(events: CalendarEvent[], desde: Date | null, hasta: Date | null) {
+    const dentroDelRango = (e: CalendarEvent) => {
+        if (!desde || !hasta) return true;
+        const t = new Date(e.start).getTime();
+        return t >= desde.getTime() && t < hasta.getTime();
+    };
+
+    const porDia = new Map<string, CalendarEvent[]>();
+    events
+        .filter(dentroDelRango)
+        .sort((a, b) => {
+            const d = new Date(a.start).getTime() - new Date(b.start).getTime();
+            return d !== 0 ? d : (a.extendedProps.hora || '').localeCompare(b.extendedProps.hora || '');
+        })
+        .forEach((e) => {
+            const dia = new Date(e.start).toISOString().split('T')[0];
+            if (!porDia.has(dia)) porDia.set(dia, []);
+            porDia.get(dia)!.push(e);
+        });
+
+    return Array.from(porDia.entries());
+}
+
 export default function CalendarioView({ events, onEventClick, onDatesSet }: Props) {
     const calendarRef = useRef<any>(null);
     const calendarContainerRef = useRef<HTMLDivElement>(null);
+    /** Rango que está mostrando el calendario. Lo dicta FullCalendar (que sigue
+     *  siendo la única fuente de verdad del mes visible) y la agenda de móvil lo
+     *  usa para filtrar; así los dos siempre muestran lo mismo. */
+    const [rango, setRango] = useState<{ start: Date; end: Date } | null>(null);
+
+    const manejarDatesSet = (info: any) => {
+        setRango({ start: info.start, end: info.end });
+        onDatesSet(info);
+    };
+
+    const api = () => calendarRef.current?.getApi();
+
+    const etiquetaMes = rango
+        ? new Date(rango.start.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('es-CO', {
+              month: 'long',
+              year: 'numeric',
+          })
+        : '';
+
+    const dias = useMemo(
+        () => agruparPorDia(events, rango?.start ?? null, rango?.end ?? null),
+        [events, rango],
+    );
 
     useEffect(() => {
         const container = calendarContainerRef.current;
@@ -57,7 +105,141 @@ export default function CalendarioView({ events, onEventClick, onDatesSet }: Pro
     }, []);
 
     return (
-        <div ref={calendarContainerRef} className="border border-neutral-200 rounded-xl overflow-hidden bg-white w-full">
+        <>
+        {/* ── MÓVIL: agenda ──────────────────────────────────────────────
+            Una rejilla de mes en 375px da celdas de ~50px: no cabe ni el título
+            de una reserva, así que todo termina en "+3 más" y el calendario deja
+            de servir para lo único que importa aquí, que es ver qué hay y a qué
+            hora. Las apps de calendario resuelven esto en teléfono con vista de
+            agenda: los días en una lista vertical y, dentro de cada día, sus
+            eventos con hora. Eso es lo que se muestra abajo.
+
+            El FullCalendar de escritorio se queda montado (oculto) porque sigue
+            siendo quien manda el rango visible: los botones de aquí le hablan por
+            su API, y él avisa del cambio por datesSet. Así no hay dos
+            calendarios que puedan desincronizarse. */}
+        <div className="lg:hidden flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+                <button
+                    onClick={() => api()?.prev()}
+                    aria-label="Mes anterior"
+                    className="w-11 h-11 flex-shrink-0 inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-600 active:bg-neutral-100"
+                >
+                    <ChevronLeft size={18} />
+                </button>
+                <div className="flex-1 min-w-0 text-center">
+                    {/* `first-letter` y no `capitalize`: toLocaleDateString devuelve
+                        "agosto de 2026" y capitalize lo dejaría en "Agosto De 2026". */}
+                    <p className="text-sm font-semibold text-neutral-900 first-letter:uppercase truncate">
+                        {etiquetaMes || '—'}
+                    </p>
+                    <p className="text-[11px] text-neutral-400">
+                        {dias.reduce((n, [, evs]) => n + evs.length, 0)} reserva
+                        {dias.reduce((n, [, evs]) => n + evs.length, 0) === 1 ? '' : 's'}
+                    </p>
+                </div>
+                <button
+                    onClick={() => api()?.next()}
+                    aria-label="Mes siguiente"
+                    className="w-11 h-11 flex-shrink-0 inline-flex items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-600 active:bg-neutral-100"
+                >
+                    <ChevronRight size={18} />
+                </button>
+                <button
+                    onClick={() => api()?.today()}
+                    className="h-11 px-3 flex-shrink-0 rounded-lg border border-neutral-200 bg-white text-sm text-neutral-700 active:bg-neutral-100"
+                >
+                    Hoy
+                </button>
+            </div>
+
+            {dias.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-neutral-200 bg-white py-12 text-center">
+                    <CalendarDays size={22} className="mx-auto text-neutral-300" />
+                    <p className="mt-2 text-sm text-neutral-400">
+                        Sin reservas en {etiquetaMes || 'este mes'}
+                    </p>
+                </div>
+            ) : (
+                <div className="flex flex-col gap-3">
+                    {dias.map(([dia, delDia]) => {
+                        const fecha = new Date(dia + 'T12:00:00');
+                        const esHoy = dia === new Date().toISOString().split('T')[0];
+                        return (
+                            <div key={dia}>
+                                {/* Cabecera de día pegajosa: al scrollear una lista larga
+                                    es lo único que dice en qué día vas parado. */}
+                                <div
+                                    className={`sticky top-14 z-10 -mx-4 px-4 py-1.5 backdrop-blur-sm ${
+                                        esHoy ? 'bg-amber-50/95' : 'bg-neutral-50/95'
+                                    }`}
+                                >
+                                    <span
+                                        className={`text-xs font-semibold inline-block first-letter:uppercase ${
+                                            esHoy ? 'text-amber-700' : 'text-neutral-600'
+                                        }`}
+                                    >
+                                        {fecha.toLocaleDateString('es-CO', {
+                                            weekday: 'long',
+                                            day: 'numeric',
+                                            month: 'short',
+                                        })}
+                                        {esHoy && ' · hoy'}
+                                    </span>
+                                    <span className="text-[11px] text-neutral-400 ml-1.5">
+                                        ({delDia.length})
+                                    </span>
+                                </div>
+
+                                <div className="flex flex-col gap-1.5 mt-1.5">
+                                    {delDia.map((e) => (
+                                        <button
+                                            key={e.id}
+                                            onClick={() =>
+                                                onEventClick({
+                                                    event: { id: e.id, extendedProps: e.extendedProps },
+                                                })
+                                            }
+                                            className="w-full text-left rounded-xl border border-neutral-200 bg-white p-3 pl-3.5 active:bg-neutral-50 transition-colors"
+                                            style={{ borderLeftWidth: 4, borderLeftColor: e.backgroundColor }}
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-semibold text-neutral-900 truncate">
+                                                        {e.extendedProps.hora || '—'}
+                                                        <span className="font-normal text-neutral-500">
+                                                            {' · '}
+                                                            {e.extendedProps.codigo}
+                                                        </span>
+                                                    </p>
+                                                    <p className="text-[13px] text-neutral-800 mt-0.5 truncate">
+                                                        {e.extendedProps.cliente}
+                                                    </p>
+                                                    <p className="text-xs text-neutral-500 mt-0.5 truncate">
+                                                        {e.extendedProps.servicio}
+                                                    </p>
+                                                </div>
+                                                {e.extendedProps.esReservaAliado && (
+                                                    <span
+                                                        className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 flex-shrink-0"
+                                                        title={e.extendedProps.aliado ?? 'Vía aliado'}
+                                                    >
+                                                        ★
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+
+        {/* ── ESCRITORIO: la rejilla de mes de siempre ── */}
+        <div ref={calendarContainerRef} className="hidden lg:block border border-neutral-200 rounded-xl overflow-hidden bg-white w-full">
             <style>{`
                 .fc { font-family: inherit; }
                 .fc .fc-toolbar { padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
@@ -107,7 +289,7 @@ export default function CalendarioView({ events, onEventClick, onDatesSet }: Pro
                 events={events}
                 eventOrder="start"
                 eventClick={onEventClick}
-                datesSet={onDatesSet}
+                datesSet={manejarDatesSet}
                 headerToolbar={{
                     left: 'prev,next today',
                     center: 'title',
@@ -136,5 +318,6 @@ export default function CalendarioView({ events, onEventClick, onDatesSet }: Pro
                 }}
             />
         </div>
+        </>
     );
 }

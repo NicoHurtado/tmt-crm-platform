@@ -193,7 +193,10 @@ export default function TourCompartidoView({ reservas, onReservationDeleted }: T
   const hasFilters = !!(search || estadoFilter !== 'TODOS')
 
   return (
-    <div className="grid grid-cols-[272px_1fr] gap-4 items-start">
+    /* Dos columnas fijas (272px de calendario + la lista) suman más que el ancho
+       de un teléfono y la lista se salía 614px. Debajo de `lg` se apilan: el
+       mini calendario arriba, que es el que decide el día, y la lista debajo. */
+    <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[272px_1fr] lg:gap-4 lg:items-start min-w-0">
       {/* Left panel */}
       <div className="space-y-3">
         {/* Mini Calendar */}
@@ -334,7 +337,7 @@ export default function TourCompartidoView({ reservas, onReservationDeleted }: T
       </div>
 
       {/* Right panel: grouped list */}
-      <div className="space-y-3">
+      <div className="space-y-3 min-w-0">
         {grupos.length === 0 ? (
           <div className="border border-neutral-200 rounded-lg bg-white p-12 text-center">
             <p className="text-sm text-neutral-400">

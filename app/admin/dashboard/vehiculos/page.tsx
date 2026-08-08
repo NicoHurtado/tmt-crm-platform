@@ -125,17 +125,17 @@ export default function VehiculosPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 w-full">
+    <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 w-full min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900">Vehículos</h1>
+          <h1 className="text-lg sm:text-xl font-semibold text-neutral-900">Vehículos</h1>
           <p className="text-sm text-neutral-500 mt-0.5">
             {vehiculos.length} vehículo{vehiculos.length !== 1 ? 's' : ''} registrado
             {vehiculos.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button size="sm" className="gap-1.5 text-sm" onClick={openCreate}>
+        <Button className="gap-1.5 text-sm h-11 sm:h-9 w-full sm:w-auto" onClick={openCreate}>
           <Plus size={14} />
           Nuevo vehículo
         </Button>
@@ -161,7 +161,59 @@ export default function VehiculosPage() {
           </Button>
         </div>
       ) : (
-        <div className="border border-neutral-200 rounded-xl bg-white overflow-hidden shadow-sm">
+        <>
+        {/* Móvil: tarjetas.
+            La rejilla de escritorio es de columnas fijas (64+160+80+88px) y en un
+            teléfono se sale ~100px. Aquí el vehículo va con su icono y nombre en
+            una fila, la capacidad y el estado debajo, y las acciones a lo ancho
+            para que se puedan tocar. */}
+        <div className="flex flex-col gap-2 lg:hidden">
+          {vehiculos.map((v) => (
+            <div key={v.id} className="rounded-xl border border-neutral-200 bg-white p-3.5">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-16 bg-white rounded-lg border border-neutral-100 flex items-center justify-center shrink-0 overflow-hidden">
+                  <VehicleIcon nombre={v.nombre} size="sm" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-neutral-800 truncate">{v.nombre}</p>
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-500 mt-0.5">
+                    <Users size={13} className="flex-shrink-0" />
+                    <span>
+                      {v.capacidadMinima}–{v.capacidadMaxima} pasajeros
+                    </span>
+                  </div>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] font-medium flex-shrink-0 ${v.activo ? 'bg-green-50 text-green-700 border-green-200' : 'bg-neutral-100 text-neutral-500 border-neutral-200'}`}
+                >
+                  {v.activo ? 'Activo' : 'Inactivo'}
+                </Badge>
+              </div>
+              <div className="flex gap-2 mt-3 pt-3 border-t border-neutral-100">
+                <Button
+                  variant="outline"
+                  className="h-11 flex-1 text-sm border-neutral-200 gap-1.5 font-normal"
+                  onClick={() => openEdit(v)}
+                >
+                  <Edit2 size={14} />
+                  Editar
+                </Button>
+                <Button
+                  variant="outline"
+                  aria-label="Eliminar vehículo"
+                  className="h-11 w-11 p-0 flex-shrink-0 border-neutral-200 text-red-500 hover:text-red-600 hover:bg-red-50 hover:border-red-200"
+                  onClick={() => setDeleteId(v.id)}
+                >
+                  <Trash2 size={15} />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Escritorio: la rejilla de siempre */}
+        <div className="hidden lg:block border border-neutral-200 rounded-xl bg-white overflow-hidden shadow-sm">
           {/* Table header */}
           <div className="grid grid-cols-[64px_1fr_160px_80px_88px] items-center px-4 py-2.5 bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-500 uppercase tracking-wide">
             <span></span>
@@ -222,6 +274,7 @@ export default function VehiculosPage() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       {/* Create/Edit Dialog */}
