@@ -46,11 +46,6 @@ export default function Footer() {
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/admin/login" className="hover:text-white transition-colors">
-                                    {t('landing.footer_admin', language)}
-                                </Link>
-                            </li>
-                            <li>
                                 <Link href="#" className="hover:text-white transition-colors">
                                     {t('landing.footer_terminos', language)}
                                 </Link>
