@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Search, Phone, Link2, Copy, Check } from 'lucide-react'
+import { Plus, Trash2, Search, Phone, Link2, Copy, Check, AlertTriangle } from 'lucide-react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,6 +49,18 @@ interface Conductor {
   selfRegistered?: boolean
 }
 
+interface InviteActivo {
+  token: string
+  url: string
+  expiresAt: string
+  usedAt: string | null
+  createdAt: string
+  createdBy: string | null
+}
+
+/** Un link generado desde el entorno de desarrollo no le sirve al conductor. */
+const esLinkLocal = (url: string) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/i.test(url)
+
 const EMPTY_FORM = {
   nombre: '',
   whatsapp: '',
@@ -74,6 +86,26 @@ export default function ConductoresPage() {
   const [inviteUrl, setInviteUrl] = useState<string | null>(null)
   const [inviteLoading, setInviteLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [invites, setInvites] = useState<InviteActivo[]>([])
+  const [revoking, setRevoking] = useState<string | null>(null)
+  const [copiado, setCopiado] = useState<string | null>(null)
+
+  const cargarInvites = async () => {
+    try {
+      const res = await fetch('/api/admin/conductores/invites')
+      const data = await res.json()
+      if (res.ok) setInvites(data.data)
+    } catch {
+      /* la lista es informativa: si falla, el diálogo sigue sirviendo para generar */
+    }
+  }
+
+  const abrirInvites = async () => {
+    setInviteUrl(null)
+    setCopied(false)
+    setInviteOpen(true)
+    await cargarInvites()
+  }
 
   const handleGenerateInvite = async () => {
     setInviteLoading(true)
@@ -83,12 +115,36 @@ export default function ConductoresPage() {
     try {
       const res = await fetch('/api/admin/conductores/invites', { method: 'POST' })
       const data = await res.json()
-      if (res.ok) setInviteUrl(data.data.url)
-      else alert(data.error || 'Error al generar link')
+      if (res.ok) {
+        setInviteUrl(data.data.url)
+        await cargarInvites()
+      } else alert(data.error || 'Error al generar link')
     } catch {
       alert('Error de conexión')
     } finally {
       setInviteLoading(false)
+    }
+  }
+
+  /** Anula un link que ya no debería servir (se filtró, se reenvió de más). */
+  const revocarInvite = async (token: string) => {
+    if (!confirm('¿Anular este link? Quien lo tenga dejará de poder registrarse.')) return
+    setRevoking(token)
+    try {
+      const res = await fetch(`/api/admin/conductores/invites?token=${encodeURIComponent(token)}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error || 'No se pudo anular el link')
+        return
+      }
+      if (inviteUrl?.endsWith(token)) setInviteUrl(null)
+      await cargarInvites()
+    } catch {
+      alert('Error de conexión')
+    } finally {
+      setRevoking(null)
     }
   }
 
@@ -98,6 +154,17 @@ export default function ConductoresPage() {
       await navigator.clipboard.writeText(inviteUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    } catch {
+      alert('No se pudo copiar')
+    }
+  }
+
+  /** Copia el link de uno de los vigentes; `marca` es el token, para el ✓. */
+  const copiarTexto = async (texto: string, marca: string) => {
+    try {
+      await navigator.clipboard.writeText(texto)
+      setCopiado(marca)
+      setTimeout(() => setCopiado((actual) => (actual === marca ? null : actual)), 2000)
     } catch {
       alert('No se pudo copiar')
     }
@@ -225,10 +292,10 @@ export default function ConductoresPage() {
             size="sm"
             variant="outline"
             className="gap-1.5 text-sm w-full sm:w-auto"
-            onClick={handleGenerateInvite}
+            onClick={abrirInvites}
           >
             <Link2 size={14} />
-            Generar link de registro
+            Link de registro
           </Button>
           <Button size="sm" className="gap-1.5 text-sm w-full sm:w-auto" onClick={openCreate}>
             <Plus size={14} />
@@ -647,23 +714,98 @@ export default function ConductoresPage() {
             {inviteLoading ? (
               <div className="h-10 rounded bg-neutral-100 animate-pulse" />
             ) : inviteUrl ? (
-              <div className="flex items-center gap-2 p-2 bg-neutral-50 border border-neutral-200 rounded-lg">
-                <input
-                  readOnly
-                  value={inviteUrl}
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                  className="flex-1 bg-transparent text-xs font-mono text-neutral-700 outline-none min-w-0"
-                />
-                <Button size="sm" variant="ghost" className="gap-1.5 flex-shrink-0" onClick={copyInvite}>
-                  {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
-                  {copied ? 'Copiado' : 'Copiar'}
-                </Button>
-              </div>
+              <>
+                <div className="flex items-center gap-2 p-2 bg-neutral-50 border border-neutral-200 rounded-lg">
+                  <input
+                    readOnly
+                    value={inviteUrl}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    className="flex-1 bg-transparent text-xs font-mono text-neutral-700 outline-none min-w-0"
+                  />
+                  <Button size="sm" variant="ghost" className="gap-1.5 flex-shrink-0" onClick={copyInvite}>
+                    {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+                    {copied ? 'Copiado' : 'Copiar'}
+                  </Button>
+                </div>
+                {/* Generado desde el entorno local: el link apunta a localhost y
+                    al conductor no le va a abrir. Vale más avisarlo aquí que
+                    descubrirlo cuando el conductor responda que no funciona. */}
+                {esLinkLocal(inviteUrl) && (
+                  <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200">
+                    <AlertTriangle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-amber-800">
+                      Este link apunta a <strong>localhost</strong>, así que solo abre en tu
+                      computador. Para mandárselo a un conductor, genéralo desde el panel publicado.
+                    </p>
+                  </div>
+                )}
+              </>
             ) : null}
+
+            {/* Links vigentes: sin esto, un link reenviado de más quedaba
+                sirviendo 30 días y no había forma de cortarlo. */}
+            {invites.length > 0 && (
+              <div className="pt-1">
+                <p className="text-xs font-medium text-neutral-500 mb-1.5">
+                  Links vigentes ({invites.length})
+                </p>
+                <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto">
+                  {invites.map((inv) => (
+                    <div
+                      key={inv.token}
+                      className="flex items-center gap-2 p-2 rounded-lg border border-neutral-200"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-mono text-neutral-700 truncate">
+                          …{inv.token.slice(-10)}
+                        </p>
+                        <p className="text-[11px] text-neutral-400">
+                          Expira {new Date(inv.expiresAt).toLocaleDateString('es-CO')}
+                          {inv.usedAt
+                            ? ` · usado ${new Date(inv.usedAt).toLocaleDateString('es-CO')}`
+                            : ' · sin usar'}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="flex-shrink-0 h-8 px-2 gap-1 text-xs"
+                        onClick={() => copiarTexto(inv.url, inv.token)}
+                      >
+                        {copiado === inv.token ? (
+                          <Check size={13} className="text-green-600" />
+                        ) : (
+                          <Copy size={13} />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="flex-shrink-0 h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                        disabled={revoking === inv.token}
+                        onClick={() => revocarInvite(inv.token)}
+                      >
+                        {revoking === inv.token ? 'Anulando…' : 'Anular'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter className="gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setInviteOpen(false)}>
               Cerrar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="gap-1.5"
+              disabled={inviteLoading}
+              onClick={handleGenerateInvite}
+            >
+              <Link2 size={14} />
+              {inviteLoading ? 'Generando…' : 'Generar link nuevo'}
             </Button>
           </DialogFooter>
         </DialogContent>

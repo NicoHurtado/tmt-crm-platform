@@ -19,7 +19,9 @@ import {
   confirmacionReservaCliente,
   notificacionAliadoReserva,
   actualizacionEstadoCliente,
+  tplConductorAutoRegistrado,
   ReservaTemplate,
+  ConductorAutoRegistradoTemplate,
 } from './email-templates';
 import { Reserva, Servicio, Conductor, Vehiculo, Aliado } from '@prisma/client';
 import { getDatos } from '@/types/reserva-datos';
@@ -282,4 +284,22 @@ export async function sendReservationNotifications(
   } else if (context.event === 'cancelled') {
     await sendCancelacionEmail(reserva, lang.toUpperCase() as 'ES' | 'EN');
   }
+}
+
+// ─── Auto-registro de conductor ──────────────────────────────────────────────
+
+/**
+ * Avisa al admin cuando un conductor se registra solo con el link de invitación.
+ * Sin esto el alta pasaba en silencio: el conductor quedaba activo y disponible
+ * (o sea, asignable a reservas) y nadie se enteraba hasta abrir la lista.
+ */
+export async function sendConductorAutoRegistradoEmail(
+  conductor: ConductorAutoRegistradoTemplate
+) {
+  await transporter.sendMail({
+    from: FROM,
+    to: ADMIN_EMAIL,
+    subject: `Nuevo conductor registrado — ${conductor.nombre} (${conductor.placa})`,
+    html: tplConductorAutoRegistrado(conductor),
+  });
 }

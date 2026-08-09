@@ -22,6 +22,77 @@ function resolveBaseUrl(request: Request): string {
 }
 
 /**
+ * GET /api/admin/conductores/invites
+ * Lista los links todavía vigentes, para poder verlos y anularlos.
+ */
+export async function GET(request: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session) {
+            return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+        }
+
+        const invites = await prisma.conductorInvite.findMany({
+            where: { expiresAt: { gt: new Date() } },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        const base = resolveBaseUrl(request);
+        return NextResponse.json({
+            data: invites.map((i) => ({
+                token: i.token,
+                url: `${base}/conductor/registro/${i.token}`,
+                expiresAt: i.expiresAt,
+                usedAt: i.usedAt,
+                createdAt: i.createdAt,
+                createdBy: i.createdBy,
+            })),
+        });
+    } catch (error) {
+        console.error('Error listing conductor invites:', error);
+        return NextResponse.json({ error: 'Error al listar invitaciones' }, { status: 500 });
+    }
+}
+
+/**
+ * DELETE /api/admin/conductores/invites?token=...
+ * Anula un link. No borra la fila: le adelanta la expiración, con lo que
+ * `checkInvite` empieza a rechazarlo de inmediato y se conserva el rastro de
+ * quién lo creó y cuándo se usó por última vez.
+ */
+export async function DELETE(request: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session) {
+            return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+        }
+
+        const token = new URL(request.url).searchParams.get('token');
+        if (!token) {
+            return NextResponse.json({ error: 'Falta el token' }, { status: 400 });
+        }
+
+        const invite = await prisma.conductorInvite.findUnique({ where: { token } });
+        if (!invite) {
+            return NextResponse.json({ error: 'Ese link no existe' }, { status: 404 });
+        }
+
+        // Un segundo atrás y no `ahora`: checkInvite compara con `<`, así que
+        // dejarlo exactamente en el instante actual lo daría por válido durante
+        // ese milisegundo.
+        await prisma.conductorInvite.update({
+            where: { token },
+            data: { expiresAt: new Date(Date.now() - 1000) },
+        });
+
+        return NextResponse.json({ data: { token, revoked: true } });
+    } catch (error) {
+        console.error('Error revoking conductor invite:', error);
+        return NextResponse.json({ error: 'Error al anular el link' }, { status: 500 });
+    }
+}
+
+/**
  * POST /api/admin/conductores/invites
  * Genera un link de registro reutilizable: cualquier cantidad de conductores
  * puede registrarse con el mismo link mientras no expire.

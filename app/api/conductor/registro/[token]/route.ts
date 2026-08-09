@@ -6,6 +6,7 @@ import {
     normalizarPlaca,
     normalizarTelefono,
 } from '@/lib/conductor-invite';
+import { sendConductorAutoRegistradoEmail } from '@/lib/email-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,6 +97,15 @@ export async function POST(request: Request, { params }: { params: { token: stri
             });
             return c;
         });
+
+        // El aviso no puede tumbar el registro: si el SMTP falla, el conductor
+        // ya quedó creado y lo único que se pierde es el correo. Se registra en
+        // el log y se sigue.
+        try {
+            await sendConductorAutoRegistradoEmail(conductor);
+        } catch (mailError) {
+            console.error('No se pudo avisar del auto-registro de conductor:', mailError);
+        }
 
         return NextResponse.json({ data: { id: conductor.id, nombre: conductor.nombre } }, { status: 201 });
     } catch (error) {

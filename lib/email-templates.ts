@@ -707,3 +707,42 @@ export const notificacionAliadoReserva = (r: ReservaTemplate, aliado: AliadoTemp
 
 export const actualizacionEstadoCliente = (r: ReservaTemplate, idioma: 'es' | 'en'): string =>
   tplConductorAsignado(r, idioma === 'en' ? 'EN' : 'ES');
+
+/**
+ * Aviso interno: un conductor se dio de alta solo por el link de invitación.
+ * Va al admin, no al conductor, y por eso solo existe en español.
+ */
+export interface ConductorAutoRegistradoTemplate {
+  nombre: string;
+  documento: string;
+  placa: string;
+  telefono: string;
+  whatsapp: string;
+  foto?: string | null;
+}
+
+export const tplConductorAutoRegistrado = (c: ConductorAutoRegistradoTemplate): string => {
+  const fila = (etiqueta: string, valor: string): string => `
+    <tr>
+      <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px;color:#6b7280;">${etiqueta}</td>
+      <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px;color:#111827;font-weight:600;text-align:right;">${valor}</td>
+    </tr>`;
+
+  return getEmailLayout(`
+    ${badgeHtml('Nuevo Conductor', '#92400e', '#fffbeb')}
+    <p style="margin:0 0 6px;font-size:16px;color:#374151;">
+      <strong>${c.nombre}</strong> se registró con el link de invitación.
+    </p>
+    <p style="margin:0 0 24px;font-size:14px;color:#6b7280;line-height:1.7;">
+      Ya aparece en el panel como <strong>activo y disponible</strong>, es decir,
+      se le puede asignar una reserva. Revisa sus datos antes de hacerlo.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #f3f4f6;">
+      ${fila('Documento', c.documento)}
+      ${fila('Placa', c.placa)}
+      ${fila('Teléfono', c.telefono)}
+      ${fila('WhatsApp', c.whatsapp)}
+      ${fila('Foto', c.foto ? 'Sí' : 'No adjuntó')}
+    </table>
+  `, 'ES');
+};
