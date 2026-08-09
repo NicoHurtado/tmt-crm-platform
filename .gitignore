@@ -40,7 +40,13 @@ CLAUDE.md
 /docs/
 
 # ─── Backups y archivos Railway ──────────────────────────────
+# El *.sql es para volcados de base de datos, pero se tragaba también las
+# migraciones de Prisma: las viejas siguen versionadas solo porque ya estaban
+# trackeadas cuando se añadió la regla, y toda migración nueva se perdía en
+# silencio (por eso ConductorInvite nunca llegó a prisma/migrations). La
+# excepción las devuelve al repositorio.
 *.sql
+!prisma/migrations/**/*.sql
 nixpacks.toml
 
 # ─── Archivos temporales Prisma ──────────────────────────────
