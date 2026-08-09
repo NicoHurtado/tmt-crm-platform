@@ -295,12 +295,8 @@ function vistaFormulario(v = {}) {
         </select>
         <label>Dirección del alojamiento</label>
         <input name="lugarRecogida" value="${val('lugarRecogida', 'Cra 43A #7-50, Apto 1204, El Poblado')}" required>
-        <div class="fila">
-          <div><label>Número de vuelo</label>
-            <input name="numeroVuelo" value="${val('numeroVuelo', 'AV8432')}"></div>
-          <div><label>Margen de ${esc(SOCIO_NOMBRE)} (ilustrativo)</label>
-            <input type="number" name="margen" min="0" max="100" value="${val('margen', '20')}"></div>
-        </div>
+        <label>Número de vuelo</label>
+        <input name="numeroVuelo" value="${val('numeroVuelo', 'AV8432')}">
         <div class="fila">
           <div><label>Nombre del huésped</label>
             <input name="nombreCliente" value="${val('nombreCliente', 'Demo Reunión')}" required></div>
@@ -358,9 +354,6 @@ async function vistaPrecio(f) {
         );
     }
 
-    const margen = Math.max(0, Math.min(100, Number(f.margen) || 0));
-    const precioHuesped = Math.round(datos.total * (1 + margen / 100));
-    const gana = precioHuesped - datos.total;
     const d = datos.desglose;
 
     return pagina(
@@ -372,20 +365,14 @@ async function vistaPrecio(f) {
         ${f.aeropuertoNombre === 'OLAYA_HERRERA' ? 'Olaya Herrera' : 'José María Córdova'}</p>
 
       <div class="precio-box">
-        <div class="et">Precio para el huésped</div>
-        <div class="total">${cop(precioHuesped)}</div>
+        <div class="et">Precio del traslado</div>
+        <div class="total">${cop(datos.total)}</div>
         <div class="veh">COP · vehículo completo, no por persona</div>
         <div class="desglose">
           <span>Tarifa base <b>${cop(d.precioBase)}</b></span>
           ${d.recargoNocturno > 0 ? `<span>Recargo nocturno <b>${cop(d.recargoNocturno)}</b></span>` : ''}
           ${d.precioAdicionales > 0 ? `<span>Adicionales <b>${cop(d.precioAdicionales)}</b></span>` : ''}
         </div>
-      </div>
-
-      <div class="margen">
-        <div class="lin"><span>TMT le cobra a ${esc(SOCIO_NOMBRE)}</span><b>${cop(datos.total)}</b></div>
-        <div class="lin"><span>${esc(SOCIO_NOMBRE)} le cobra a su huésped (+${margen}%)</span><b>${cop(precioHuesped)}</b></div>
-        <div class="lin destaca"><span>Margen de ${esc(SOCIO_NOMBRE)}</span><span>${cop(gana)}</span></div>
       </div>
 
       <form method="POST" action="/pago">
@@ -407,7 +394,7 @@ async function vistaPrecio(f) {
 
 // ── Pantalla 3 · pasarela de pago simulada (aquí no se llama a TMT) ─────────
 
-function vistaPago(f, total, precioHuesped) {
+function vistaPago(f, total) {
     return pagina(
         'Pago',
         2,
@@ -415,7 +402,7 @@ function vistaPago(f, total, precioHuesped) {
       <div class="cab">
         <div>
           <div class="m">Total a pagar</div>
-          <div class="v">${cop(precioHuesped)} COP</div>
+          <div class="v">${cop(total)} COP</div>
         </div>
         <div style="text-align:right">
           <div class="m">Comercio</div>
@@ -435,7 +422,7 @@ function vistaPago(f, total, precioHuesped) {
           <div><label>Vence</label><input value="12/29" readonly></div>
           <div><label>CVV</label><input value="123" readonly></div>
         </div>
-        <button class="pagar" type="submit">Pagar ${cop(precioHuesped)}</button>
+        <button class="pagar" type="submit">Pagar ${cop(total)}</button>
       </form>
 
       ${nota(
@@ -515,9 +502,6 @@ async function vistaConfirmacion(f) {
         );
     }
 
-    const margen = Math.max(0, Math.min(100, Number(f.margen) || 0));
-    const precioHuesped = Math.round(datos.total * (1 + margen / 100));
-
     return pagina(
         '¡Traslado confirmado!',
         3,
@@ -533,8 +517,7 @@ async function vistaConfirmacion(f) {
           confirmada y en la cola de asignación de conductor</span></dd>
         <dt>Servicio</dt><dd>${esc(datos.fecha)} a las ${esc(datos.hora)} · ${esc(datos.vehiculo)} · ${esc(datos.numeroPasajeros)} pasajeros</dd>
         <dt>Huésped</dt><dd>${esc(f.nombreCliente)} · ${esc(f.emailCliente)}</dd>
-        <dt>TMT cobra</dt><dd>${cop(datos.total)} COP</dd>
-        <dt>${esc(SOCIO_NOMBRE)} cobró</dt><dd>${cop(precioHuesped)} COP <span style="color:#0a8f4a;font-weight:600">(margen ${cop(precioHuesped - datos.total)})</span></dd>
+        <dt>Precio</dt><dd>${cop(datos.total)} COP</dd>
         <dt>Referencia de ${esc(SOCIO_NOMBRE)}</dt><dd><code>${esc(refExterna)}</code></dd>
       </dl>
 
@@ -610,8 +593,7 @@ http.createServer(async (req, res) => {
                 aeropuertoNombre: f.aeropuertoNombre,
             });
             if (!datos.ok) return responder(await vistaPrecio(f));
-            const margen = Math.max(0, Math.min(100, Number(f.margen) || 0));
-            return responder(vistaPago(f, datos.total, Math.round(datos.total * (1 + margen / 100))));
+            return responder(vistaPago(f, datos.total));
         }
 
         if (req.method === 'POST' && req.url === '/confirmar') {
