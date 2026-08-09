@@ -181,11 +181,16 @@ export default function CalendarioPage() {
     };
 
     const handleDatesSet = (dateInfo: any) => {
+        // dateInfo.start/end son los de la rejilla, con relleno de los meses
+        // vecinos (agosto de 2026 arranca el 26 de julio). El export dice
+        // "Calendario_agosto_de_2026" y debe traer agosto, no el relleno: se
+        // recorta al mes real, el mismo que usa la agenda de móvil.
+        const dentro = new Date(dateInfo.start.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const start = new Date(dentro.getFullYear(), dentro.getMonth(), 1);
         setCurrentMonth({
-            start: dateInfo.start,
-            end: dateInfo.end,
-            label: new Date(dateInfo.start.getTime() + 7 * 24 * 60 * 60 * 1000)
-                .toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
+            start,
+            end: new Date(dentro.getFullYear(), dentro.getMonth() + 1, 1),
+            label: start.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }),
         });
     };
 

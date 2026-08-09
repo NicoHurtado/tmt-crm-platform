@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, CalendarDays } from 'lucide-react';
 
 export interface CalendarEvent {
     id: string;
@@ -36,6 +36,15 @@ interface Props {
     onDatesSet: (dateInfo: any) => void;
 }
 
+/** Clave YYYY-MM-DD en hora **local**. Con `toISOString()` la clave sale en UTC
+ *  y en Colombia (UTC-5) toda reserva desde las 19:00 se agrupaba en el día
+ *  siguiente. */
+function claveDia(d: Date) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+        d.getDate(),
+    ).padStart(2, '0')}`;
+}
+
 /** Agrupa por día y ordena, para la agenda de móvil. */
 function agruparPorDia(events: CalendarEvent[], desde: Date | null, hasta: Date | null) {
     const dentroDelRango = (e: CalendarEvent) => {
@@ -52,13 +61,15 @@ function agruparPorDia(events: CalendarEvent[], desde: Date | null, hasta: Date 
             return d !== 0 ? d : (a.extendedProps.hora || '').localeCompare(b.extendedProps.hora || '');
         })
         .forEach((e) => {
-            const dia = new Date(e.start).toISOString().split('T')[0];
+            const dia = claveDia(new Date(e.start));
             if (!porDia.has(dia)) porDia.set(dia, []);
             porDia.get(dia)!.push(e);
         });
 
     return Array.from(porDia.entries());
 }
+
+type Dia = [string, CalendarEvent[]];
 
 export default function CalendarioView({ events, onEventClick, onDatesSet }: Props) {
     const calendarRef = useRef<any>(null);
@@ -75,17 +86,107 @@ export default function CalendarioView({ events, onEventClick, onDatesSet }: Pro
 
     const api = () => calendarRef.current?.getApi();
 
-    const etiquetaMes = rango
-        ? new Date(rango.start.getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('es-CO', {
-              month: 'long',
-              year: 'numeric',
-          })
+    /** El rango que reporta FullCalendar es el de la **rejilla**, con relleno de
+     *  los meses vecinos: para agosto de 2026 arranca el domingo 26 de julio. En
+     *  la rejilla ese relleno se ve gris y se entiende; en una lista parecía que
+     *  el mes empezaba en julio. La agenda usa el mes real. */
+    const mes = useMemo(() => {
+        if (!rango) return null;
+        const dentro = new Date(rango.start.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return {
+            start: new Date(dentro.getFullYear(), dentro.getMonth(), 1),
+            end: new Date(dentro.getFullYear(), dentro.getMonth() + 1, 1),
+        };
+    }, [rango]);
+
+    const etiquetaMes = mes
+        ? mes.start.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
         : '';
 
     const dias = useMemo(
-        () => agruparPorDia(events, rango?.start ?? null, rango?.end ?? null),
-        [events, rango],
+        () => agruparPorDia(events, mes?.start ?? null, mes?.end ?? null),
+        [events, mes],
     );
+
+    /** Hoy arriba y el futuro debajo: en una lista de un mes entero, los días ya
+     *  pasados empujaban la reserva de hoy fuera de la primera pantalla. Se
+     *  separan y los pasados quedan plegados al final — siguen a un toque, pero
+     *  no estorban. Las claves son YYYY-MM-DD, así que comparar strings ordena
+     *  igual que comparar fechas. */
+    const hoyClave = claveDia(new Date());
+    const pasados: Dia[] = dias.filter(([d]) => d < hoyClave);
+    const proximos: Dia[] = dias.filter(([d]) => d >= hoyClave);
+
+    const renderDia = ([dia, delDia]: Dia) => {
+        const fecha = new Date(dia + 'T12:00:00');
+        const esHoy = dia === hoyClave;
+        return (
+            <div key={dia}>
+                {/* Cabecera de día pegajosa: al scrollear una lista larga
+                    es lo único que dice en qué día vas parado. */}
+                <div
+                    className={`sticky top-14 z-10 -mx-4 px-4 py-1.5 backdrop-blur-sm ${
+                        esHoy ? 'bg-amber-50/95' : 'bg-neutral-50/95'
+                    }`}
+                >
+                    <span
+                        className={`text-xs font-semibold inline-block first-letter:uppercase ${
+                            esHoy ? 'text-amber-700' : 'text-neutral-600'
+                        }`}
+                    >
+                        {fecha.toLocaleDateString('es-CO', {
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'short',
+                        })}
+                        {esHoy && ' · hoy'}
+                    </span>
+                    <span className="text-[11px] text-neutral-400 ml-1.5">({delDia.length})</span>
+                </div>
+
+                <div className="flex flex-col gap-1.5 mt-1.5">
+                    {delDia.map((e) => (
+                        <button
+                            key={e.id}
+                            onClick={() =>
+                                onEventClick({
+                                    event: { id: e.id, extendedProps: e.extendedProps },
+                                })
+                            }
+                            className="w-full text-left rounded-xl border border-neutral-200 bg-white p-3 pl-3.5 active:bg-neutral-50 transition-colors"
+                            style={{ borderLeftWidth: 4, borderLeftColor: e.backgroundColor }}
+                        >
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-neutral-900 truncate">
+                                        {e.extendedProps.hora || '—'}
+                                        <span className="font-normal text-neutral-500">
+                                            {' · '}
+                                            {e.extendedProps.codigo}
+                                        </span>
+                                    </p>
+                                    <p className="text-[13px] text-neutral-800 mt-0.5 truncate">
+                                        {e.extendedProps.cliente}
+                                    </p>
+                                    <p className="text-xs text-neutral-500 mt-0.5 truncate">
+                                        {e.extendedProps.servicio}
+                                    </p>
+                                </div>
+                                {e.extendedProps.esReservaAliado && (
+                                    <span
+                                        className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 flex-shrink-0"
+                                        title={e.extendedProps.aliado ?? 'Vía aliado'}
+                                    >
+                                        ★
+                                    </span>
+                                )}
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+    };
 
     useEffect(() => {
         const container = calendarContainerRef.current;
@@ -162,78 +263,26 @@ export default function CalendarioView({ events, onEventClick, onDatesSet }: Pro
                 </div>
             ) : (
                 <div className="flex flex-col gap-3">
-                    {dias.map(([dia, delDia]) => {
-                        const fecha = new Date(dia + 'T12:00:00');
-                        const esHoy = dia === new Date().toISOString().split('T')[0];
-                        return (
-                            <div key={dia}>
-                                {/* Cabecera de día pegajosa: al scrollear una lista larga
-                                    es lo único que dice en qué día vas parado. */}
-                                <div
-                                    className={`sticky top-14 z-10 -mx-4 px-4 py-1.5 backdrop-blur-sm ${
-                                        esHoy ? 'bg-amber-50/95' : 'bg-neutral-50/95'
-                                    }`}
-                                >
-                                    <span
-                                        className={`text-xs font-semibold inline-block first-letter:uppercase ${
-                                            esHoy ? 'text-amber-700' : 'text-neutral-600'
-                                        }`}
-                                    >
-                                        {fecha.toLocaleDateString('es-CO', {
-                                            weekday: 'long',
-                                            day: 'numeric',
-                                            month: 'short',
-                                        })}
-                                        {esHoy && ' · hoy'}
-                                    </span>
-                                    <span className="text-[11px] text-neutral-400 ml-1.5">
-                                        ({delDia.length})
-                                    </span>
-                                </div>
+                    {/* Si el mes entero ya pasó (navegando hacia atrás) no hay nada
+                        que plegar: se listan los días tal cual. */}
+                    {proximos.length === 0
+                        ? pasados.map(renderDia)
+                        : proximos.map(renderDia)}
 
-                                <div className="flex flex-col gap-1.5 mt-1.5">
-                                    {delDia.map((e) => (
-                                        <button
-                                            key={e.id}
-                                            onClick={() =>
-                                                onEventClick({
-                                                    event: { id: e.id, extendedProps: e.extendedProps },
-                                                })
-                                            }
-                                            className="w-full text-left rounded-xl border border-neutral-200 bg-white p-3 pl-3.5 active:bg-neutral-50 transition-colors"
-                                            style={{ borderLeftWidth: 4, borderLeftColor: e.backgroundColor }}
-                                        >
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-semibold text-neutral-900 truncate">
-                                                        {e.extendedProps.hora || '—'}
-                                                        <span className="font-normal text-neutral-500">
-                                                            {' · '}
-                                                            {e.extendedProps.codigo}
-                                                        </span>
-                                                    </p>
-                                                    <p className="text-[13px] text-neutral-800 mt-0.5 truncate">
-                                                        {e.extendedProps.cliente}
-                                                    </p>
-                                                    <p className="text-xs text-neutral-500 mt-0.5 truncate">
-                                                        {e.extendedProps.servicio}
-                                                    </p>
-                                                </div>
-                                                {e.extendedProps.esReservaAliado && (
-                                                    <span
-                                                        className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 flex-shrink-0"
-                                                        title={e.extendedProps.aliado ?? 'Vía aliado'}
-                                                    >
-                                                        ★
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })}
+                    {proximos.length > 0 && pasados.length > 0 && (
+                        <details className="group">
+                            <summary className="list-none cursor-pointer inline-flex items-center gap-1.5 h-11 text-xs font-medium text-neutral-500">
+                                <ChevronDown
+                                    size={14}
+                                    className="transition-transform group-open:rotate-180"
+                                />
+                                Días anteriores de{' '}
+                                <span className="first-letter:uppercase">{etiquetaMes}</span> (
+                                {pasados.reduce((n, [, evs]) => n + evs.length, 0)})
+                            </summary>
+                            <div className="flex flex-col gap-3 mt-1">{pasados.map(renderDia)}</div>
+                        </details>
+                    )}
                 </div>
             )}
         </div>
