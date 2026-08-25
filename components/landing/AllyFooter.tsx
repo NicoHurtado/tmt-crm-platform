@@ -34,7 +34,7 @@ export default function AllyFooter() {
                         <div className="space-y-3">
                             <div className="flex items-center gap-3 text-gray-300">
                                 <FiPhone className="text-[#D6A75D] flex-shrink-0" size={18} />
-                                <span className="text-sm">+57 310 6676736</span>
+                                <span className="text-sm">+57 3175177409</span>
                             </div>
 
                             <div className="flex items-center gap-3 text-gray-300">
@@ -60,4 +60,3 @@ export default function AllyFooter() {
         </footer>
     );
 }
-

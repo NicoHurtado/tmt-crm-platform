@@ -72,7 +72,7 @@ export default function Footer() {
                                     className="flex items-center gap-3 hover:text-white transition-colors"
                                 >
                                     <FiPhone className="text-[#D6A75D]" />
-                                    <span>+57 310 6676736</span>
+                                    <span>+57 3175177409</span>
                                 </a>
                             </li>
                             <li>
