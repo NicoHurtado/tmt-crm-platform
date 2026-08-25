@@ -17,7 +17,7 @@ export default function StepWhatsAppContact({ serviceName, onBack }: StepWhatsAp
             : `Hello, I am interested in the hourly transport service: ${serviceName}.`;
 
         const encodedMessage = encodeURIComponent(message);
-        window.open(`https://wa.me/573106676736?text=${encodedMessage}`, '_blank');
+        window.open(`https://wa.me/573175177409?text=${encodedMessage}`, '_blank');
     };
 
     return (

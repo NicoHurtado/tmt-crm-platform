@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { FaWhatsapp } from 'react-icons/fa';
 
-const WHATSAPP_NUMBER = '573106676736';
+const WHATSAPP_NUMBER = '57317 5177409';
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 export default function WhatsAppButton() {

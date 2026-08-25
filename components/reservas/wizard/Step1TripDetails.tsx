@@ -469,7 +469,7 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         const message = encodeURIComponent(
             `Hola, necesito asistencia con el servicio: ${service.nombre}. Requiero múltiples recogidas o una petición personalizada.`
         );
-        window.open(`https://wa.me/573106676736?text=${message}`, '_blank');
+        window.open(`https://wa.me/573175177409?text=${message}`, '_blank');
     };
 
     // Check if this is municipal transport

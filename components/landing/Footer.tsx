@@ -66,7 +66,7 @@ export default function Footer() {
                         <ul className="space-y-4 text-gray-300">
                             <li>
                                 <a
-                                    href="https://wa.me/573106676736"
+                                    href="https://wa.me/573175177409"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-3 hover:text-white transition-colors"
