@@ -425,7 +425,7 @@ export default function AliadosPage() {
                 </button>
                 <button
                   onClick={() => setQrAliado(aliado)}
-                  aria-label="QR de referido"
+                  aria-label="QR del perfil del aliado"
                   className="w-11 h-11 flex-shrink-0 inline-flex items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 active:bg-neutral-100"
                 >
                   <QrCode size={16} />
@@ -557,7 +557,7 @@ export default function AliadosPage() {
                       <button
                         onClick={() => setQrAliado(aliado)}
                         className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                        title="QR de referido"
+                        title="QR del perfil del aliado"
                       >
                         <QrCode size={13} />
                       </button>
@@ -795,7 +795,7 @@ export default function AliadosPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* QR de referido */}
+      {/* QR del perfil del aliado */}
       <AliadoQRModal
         open={!!qrAliado}
         onClose={() => setQrAliado(null)}

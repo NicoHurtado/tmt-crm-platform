@@ -11,12 +11,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { buildAliadoReferralLink } from '@/lib/whatsapp-referral'
 
 interface AliadoQRModalProps {
   open: boolean
   onClose: () => void
-  aliado: { nombre: string; codigo?: string } | null
+  aliado: { nombre: string; codigo: string } | null
 }
 
 const QR_SIZE = 280
@@ -33,20 +32,28 @@ function slugify(value: string): string {
 export default function AliadoQRModal({ open, onClose, aliado }: AliadoQRModalProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [profileUrl, setProfileUrl] = useState<string | null>(null)
 
-  // Genera el QR como data URL en estado (determinista: depende solo del nombre).
+  // El QR abre la página pública de reservas identificada por el código del aliado.
   // No dependemos del montaje del <canvas> en el DOM, que con el diálogo es asíncrono.
   useEffect(() => {
     if (!open || !aliado) {
       setQrDataUrl(null)
       setError(null)
+      setProfileUrl(null)
       return
     }
     let cancelled = false
     setError(null)
     setQrDataUrl(null)
-    const link = buildAliadoReferralLink(aliado.nombre)
-    QRCode.toDataURL(link, { width: QR_SIZE, margin: 1 })
+    setProfileUrl(null)
+    if (!aliado.codigo.trim()) {
+      setError('El aliado no tiene un código para abrir su página de reservas.')
+      return
+    }
+    const link = `${window.location.origin}/reservas/${encodeURIComponent(aliado.codigo)}`
+    setProfileUrl(link)
+    QRCode.toDataURL(link, { width: QR_SIZE, margin: 4 })
       .then((url) => {
         if (!cancelled) setQrDataUrl(url)
       })
@@ -94,27 +101,32 @@ export default function AliadoQRModal({ open, onClose, aliado }: AliadoQRModalPr
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">
-            QR de referido
+            QR del perfil del aliado
           </DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-3 py-2">
           {aliado && (
             <p className="text-sm text-neutral-500 text-center">
-              Al escanear, el huésped abre WhatsApp con Transportes Medellín Travel
-              mencionando a <span className="font-medium text-neutral-800">{aliado.nombre}</span>.
+              Al escanear, el huésped abre directamente la página de reservas de{' '}
+              <span className="font-medium text-neutral-800">{aliado.nombre}</span>.
             </p>
           )}
           <div className="rounded-lg border border-neutral-200 p-3 bg-white flex items-center justify-center" style={{ width: QR_SIZE + 24, height: QR_SIZE + 24 }}>
             {qrDataUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={qrDataUrl} alt="QR de referido" width={QR_SIZE} height={QR_SIZE} />
+              <img src={qrDataUrl} alt={`QR de reservas de ${aliado?.nombre}`} width={QR_SIZE} height={QR_SIZE} />
             ) : error ? (
               <span className="text-sm text-red-600">{error}</span>
             ) : (
               <span className="text-sm text-neutral-400">Generando…</span>
             )}
           </div>
+          {profileUrl && (
+            <a href={profileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-neutral-600 underline break-all text-center">
+              Abrir página del aliado
+            </a>
+          )}
         </div>
 
         <DialogFooter>
