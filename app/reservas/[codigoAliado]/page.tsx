@@ -13,6 +13,7 @@ import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 import { CartModal } from '@/components/carrito/CartModal';
 import WhatsAppButton from '@/components/ui/WhatsAppButton';
 import { useLanguage, t } from '@/lib/i18n';
+import { calcularPrecioDesdeAliado, type PrecioDesde } from '@/lib/precio-desde-aliado';
 
 interface Service {
     id: string;
@@ -36,6 +37,7 @@ interface Service {
     camposPersonalizados: any[];
     adicionales: any[];
     vehiculosPermitidos?: any[];
+    precioDesde?: PrecioDesde | null;
 }
 
 interface Aliado {
@@ -83,7 +85,7 @@ export default function ReservaAliadoPage() {
             // 2. Load Configuration & Services
             await Promise.all([
                 fetchAliadoConfig(aliadoData.id),
-                fetchServices(aliadoData.id)
+                fetchServices(aliadoData.id, aliadoData.tipo)
             ]);
 
         } catch (err: any) {
@@ -126,7 +128,7 @@ export default function ReservaAliadoPage() {
         }
     };
 
-    const fetchServices = async (aliadoId: string) => {
+    const fetchServices = async (aliadoId: string, aliadoTipo: string) => {
         try {
             const res = await fetch(`/api/aliados/${aliadoId}/servicios`, { cache: 'no-store' });
             const data = await res.json();
@@ -143,7 +145,8 @@ export default function ReservaAliadoPage() {
                 .map((sa: any) => {
                     // Destructure aliado-specific fields, spread remaining service fields
                     const { servicioId, activo, tipoComision, comisionValor, vehiculos, ...serviceFields } = sa;
-                    return serviceFields;
+                    // "Desde $…" con el precio más bajo configurado para ESTE aliado
+                    return { ...serviceFields, precioDesde: calcularPrecioDesdeAliado(sa, aliadoTipo) };
                 });
 
             setServices(activeServices as Service[]);

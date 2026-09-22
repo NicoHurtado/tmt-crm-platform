@@ -41,6 +41,8 @@ export interface CatalogService {
     tipoTarifa?: 'POR_PERSONA' | null;
     preciosPorPersona?: { p1: number; p2: number; p3: number } | null;
     vehiculosPermitidos?: any[];
+    /** Precio "Desde" precalculado (catálogo co-branded del aliado). Tiene prioridad sobre `showPrices`. */
+    precioDesde?: { monto: number; unidad: 'persona' | 'hora' | null } | null;
     [key: string]: any;
 }
 
@@ -178,8 +180,28 @@ export default function ServiceCatalog<T extends CatalogService>({
         );
     };
 
+    // Bloque "Desde $…" (opcionalmente por persona / por hora)
+    const renderPrecioDesde = (monto: number, unidad: 'persona' | 'hora' | null) => (
+        <div>
+            <p className="text-sm text-gray-500">{t('reservas.desde', language)}</p>
+            <p className="text-2xl font-bold text-[#D6A75D]">
+                ${monto.toLocaleString('es-CO')}
+                {unidad && (
+                    <span className="text-sm font-medium text-gray-500">
+                        {' / '}
+                        {unidad === 'persona'
+                            ? (language === 'es' ? 'persona' : 'person')
+                            : (language === 'es' ? 'hora' : 'hour')}
+                    </span>
+                )}
+            </p>
+        </div>
+    );
+
     // Card reutilizable de servicio (ancho fijo para el carrusel horizontal)
-    const renderServiceCard = (service: T) => (
+    const renderServiceCard = (service: T) => {
+        const conPrecio = showPrices || service.precioDesde !== undefined;
+        return (
         <div
             key={service.id}
             className="group w-[300px] shrink-0 snap-start bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
@@ -216,41 +238,38 @@ export default function ServiceCatalog<T extends CatalogService>({
                 </div>
 
                 <div className="flex items-center justify-between">
-                    {showPrices && (() => {
+                    {conPrecio && (() => {
+                        // Catálogo del aliado: precio "Desde" con la tarifa más baja de ese aliado
+                        if (service.precioDesde !== undefined) {
+                            if (!service.precioDesde) return <div />;
+                            return renderPrecioDesde(service.precioDesde.monto, service.precioDesde.unidad);
+                        }
                         // Tours con precio por persona: mostrar "Desde $p1 por persona"
                         if (service.tipoTarifa === 'POR_PERSONA' && service.preciosPorPersona) {
                             const p1 = Number(service.preciosPorPersona.p1 ?? 0);
                             if (p1 <= 0) return <div />;
-                            return (
-                                <div>
-                                    <p className="text-sm text-gray-500">{t('reservas.desde', language)}</p>
-                                    <p className="text-2xl font-bold text-[#D6A75D]">
-                                        ${p1.toLocaleString('es-CO')}
-                                        <span className="text-sm font-medium text-gray-500"> / {language === 'es' ? 'persona' : 'person'}</span>
-                                    </p>
-                                </div>
-                            );
+                            return renderPrecioDesde(p1, 'persona');
                         }
                         const precios = (service.vehiculosPermitidos || [])
                             .map((sv: any) => Number(sv.precio ?? 0))
                             .filter((p: number) => p > 0);
                         if (precios.length === 0) return <div />;
-                        return (
-                            <div>
-                                <p className="text-sm text-gray-500">{t('reservas.desde', language)}</p>
-                                <p className="text-2xl font-bold text-[#D6A75D]">
-                                    ${Math.min(...precios).toLocaleString('es-CO')}
-                                </p>
-                            </div>
-                        );
+                        return renderPrecioDesde(Math.min(...precios), null);
                     })()}
-                    <button className={`${showPrices ? '' : 'w-full'} bg-gray-100 hover:bg-[#D6A75D] text-gray-800 hover:text-black font-bold py-2 px-4 rounded-lg transition-colors`}>
+                    <button className={`${conPrecio ? '' : 'w-full'} bg-gray-100 hover:bg-[#D6A75D] text-gray-800 hover:text-black font-bold py-2 px-4 rounded-lg transition-colors`}>
                         {t('header.reservar', language)}
                     </button>
                 </div>
             </div>
         </div>
-    );
+        );
+    };
+
+    // Precio "Desde" de la tarjeta municipal: el menor entre los destinos del aliado
+    const preciosMunicipales = serviciosMunicipales
+        .map(s => s.precioDesde?.monto ?? 0)
+        .filter(m => m > 0);
+    const precioDesdeMunicipal = preciosMunicipales.length > 0 ? Math.min(...preciosMunicipales) : null;
 
     // Tarjeta de Transporte Municipal (abre el modal de destinos)
     const renderMunicipalCard = () => (
@@ -289,7 +308,8 @@ export default function ServiceCatalog<T extends CatalogService>({
                     </div>
                 </div>
 
-                <div className="flex items-center justify-end">
+                <div className={`flex items-center ${precioDesdeMunicipal ? 'justify-between' : 'justify-end'}`}>
+                    {precioDesdeMunicipal && renderPrecioDesde(precioDesdeMunicipal, null)}
                     <button className="bg-gray-100 hover:bg-[#D6A75D] text-gray-800 hover:text-black font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
                         {language === 'es' ? 'Ver Destinos' : 'View Destinations'}
                         <FiChevronRight />
