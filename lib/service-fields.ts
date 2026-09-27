@@ -36,6 +36,19 @@ export interface ServiceDescriptor {
     esPorHoras?: boolean;
     /** 'POR_PERSONA' => tour con precio por persona (formulario ágil con dirección de recogida). */
     tipoTarifa?: 'POR_PERSONA' | null;
+    nombre?: unknown;
+}
+
+/**
+ * Traslado urbano (dentro de Medellín): no va hacia/desde un municipio, así que
+ * origen y destino son libres (sin selector de dirección ni destino fijo).
+ * Se identifica por nombre ("Traslado Urbano") porque no hay flag estructural propio.
+ */
+export function esTrasladoUrbano(service: ServiceDescriptor): boolean {
+    if (service.esAeropuerto || service.esMunicipal || !service.esTraslado) return false;
+    const n = service.nombre as any;
+    const nombre = typeof n === 'string' ? n : (n?.es || n?.ES || n?.en || n?.EN || '');
+    return /\burban[oa]?\b/i.test(String(nombre));
 }
 
 /**
@@ -91,8 +104,8 @@ export function getCamposBuiltin(service: ServiceDescriptor): CampoBuiltin[] {
             { id: 'lugarRecogida', required: true, labelEs: 'Origen', labelEn: 'Origin' },
             {
                 id: 'trasladoDestino',
-                // Required only when travelling FROM the municipality
-                required: (f) => f.trasladoTipo === 'DESDE_MUNICIPIO',
+                // Required only when travelling FROM the municipality (always for urban transfers)
+                required: (f) => esTrasladoUrbano(service) || f.trasladoTipo === 'DESDE_MUNICIPIO',
                 labelEs: 'Destino',
                 labelEn: 'Destination',
             },

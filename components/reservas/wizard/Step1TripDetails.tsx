@@ -13,6 +13,7 @@ import { useLanguage, t } from '@/lib/i18n';
 import { DateInput, TimeInput } from '@/components/ui';
 import { SharedTourLogisticsCard } from '@/components/reservas/SharedTourLogisticsCard';
 import { normalizeInfoTourCompartido } from '@/lib/info-tour-compartido';
+import { esTrasladoUrbano } from '@/lib/service-fields';
 import { precioTramoPorPersona, totalPorPersona, comisionPorPersona } from '@/types/servicio-config';
 
 /**
@@ -96,6 +97,9 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
 
     const municipalityName = getMunicipalityFromServiceName();
 
+    // 🏙️ Traslado urbano: origen y destino libres (no hay municipio fijo ni dirección)
+    const isTrasladoUrbano = isTraslado && esTrasladoUrbano(service);
+
     // Initialize datosDinamicos if not exists
     useEffect(() => {
         if (!formData.datosDinamicos && dynamicFields.length > 0) {
@@ -126,9 +130,22 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
         }
     }, [isHotel, hotelName, formData.lugarRecogida, updateFormData, isTraslado]);
 
+    // 🏙️ Traslado urbano: no se elige dirección; se fija DESDE_UBICACION para que resúmenes,
+    // carrito y calendario lean origen = lugarRecogida y destino = trasladoDestino.
+    // El origen arranca con el nombre del aliado (si aplica) pero es editable.
+    useEffect(() => {
+        if (!isTrasladoUrbano || formData.trasladoTipo) return;
+        updateFormData({
+            trasladoTipo: 'DESDE_UBICACION',
+            lugarRecogida: formData.lugarRecogida || aliadoNombre || '',
+            trasladoDestino: formData.trasladoDestino || '',
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isTrasladoUrbano, formData.trasladoTipo]);
+
     // 🚗 Auto-fill fields for traslados based on direction (only on direction change)
     useEffect(() => {
-        if (!isTraslado || !formData.trasladoTipo) return;
+        if (!isTraslado || isTrasladoUrbano || !formData.trasladoTipo) return;
 
         if (formData.trasladoTipo === 'DESDE_UBICACION') {
             // From my location to municipality
@@ -705,6 +722,34 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                             : (service.esMunicipal ? 'Transport Details' : 'Transfer Details')}
                     </h3>
 
+                    {isTrasladoUrbano ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className={labelClass}>
+                                    {t('reservas.paso1_origen', language)} *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.lugarRecogida || ''}
+                                    onChange={(e) => updateFormData({ lugarRecogida: e.target.value })}
+                                    placeholder={language === 'es' ? 'Ej: Hotel Dann Carlton, El Poblado' : 'E.g.: Dann Carlton Hotel, El Poblado'}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#D6A75D]/30 focus:border-[#D6A75D] outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>
+                                    {t('reservas.paso1_destino', language)} *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.trasladoDestino || ''}
+                                    onChange={(e) => updateFormData({ trasladoDestino: e.target.value })}
+                                    placeholder={language === 'es' ? 'Ej: Parque Lleras, Laureles' : 'E.g.: Lleras Park, Laureles'}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#D6A75D]/30 focus:border-[#D6A75D] outline-none"
+                                />
+                            </div>
+                        </div>
+                    ) : (<>
                     {/* Direction Selection - Buttons */}
                     <div>
                         <label className={labelClass}>
@@ -842,6 +887,7 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                             </div>
                         </div>
                     )}
+                    </>)}
                 </div>
             )}
 

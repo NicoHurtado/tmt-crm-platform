@@ -15,12 +15,20 @@ describe('calcularPrecioDesdeAliado', () => {
         expect(r).toEqual({ monto: 80000, unidad: null });
     });
 
-    it('considera el precio alterno de Olaya si es menor', () => {
+    it('aeropuerto muestra el precio de José María Córdova aunque Olaya sea menor', () => {
         const r = calcularPrecioDesdeAliado({
             esAeropuerto: true,
             vehiculos: [{ precioServicio: 90000, tipoComision: 'PORCENTAJE', comisionValor: 0, precioServicioOlaya: 60000 }],
         }, 'HOTEL');
-        expect(r?.monto).toBe(60000);
+        expect(r?.monto).toBe(90000);
+    });
+
+    it('aeropuerto usa Olaya solo si el vehículo no tiene precio JMC', () => {
+        const r = calcularPrecioDesdeAliado({
+            esAeropuerto: true,
+            vehiculos: [{ precioServicio: 0, tipoComision: 'FIJO', comisionValor: 5000, precioServicioOlaya: 60000 }],
+        }, 'HOTEL');
+        expect(r?.monto).toBe(65000);
     });
 
     it('tour POR_PERSONA usa p1 + comisión por tipo de aliado', () => {

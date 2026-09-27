@@ -6,8 +6,9 @@ import { comisionPorPersona, type PreciosPorPersona } from '@/types/servicio-con
  *
  * Replica la lógica de precio del wizard en modo aliado (Step1TripDetails) para la
  * opción más barata disponible de ESE aliado:
- *  - Vehículo: `precioServicio` del aliado (PrecioVehiculoAliado.precioBase, o su
- *    alterno Olaya si es menor) + comisión del aliado (porcentaje o fijo).
+ *  - Vehículo: `precioServicio` del aliado (PrecioVehiculoAliado.precioBase) + comisión
+ *    del aliado (porcentaje o fijo). En aeropuerto es el precio de José María Córdova;
+ *    el alterno de Olaya Herrera solo aplica si el vehículo no tiene precio JMC.
  *  - Tour compartido: precio del cupo por 1 persona + comisión.
  *  - Tour POR_PERSONA: tarifa p1 + comisión por persona (override o ±10% por tipo).
  *
@@ -63,8 +64,13 @@ export function calcularPrecioDesdeAliado(sa: ServicioAliadoPrecio, aliadoTipo: 
     for (const v of sa.vehiculos ?? []) {
         if (v.activo === false) continue;
         const precio = Number(v.precioServicio ?? 0);
-        if (precio > 0) candidatos.push(conComision(precio, v.tipoComision, v.comisionValor));
-        // Aeropuerto Olaya Herrera: precio/comisión alternos (fallback a los de JMC).
+        if (precio > 0) {
+            candidatos.push(conComision(precio, v.tipoComision, v.comisionValor));
+            continue;
+        }
+        // Aeropuerto: el "Desde" muestra José María Córdova (el aeropuerto por defecto
+        // del wizard). El alterno de Olaya Herrera solo se usa si el vehículo no tiene
+        // precio JMC configurado.
         if (sa.esAeropuerto && v.precioServicioOlaya != null && Number(v.precioServicioOlaya) > 0) {
             candidatos.push(conComision(
                 Number(v.precioServicioOlaya),
