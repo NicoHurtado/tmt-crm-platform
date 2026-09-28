@@ -119,7 +119,7 @@ export default function CalendarioPage() {
                         lugarRecogida = d.lugarRecogida || 'No especificado';
                         lugarDestino = d.trasladoDestino || reserva.municipio || 'No especificado';
                     } else {
-                        lugarRecogida = reserva.municipio || 'No especificado';
+                        lugarRecogida = d.lugarRecogida || reserva.municipio || 'No especificado';
                         lugarDestino = d.trasladoDestino || 'No especificado';
                     }
                 } else {
@@ -229,7 +229,7 @@ export default function CalendarioPage() {
                 else { recogida = rd.lugarRecogida || 'No especificado'; destino = ap; }
             } else if (rd.trasladoTipo) {
                 if (rd.trasladoTipo === 'DESDE_UBICACION') { recogida = rd.lugarRecogida || 'No especificado'; destino = rd.trasladoDestino || r.municipio || 'No especificado'; }
-                else { recogida = r.municipio || 'No especificado'; destino = rd.trasladoDestino || 'No especificado'; }
+                else { recogida = rd.lugarRecogida || r.municipio || 'No especificado'; destino = rd.trasladoDestino || 'No especificado'; }
             } else {
                 destino = r.servicio?.destinoAutoFill
                     ? (typeof r.servicio.destinoAutoFill === 'string' ? r.servicio.destinoAutoFill : getLocalizedText(r.servicio.destinoAutoFill, 'ES'))

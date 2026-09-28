@@ -115,6 +115,9 @@ export async function PUT(
         if (body.lugarRecogida !== undefined) {
             datosPatch.lugarRecogida = body.lugarRecogida === '' ? undefined : body.lugarRecogida;
         }
+        if (body.trasladoDestino !== undefined) {
+            datosPatch.trasladoDestino = body.trasladoDestino === '' ? undefined : body.trasladoDestino;
+        }
         if (body.aeropuertoNombre !== undefined) {
             datosPatch.aeropuertoNombre = body.aeropuertoNombre === '' ? undefined : body.aeropuertoNombre;
         }

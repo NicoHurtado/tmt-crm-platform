@@ -130,6 +130,7 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
     const [municipio, setMunicipio] = useState('');
     const [numeroVuelo, setNumeroVuelo] = useState('');
     const [lugarRecogida, setLugarRecogida] = useState('');
+    const [trasladoDestino, setTrasladoDestino] = useState('');
     const [notas, setNotas] = useState('');
     const [aeropuertoNombre, setAeropuertoNombre] = useState('');
     const [nombreCliente, setNombreCliente] = useState('');
@@ -158,6 +159,7 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
         const rd = getDatos(data.datos);
         setNumeroVuelo((rd.numeroVuelo as string) || '');
         setLugarRecogida((rd.lugarRecogida as string) || '');
+        setTrasladoDestino((rd.trasladoDestino as string) || '');
         setNotas(data.notas || '');
         setAeropuertoNombre((rd.aeropuertoNombre as string) || '');
         if (data.asistentes?.length > 0) {
@@ -249,6 +251,7 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                     numeroPasajeros: Number(numeroPasajeros),
                     vehiculoId: vehiculoId || null,
                     municipio, numeroVuelo, lugarRecogida, notas, aeropuertoNombre,
+                    ...(reserva.servicio?.esAeropuerto ? {} : { trasladoDestino }),
                 };
                 if (reserva.estado === 'CONFIRMED_UNASSIGNED' && selectedEstado === 'PENDING_PAYMENT') {
                     body.precioTotal = quotePrice;
@@ -291,6 +294,7 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
             const rd = getDatos(reserva.datos);
             setNumeroVuelo((rd.numeroVuelo as string) || '');
             setLugarRecogida((rd.lugarRecogida as string) || '');
+            setTrasladoDestino((rd.trasladoDestino as string) || '');
             setNotas(reserva.notas || '');
             setAeropuertoNombre((rd.aeropuertoNombre as string) || '');
         } else if (section === 'pasajeros') {
@@ -352,6 +356,8 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
     const destinoLabel = (() => {
         if (rd.aeropuertoTipo === 'HACIA') return rd.aeropuertoNombre === 'JOSE_MARIA_CORDOVA' ? 'Aeropuerto JMC' : 'Aeropuerto Olaya Herrera';
         if (rd.aeropuertoTipo === 'DESDE') return (rd.lugarRecogida as string) || 'Tu Hotel/Residencia';
+        // Destino escrito por el cliente (traslados / urbano); si no hay, el del servicio
+        if (rd.trasladoDestino) return rd.trasladoDestino as string;
         return reserva.servicio?.destinoAutoFill ||
             (typeof reserva.servicio?.nombre === 'string' ? reserva.servicio.nombre : reserva.servicio?.nombre?.['es']) ||
             'No especificado';
@@ -563,7 +569,7 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                                     </div>
                                     <div>
                                         <label className="block text-xs text-gray-500 mb-1">
-                                            {rd.aeropuertoTipo === 'DESDE' ? 'Origen (Aeropuerto)' : 'Lugar de Recogida'}
+                                            {rd.aeropuertoTipo === 'DESDE' ? 'Origen (Aeropuerto)' : 'Origen / Lugar de Recogida'}
                                         </label>
                                         {rd.aeropuertoTipo === 'DESDE' ? (
                                             <select
@@ -584,6 +590,18 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                                             />
                                         )}
                                     </div>
+                                    {!reserva.servicio?.esAeropuerto && (
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">Destino</label>
+                                            <input
+                                                type="text"
+                                                value={trasladoDestino}
+                                                onChange={(e) => setTrasladoDestino(e.target.value)}
+                                                placeholder={destinoLabel}
+                                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#D6A75D]/30 focus:border-[#D6A75D] outline-none"
+                                            />
+                                        </div>
+                                    )}
                                     <div>
                                         <label className="block text-xs text-gray-500 mb-1">Vehículo</label>
                                         <select
