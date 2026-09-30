@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createCalendarEvent, updateCalendarEvent, createOrUpdateTourCompartidoEvent } from '@/lib/google-calendar-service';
+import { createCalendarEvent, updateCalendarEvent, createOrUpdateTourCompartidoEvent, cancelReservationCalendarEvent } from '@/lib/google-calendar-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -16,6 +16,17 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const mode = searchParams.get('mode'); // 'create' (default) or 'update'
+
+        // Reintentar cancelaciones cuya eliminación falló, incluidas reservas antiguas.
+        const cancelledReservations = await prisma.reserva.findMany({
+            where: { estado: 'CANCELLED', googleCalendarEventId: { not: null } },
+            include: { servicio: true, conductor: true, vehiculo: true, aliado: true, asistentes: true },
+        });
+        const cancellationResults = [];
+        for (const reserva of cancelledReservations) {
+            const success = await cancelReservationCalendarEvent(reserva);
+            cancellationResults.push({ codigo: reserva.codigo, success });
+        }
 
         // 1. Determine which reservations to fetch based on mode
         const whereClause: any = {
@@ -127,6 +138,7 @@ export async function GET(request: Request) {
             totalFound: reservationsToSync.length,
             syncedCount,
             errorCount,
+            cancellations: cancellationResults,
             details: results
         });
 

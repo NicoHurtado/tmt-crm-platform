@@ -29,7 +29,6 @@ const estadoColors: Record<string, { bg: string; border: string; text: string }>
     'CONFIRMED_ASSIGNED': { bg: '#7C3AED', border: '#6D28D9', text: '#ffffff' },
     'IN_PROGRESS': { bg: '#F97316', border: '#EA580C', text: '#ffffff' },
     'COMPLETED': { bg: '#009E73', border: '#0072B2', text: '#ffffff' },
-    'CANCELLED': { bg: '#333333', border: '#000000', text: '#ffffff' },
     'PAYMENT_FAILED': { bg: '#DC2626', border: '#B91C1C', text: '#ffffff' }
 };
 
@@ -69,7 +68,7 @@ export default function CalendarioPage() {
         try {
             const res = await fetch('/api/reservas');
             const data = await res.json();
-            const reservas = data.data || [];
+            const reservas = (data.data || []).filter((r: any) => r.estado !== 'CANCELLED');
             setRawReservas(reservas);
 
             // Build sheet-compatible list
@@ -331,7 +330,6 @@ const leyenda = (
         { key: 'CONFIRMED_ASSIGNED',   label: 'Confirmada · Asignada'    },
         { key: 'IN_PROGRESS',          label: 'En curso'                 },
         { key: 'COMPLETED',            label: 'Completada'               },
-        { key: 'CANCELLED',            label: 'Cancelada'                },
         { key: 'PAYMENT_FAILED',       label: 'Pago fallido'             },
       ].map(({ key, label }) => {
         const c = estadoColors[key];

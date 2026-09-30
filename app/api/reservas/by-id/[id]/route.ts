@@ -207,7 +207,7 @@ export async function PUT(
                         await emailService.sendServicioCompletadoEmail(reserva as any, idioma);
                         break;
                     case EstadoReserva.CANCELLED:
-                        // Email de cancelación no implementado aún
+                        await emailService.sendCancelacionEmail(reserva as any, idioma);
                         break;
                 }
             } catch (emailError) {
@@ -226,20 +226,8 @@ export async function PUT(
                     await createOrUpdateTourCompartidoEvent(reserva as any);
                 } else {
                     // Regular services: update individual event
-                    const { updateCalendarEvent, deleteCalendarEvent } = await import('@/lib/google-calendar-service');
-                    if (reserva.googleCalendarEventId) {
-                        if (reserva.estado === EstadoReserva.CANCELLED) {
-                            await deleteCalendarEvent(reserva.googleCalendarEventId);
-
-                            // Clean up the ID from our database since it's gone from Calendar
-                            await prisma.reserva.update({
-                                where: { id: params.id },
-                                data: { googleCalendarEventId: null }
-                            });
-                        } else {
-                            await updateCalendarEvent(reserva as any);
-                        }
-                    }
+                    const { updateCalendarEvent } = await import('@/lib/google-calendar-service');
+                    await updateCalendarEvent(reserva as any);
                 }
             } catch (calendarError) {
                 console.error('Error updating calendar event:', calendarError);

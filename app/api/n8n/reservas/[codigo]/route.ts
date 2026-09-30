@@ -142,6 +142,11 @@ export async function PATCH(
             include: { servicio: true, vehiculo: true, conductor: true, aliado: true, asistentes: true },
         });
 
+        if (reserva.estado === 'CANCELLED') {
+            const { cancelReservationCalendarEvent } = await import('@/lib/google-calendar-service');
+            await cancelReservationCalendarEvent(reserva);
+        }
+
         return NextResponse.json({ success: true, data: formatReserva(reserva) });
     } catch (error: any) {
         if (error?.code === 'P2025') {

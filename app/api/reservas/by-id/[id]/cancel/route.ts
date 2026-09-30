@@ -118,10 +118,8 @@ export async function POST(
 
         // Cancel Google Calendar event if exists
         try {
-            if (reservaActualizada.googleCalendarEventId) {
-                const { deleteCalendarEvent } = await import('@/lib/google-calendar-service');
-                await deleteCalendarEvent(reservaActualizada.googleCalendarEventId);
-            }
+            const { cancelReservationCalendarEvent } = await import('@/lib/google-calendar-service');
+            await cancelReservationCalendarEvent(reservaActualizada);
         } catch (calendarError) {
             console.error('Error canceling calendar event:', calendarError);
             // Don't fail the cancellation if calendar sync fails

@@ -82,6 +82,9 @@ export async function POST(
             // Don't fail the cancellation if email fails
         }
 
+        const { cancelReservationCalendarEvent } = await import('@/lib/google-calendar-service');
+        await cancelReservationCalendarEvent(updatedReserva);
+
         return NextResponse.json({
             data: updatedReserva,
             message: 'Reserva cancelada exitosamente'

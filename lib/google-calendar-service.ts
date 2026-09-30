@@ -374,10 +374,11 @@ function formatEventDetails(reserva: ReservaConRelaciones): {
 export async function createCalendarEvent(
     reserva: ReservaConRelaciones
 ): Promise<string | null> {
-    if (process.env.DISABLE_CALENDAR_SYNC === 'true') {
+    if (['true', '1'].includes(process.env.DISABLE_CALENDAR_SYNC ?? '')) {
         console.log('[TEST MODE] Calendar sync disabled — skipping createCalendarEvent');
         return null;
     }
+    if (reserva.estado === 'CANCELLED') return null;
     try {
         const { calendar, calendarId } = getCalendarClient();
         const eventDetails = formatEventDetails(reserva);
@@ -404,6 +405,8 @@ export async function createCalendarEvent(
 export async function updateCalendarEvent(
     reserva: ReservaConRelaciones
 ): Promise<boolean> {
+    if (reserva.estado === 'CANCELLED') return cancelReservationCalendarEvent(reserva);
+    if (['true', '1'].includes(process.env.DISABLE_CALENDAR_SYNC ?? '')) return false;
     try {
         if (!reserva.googleCalendarEventId) {
             console.warn('⚠️ [Google Calendar] No event ID found for reservation:', reserva.codigo);
@@ -433,18 +436,48 @@ export async function updateCalendarEvent(
  * @returns true si se eliminó correctamente, false si falló
  */
 export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
+    if (['true', '1'].includes(process.env.DISABLE_CALENDAR_SYNC ?? '')) return false;
     try {
         const { calendar, calendarId } = getCalendarClient();
 
         await calendar.events.delete({
             calendarId,
             eventId,
+            sendUpdates: 'all',
         });
 
         console.log('✅ [Google Calendar] Event deleted:', eventId);
         return true;
     } catch (error) {
+        // Reintentar una eliminación ya completada es seguro.
+        if (isMissingCalendarEvent(error)) return true;
         console.error('❌ [Google Calendar] Error deleting event:', error);
+        return false;
+    }
+}
+
+function isMissingCalendarEvent(error: unknown): boolean {
+    const apiError = error as { code?: number; response?: { status?: number } };
+    const status = apiError?.response?.status ?? apiError?.code;
+    return status === 404 || status === 410;
+}
+
+/** Retira la reserva cancelada sin borrar reservas activas del tour compartido. */
+export async function cancelReservationCalendarEvent(reserva: ReservaConRelaciones): Promise<boolean> {
+    if (['true', '1'].includes(process.env.DISABLE_CALENDAR_SYNC ?? '')) return false;
+    try {
+        if (reserva.servicio.esCompartido) {
+            return (await createOrUpdateTourCompartidoEvent(reserva)) !== null;
+        }
+        if (!reserva.googleCalendarEventId) return true;
+        if (!await deleteCalendarEvent(reserva.googleCalendarEventId)) return false;
+        await prisma.reserva.updateMany({
+            where: { id: reserva.id, estado: 'CANCELLED', googleCalendarEventId: reserva.googleCalendarEventId },
+            data: { googleCalendarEventId: null },
+        });
+        return true;
+    } catch (error) {
+        console.error('❌ [Google Calendar] Error removing cancelled reservation:', error);
         return false;
     }
 }
@@ -606,7 +639,7 @@ function formatTourCompartidoEventDetails(
 export async function createOrUpdateTourCompartidoEvent(
     reserva: ReservaConRelaciones
 ): Promise<string | null> {
-    if (process.env.DISABLE_CALENDAR_SYNC === 'true') {
+    if (['true', '1'].includes(process.env.DISABLE_CALENDAR_SYNC ?? '')) {
         console.log('[TEST MODE] Calendar sync disabled — skipping createOrUpdateTourCompartidoEvent');
         return null;
     }
@@ -646,8 +679,14 @@ export async function createOrUpdateTourCompartidoEvent(
         console.log(`🚌 [Tour Compartido Calendar] Found ${reservasDelDia.length} reservations for this date`);
 
         if (reservasDelDia.length === 0) {
-            console.warn('⚠️ [Tour Compartido Calendar] No active reservations found to sync');
-            return null;
+            if (!reserva.googleCalendarEventId) return null;
+            if (!await deleteCalendarEvent(reserva.googleCalendarEventId)) return null;
+            await prisma.reserva.updateMany({
+                where: { googleCalendarEventId: reserva.googleCalendarEventId, estado: 'CANCELLED' },
+                data: { googleCalendarEventId: null },
+            });
+            // El ID indica que la limpieza terminó correctamente, aunque el evento ya no exista.
+            return reserva.googleCalendarEventId;
         }
 
         // 2. Calcular totales
@@ -655,7 +694,7 @@ export async function createOrUpdateTourCompartidoEvent(
         console.log(`🚌 [Tour Compartido Calendar] Total passengers: ${totalPasajeros}`);
 
         // 3. Buscar si ya existe un evento de calendario (usando el ID de cualquier reserva existente)
-        const existingEventId = reservasDelDia.find(r => r.googleCalendarEventId)?.googleCalendarEventId;
+        const existingEventId = reservasDelDia.find(r => r.googleCalendarEventId)?.googleCalendarEventId ?? reserva.googleCalendarEventId;
 
         const { calendar, calendarId } = getCalendarClient();
         const eventDetails = formatTourCompartidoEventDetails(reservasDelDia as ReservaConAsistentes[], totalPasajeros);
@@ -674,6 +713,7 @@ export async function createOrUpdateTourCompartidoEvent(
                 eventId = existingEventId;
                 console.log('✅ [Tour Compartido Calendar] Event updated:', eventId);
             } catch (updateError) {
+                if (!isMissingCalendarEvent(updateError)) throw updateError;
                 console.error('⚠️ [Tour Compartido Calendar] Error updating, creating new:', updateError);
                 // Si falla la actualización (evento eliminado), crear uno nuevo
                 const response = await calendar.events.insert({
@@ -701,6 +741,15 @@ export async function createOrUpdateTourCompartidoEvent(
                     id: { in: reservasDelDia.map(r => r.id) }
                 },
                 data: { googleCalendarEventId: eventId }
+            });
+            await prisma.reserva.updateMany({
+                where: {
+                    servicioId: reserva.servicioId,
+                    fecha: { gte: startOfDay, lt: endOfDay },
+                    estado: 'CANCELLED',
+                    googleCalendarEventId: existingEventId ?? eventId,
+                },
+                data: { googleCalendarEventId: null },
             });
             console.log(`✅ [Tour Compartido Calendar] Updated ${reservasDelDia.length} reservations with eventId`);
         }

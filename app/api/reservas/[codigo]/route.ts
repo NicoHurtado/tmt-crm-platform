@@ -283,18 +283,8 @@ export async function DELETE(
 
         // Actualizar/eliminar evento de Google Calendar
         try {
-            // Check if this is a Tour Compartido reservation
-            if (reservaActualizada.servicio?.esCompartido) {
-                // Update consolidation to reflect cancellation (will show updated status)
-                const { createOrUpdateTourCompartidoEvent } = await import('@/lib/google-calendar-service');
-                await createOrUpdateTourCompartidoEvent(reservaActualizada as any);
-                console.log('✅ [Reserva] Tour Compartido consolidated calendar event updated after cancellation');
-            } else if (reserva.googleCalendarEventId) {
-                // Regular services: delete individual event
-                const { deleteCalendarEvent } = await import('@/lib/google-calendar-service');
-                await deleteCalendarEvent(reserva.googleCalendarEventId);
-                console.log('✅ [Reserva] Google Calendar event deleted');
-            }
+            const { cancelReservationCalendarEvent } = await import('@/lib/google-calendar-service');
+            await cancelReservationCalendarEvent(reservaActualizada);
         } catch (calendarError) {
             console.error('❌ [Reserva] Error updating/deleting calendar event:', calendarError);
         }
