@@ -6,6 +6,7 @@ import { FiClock, FiUsers, FiMapPin, FiChevronRight, FiChevronLeft, FiArrowRight
 import { useLanguage, t } from '@/lib/i18n';
 import { getLocalizedText } from '@/types/multi-language';
 import { categoriaDeServicio } from '@/lib/servicio-categoria';
+import { tramoPorPersonaMasBarato } from '@/lib/precio-desde-aliado';
 
 /**
  * Catálogo de servicios unificado.
@@ -42,7 +43,7 @@ export interface CatalogService {
     preciosPorPersona?: { p1: number; p2: number; p3: number } | null;
     vehiculosPermitidos?: any[];
     /** Precio "Desde" precalculado (catálogo co-branded del aliado). Tiene prioridad sobre `showPrices`. */
-    precioDesde?: { monto: number; unidad: 'persona' | 'hora' | null } | null;
+    precioDesde?: { monto: number; unidad: 'persona' | 'hora' | null; minPersonas?: number } | null;
     [key: string]: any;
 }
 
@@ -181,7 +182,7 @@ export default function ServiceCatalog<T extends CatalogService>({
     };
 
     // Bloque "Desde $…" (opcionalmente por persona / por hora)
-    const renderPrecioDesde = (monto: number, unidad: 'persona' | 'hora' | null) => (
+    const renderPrecioDesde = (monto: number, unidad: 'persona' | 'hora' | null, minPersonas?: number) => (
         <div>
             <p className="text-sm text-gray-500">{t('reservas.desde', language)}</p>
             <p className="text-2xl font-bold text-[#D6A75D]">
@@ -195,6 +196,14 @@ export default function ServiceCatalog<T extends CatalogService>({
                     </span>
                 )}
             </p>
+            {/* Aclaración del tramo: el precio por persona baja según el tamaño del grupo */}
+            {unidad === 'persona' && minPersonas && minPersonas > 1 && (
+                <p className="text-xs text-gray-500">
+                    {minPersonas === 2
+                        ? (language === 'es' ? 'Por persona, grupo de 2' : 'Per person, group of 2')
+                        : (language === 'es' ? 'Por persona, grupos de 3 o más' : 'Per person, groups of 3+')}
+                </p>
+            )}
         </div>
     );
 
@@ -242,13 +251,13 @@ export default function ServiceCatalog<T extends CatalogService>({
                         // Catálogo del aliado: precio "Desde" con la tarifa más baja de ese aliado
                         if (service.precioDesde !== undefined) {
                             if (!service.precioDesde) return <div />;
-                            return renderPrecioDesde(service.precioDesde.monto, service.precioDesde.unidad);
+                            return renderPrecioDesde(service.precioDesde.monto, service.precioDesde.unidad, service.precioDesde.minPersonas);
                         }
-                        // Tours con precio por persona: mostrar "Desde $p1 por persona"
+                        // Tours con precio por persona: el tramo más barato, aclarando para cuántas personas
                         if (service.tipoTarifa === 'POR_PERSONA' && service.preciosPorPersona) {
-                            const p1 = Number(service.preciosPorPersona.p1 ?? 0);
-                            if (p1 <= 0) return <div />;
-                            return renderPrecioDesde(p1, 'persona');
+                            const tramo = tramoPorPersonaMasBarato(service.preciosPorPersona);
+                            if (!tramo) return <div />;
+                            return renderPrecioDesde(tramo.monto, 'persona', tramo.minPersonas);
                         }
                         const precios = (service.vehiculosPermitidos || [])
                             .map((sv: any) => Number(sv.precio ?? 0))

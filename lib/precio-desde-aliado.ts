@@ -10,7 +10,8 @@ import { comisionPorPersona, type PreciosPorPersona } from '@/types/servicio-con
  *    del aliado (porcentaje o fijo). En aeropuerto es el precio de José María Córdova;
  *    el alterno de Olaya Herrera solo aplica si el vehículo no tiene precio JMC.
  *  - Tour compartido: precio del cupo por 1 persona + comisión.
- *  - Tour POR_PERSONA: tarifa p1 + comisión por persona (override o ±10% por tipo).
+ *  - Tour POR_PERSONA: el tramo por persona más barato (p1/p2/p3) + comisión por persona
+ *    (override o ±10% por tipo), indicando desde cuántas personas aplica.
  *
  * No incluye cargos condicionales (recargo nocturno, municipio, campos dinámicos).
  * Devuelve null si el aliado no tiene precio configurado para el servicio.
@@ -19,6 +20,27 @@ import { comisionPorPersona, type PreciosPorPersona } from '@/types/servicio-con
 export interface PrecioDesde {
     monto: number;
     unidad: 'persona' | 'hora' | null;
+    /** Tours POR_PERSONA: personas mínimas para que aplique ese precio (2 = "2 personas", 3 = "3 o más"). */
+    minPersonas?: number;
+}
+
+/**
+ * Tramo por persona más barato de un tour POR_PERSONA (p1 = 1 pers., p2 = 2, p3 = 3+),
+ * sumando la comisión que se le aplique a cada tramo. Null si no hay tramos con precio.
+ */
+export function tramoPorPersonaMasBarato(
+    precios: PreciosPorPersona | null | undefined,
+    comision: (precio: number) => number = () => 0,
+): PrecioDesde | null {
+    let mejor: PrecioDesde | null = null;
+    const tramos: Array<[number, number | undefined]> = [[1, precios?.p1], [2, precios?.p2], [3, precios?.p3]];
+    for (const [personas, p] of tramos) {
+        const precio = Number(p ?? 0);
+        if (precio <= 0) continue;
+        const monto = precio + comision(precio);
+        if (monto > 0 && (!mejor || monto < mejor.monto)) mejor = { monto, unidad: 'persona', minPersonas: personas };
+    }
+    return mejor;
 }
 
 interface VehiculoAliado {
@@ -50,14 +72,11 @@ function conComision(precio: number, tipo: string | null | undefined, valor: num
 
 export function calcularPrecioDesdeAliado(sa: ServicioAliadoPrecio, aliadoTipo: string | null | undefined): PrecioDesde | null {
     if (sa.tipoTarifa === 'POR_PERSONA') {
-        const p1 = Number(sa.preciosPorPersona?.p1 ?? 0);
-        if (p1 <= 0) return null;
-        const comision = comisionPorPersona(p1, aliadoTipo, {
+        // Se muestra el tramo más barato (normalmente 3+ personas) y la tarjeta aclara para cuántos aplica.
+        return tramoPorPersonaMasBarato(sa.preciosPorPersona, (precio) => comisionPorPersona(precio, aliadoTipo, {
             tipo: sa.comisionPorPersonaAliadoTipo ?? null,
             valor: sa.comisionPorPersonaAliadoValor ?? null,
-        });
-        const monto = p1 + comision;
-        return monto > 0 ? { monto, unidad: 'persona' } : null;
+        }));
     }
 
     const candidatos: number[] = [];

@@ -31,10 +31,15 @@ describe('calcularPrecioDesdeAliado', () => {
         expect(r?.monto).toBe(65000);
     });
 
-    it('tour POR_PERSONA usa p1 + comisión por tipo de aliado', () => {
+    it('tour POR_PERSONA usa el tramo más barato + comisión e indica desde cuántas personas', () => {
         const svc = { tipoTarifa: 'POR_PERSONA', preciosPorPersona: { p1: 200000, p2: 150000, p3: 120000 } };
-        expect(calcularPrecioDesdeAliado(svc, 'HOTEL')).toEqual({ monto: 220000, unidad: 'persona' });
-        expect(calcularPrecioDesdeAliado(svc, 'AGENCIA')).toEqual({ monto: 180000, unidad: 'persona' });
+        expect(calcularPrecioDesdeAliado(svc, 'HOTEL')).toEqual({ monto: 132000, unidad: 'persona', minPersonas: 3 });
+        expect(calcularPrecioDesdeAliado(svc, 'AGENCIA')).toEqual({ monto: 108000, unidad: 'persona', minPersonas: 3 });
+    });
+
+    it('tour POR_PERSONA ignora tramos sin precio', () => {
+        const svc = { tipoTarifa: 'POR_PERSONA', preciosPorPersona: { p1: 200000, p2: 150000, p3: 0 } };
+        expect(calcularPrecioDesdeAliado(svc, null)).toEqual({ monto: 150000, unidad: 'persona', minPersonas: 2 });
     });
 
     it('devuelve null si el aliado no tiene precio configurado', () => {
