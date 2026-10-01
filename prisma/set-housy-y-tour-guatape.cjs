@@ -1,7 +1,15 @@
-import 'dotenv/config';
-import path from 'path';
-import { prisma } from '../lib/prisma';
-import cloudinary from '../lib/cloudinary';
+// JavaScript plano (sin tsx/esbuild) para poder correrlo con `node` directamente.
+const path = require('path');
+process.loadEnvFile('.env');
+const { PrismaClient } = require('@prisma/client');
+const cloudinary = require('cloudinary').v2;
+
+const prisma = new PrismaClient();
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 /**
  * Octubre 2026:
@@ -9,8 +17,8 @@ import cloudinary from '../lib/cloudinary';
  *  2. Housy → solo pago con tarjeta (Bold).
  *  3. Tour compartido Guatapé → nueva info comercial, precio $270.000/persona e imagen nueva.
  *
- * Uso:  npx tsx prisma/set-housy-y-tour-guatape.ts           (solo muestra lo que haría)
- *       npx tsx prisma/set-housy-y-tour-guatape.ts --apply   (aplica)
+ * Uso:  node prisma/set-housy-y-tour-guatape.cjs           (solo muestra lo que haría)
+ *       node prisma/set-housy-y-tour-guatape.cjs --apply   (aplica)
  */
 
 const TOUR_GUATAPE_ID = 'cmkufhda00000129ncx1l621l';
@@ -89,7 +97,7 @@ async function main() {
     }
 
     // 2. Housy → solo tarjeta
-    const housy = await prisma.$queryRawUnsafe<{ id: string; nombre: string; codigo: string }[]>(
+    const housy = await prisma.$queryRawUnsafe(
         `SELECT id, nombre, codigo FROM "Aliado" WHERE nombre ILIKE '%housy%'`
     );
     if (housy.length === 0) {
@@ -133,7 +141,7 @@ async function main() {
     if (apply) {
         const cfg = (servicio.configuracion && typeof servicio.configuracion === 'object'
             ? servicio.configuracion
-            : {}) as Record<string, unknown>;
+            : {});
         await prisma.$transaction([
             prisma.servicio.update({
                 where: { id: TOUR_GUATAPE_ID },
@@ -143,7 +151,7 @@ async function main() {
                     incluye: TOUR.incluye,
                     duracion: TOUR.duracion,
                     imagen,
-                    configuracion: { ...cfg, infoCompartido: TOUR.infoCompartido } as any,
+                    configuracion: { ...cfg, infoCompartido: TOUR.infoCompartido },
                 },
             }),
             prisma.servicioVehiculo.updateMany({
