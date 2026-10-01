@@ -19,6 +19,8 @@ interface ReservaData {
     estado: string;
     idioma: 'ES' | 'EN';
     vehiculo: string | null;
+    /** Aliado "solo tarjeta": no se ofrece pagar en efectivo. */
+    soloPagoTarjeta?: boolean;
 }
 
 interface BoldData {
@@ -211,7 +213,7 @@ export function ConfirmarReservaClient({
                         </div>
                     )}
 
-                    {boldData && (
+                    {boldData && !reserva.soloPagoTarjeta && (
                         <div className="flex items-center gap-2">
                             <Separator className="flex-1" />
                             <span className="text-xs text-gray-400">{isES ? 'o' : 'or'}</span>
@@ -219,6 +221,7 @@ export function ConfirmarReservaClient({
                         </div>
                     )}
 
+                    {!reserva.soloPagoTarjeta && (
                     <div>
                         <Button
                             onClick={handleEfectivo}
@@ -230,6 +233,7 @@ export function ConfirmarReservaClient({
                         </Button>
                         <p className="text-xs text-gray-400 text-center mt-1">{t.cashNote}</p>
                     </div>
+                    )}
                 </div>
 
                 {error && <p className="text-red-400 text-sm text-center">{error}</p>}

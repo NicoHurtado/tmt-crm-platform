@@ -39,6 +39,14 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Aliados "solo tarjeta" (p. ej. Housy): no se permite cambiar a efectivo.
+        if (metodoPago === 'EFECTIVO' && reserva.aliado?.soloPagoTarjeta) {
+            return NextResponse.json(
+                { success: false, error: 'Este aliado solo acepta pago con tarjeta' },
+                { status: 400 }
+            );
+        }
+
         // Verify it's a Tour Compartido service
         if (!reserva.servicio?.esCompartido) {
             return NextResponse.json(

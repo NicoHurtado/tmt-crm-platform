@@ -27,6 +27,9 @@ model Aliado {
   // Imagen/logo del aliado usada en las cards públicas de hoteles. Opcional.
   imagen          String?
   activo          Boolean          @default(true)
+  // Si es true, las reservas hechas por/para este aliado solo se pagan con tarjeta (Bold):
+  // se oculta la opción de efectivo y el "paga el aliado" en todos los formularios.
+  soloPagoTarjeta Boolean          @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   pedidos         Pedido[]

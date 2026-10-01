@@ -46,6 +46,7 @@ interface Aliado {
   contacto: string
   imagen?: string | null
   activo: boolean
+  soloPagoTarjeta?: boolean
   _count?: { reservas: number }
 }
 
@@ -56,6 +57,7 @@ const EMPTY_FORM = {
   contacto: '',
   imagen: '',
   activo: true,
+  soloPagoTarjeta: false,
 }
 
 const TIPO_BADGE: Record<string, string> = {
@@ -176,6 +178,7 @@ export default function AliadosPage() {
       contacto: aliado.contacto,
       imagen: aliado.imagen || '',
       activo: aliado.activo,
+      soloPagoTarjeta: !!aliado.soloPagoTarjeta,
     })
     setDialogOpen(true)
   }
@@ -694,6 +697,18 @@ export default function AliadosPage() {
                   id="activo-aliado"
                   checked={formData.activo}
                   onCheckedChange={(checked) => setFormData({ ...formData, activo: checked })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between border border-neutral-200 rounded-lg p-3 bg-neutral-50">
+                <div>
+                  <p className="text-sm font-medium text-neutral-800">Solo pago con tarjeta</p>
+                  <p className="text-xs text-neutral-400">Oculta el pago en efectivo en sus reservas (solo Bold)</p>
+                </div>
+                <Switch
+                  id="solo-tarjeta-aliado"
+                  checked={formData.soloPagoTarjeta}
+                  onCheckedChange={(checked) => setFormData({ ...formData, soloPagoTarjeta: checked })}
                 />
               </div>
             </div>

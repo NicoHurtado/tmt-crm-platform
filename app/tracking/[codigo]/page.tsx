@@ -710,9 +710,9 @@ export default function TrackingPage({ params }: { params: { codigo: string } })
                                                                 </div>
                                                             )}
                                                             {reserva.recargoNocturno > 0 && (
-                                                                <div className="flex justify-between text-sm">
-                                                                    <span className="text-gray-600">{t.recargoNocturno}</span>
-                                                                    <span className="font-medium">${Number(reserva.recargoNocturno).toLocaleString('es-CO')}</span>
+                                                                <div className="flex justify-between text-sm text-amber-700">
+                                                                    <span>🌙 {t.recargoNocturno}</span>
+                                                                    <span className="font-semibold">+${Number(reserva.recargoNocturno).toLocaleString('es-CO')}</span>
                                                                 </div>
                                                             )}
                                                             {reserva.tarifaMunicipio > 0 && (
@@ -1143,9 +1143,9 @@ export default function TrackingPage({ params }: { params: { codigo: string } })
                                         </div>
                                     )}
                                     {Number(reserva.recargoNocturno) > 0 && (
-                                        <div className="flex justify-between text-sm text-gray-600">
-                                            <span>{t.recargoNocturno}</span>
-                                            <span className="font-semibold">${Number(reserva.recargoNocturno).toLocaleString('es-CO')}</span>
+                                        <div className="flex justify-between text-sm text-amber-700">
+                                            <span>🌙 {t.recargoNocturno}</span>
+                                            <span className="font-semibold">+${Number(reserva.recargoNocturno).toLocaleString('es-CO')}</span>
                                         </div>
                                     )}
                                     {Number(reserva.tarifaMunicipio) > 0 && (

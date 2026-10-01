@@ -141,6 +141,20 @@ export async function POST(request: Request) {
 
         const metodoPago = body.metodoPago === 'EFECTIVO' ? 'EFECTIVO' : 'TARJETA';
 
+        // Aliados "solo tarjeta" (p. ej. Housy): ni efectivo ni reservas sin cobro al cliente.
+        if (body.aliadoId && (metodoPago === 'EFECTIVO' || body.clientePaga === false)) {
+            const aliadoPago = await prisma.aliado.findUnique({
+                where: { id: body.aliadoId },
+                select: { soloPagoTarjeta: true },
+            });
+            if (aliadoPago?.soloPagoTarjeta) {
+                return NextResponse.json(
+                    { error: 'Este aliado solo acepta pago con tarjeta' },
+                    { status: 400 }
+                );
+            }
+        }
+
         // Para hoteles o servicios normales, continuar con el flujo normal
         // Generar código único de 8 caracteres
         const codigo = await generateUniqueCodigo();

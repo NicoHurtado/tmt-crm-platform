@@ -4,7 +4,7 @@ import { FormField } from '@/components/admin/FormBuilder';
 import { useLanguage, t } from '@/lib/i18n';
 import Image from 'next/image';
 import { SharedTourLogisticsCard } from '@/components/reservas/SharedTourLogisticsCard';
-import { Banknote, CreditCard } from 'lucide-react';
+import { Banknote, CreditCard, Moon } from 'lucide-react';
 
 interface Step4Props {
     service: any;
@@ -15,6 +15,8 @@ interface Step4Props {
     selectedPaymentMethod: 'TARJETA' | 'EFECTIVO' | null;
     onPaymentMethodChange: (method: 'TARJETA' | 'EFECTIVO') => void;
     clientePaga?: boolean;
+    /** Aliado que solo acepta tarjeta: no se muestra la opción de efectivo. */
+    soloPagoTarjeta?: boolean;
     preciosPersonalizados?: any;
 }
 
@@ -27,6 +29,7 @@ export default function Step4Summary({
     selectedPaymentMethod,
     onPaymentMethodChange,
     clientePaga,
+    soloPagoTarjeta = false,
     preciosPersonalizados,
 }: Step4Props) {
     const { language } = useLanguage();
@@ -386,9 +389,19 @@ export default function Step4Summary({
                         )}
 
                         {formData.recargoNocturno > 0 && (
-                            <div className="flex justify-between">
-                                <span>{t('reservas.paso4_recargo', language)}</span>
-                                <span className="font-medium">{formatPrice(formData.recargoNocturno)}</span>
+                            <div className="-mx-2 rounded-md bg-amber-50 px-2 py-1.5 text-amber-800">
+                                <div className="flex justify-between">
+                                    <span className="flex items-center gap-1.5 font-medium">
+                                        <Moon size={14} className="text-amber-600" />
+                                        {t('reservas.paso4_recargo', language)}
+                                    </span>
+                                    <span className="font-semibold">+{formatPrice(formData.recargoNocturno)}</span>
+                                </div>
+                                <p className="mt-0.5 pl-5 text-xs text-amber-700">
+                                    {language === 'es'
+                                        ? `Aplica por la hora seleccionada (${formData.hora}).`
+                                        : `Applies for the selected time (${formData.hora}).`}
+                                </p>
                             </div>
                         )}
 
@@ -457,6 +470,7 @@ export default function Step4Summary({
                     </div>
 
                     {/* Efectivo */}
+                    {!soloPagoTarjeta && (
                     <button
                         type="button"
                         onClick={() => onPaymentMethodChange('EFECTIVO')}
@@ -488,6 +502,7 @@ export default function Step4Summary({
                             <p className="text-sm font-bold text-gray-900">{formatPrice(subtotal)}</p>
                         </div>
                     </button>
+                    )}
 
                     {/* Tarjeta */}
                     <button

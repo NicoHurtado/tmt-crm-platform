@@ -91,6 +91,7 @@ export async function POST(request: Request) {
                 contacto: body.contacto,
                 imagen: body.imagen || null,
                 activo: body.activo !== undefined ? body.activo : true,
+                soloPagoTarjeta: !!body.soloPagoTarjeta,
             },
         });
 

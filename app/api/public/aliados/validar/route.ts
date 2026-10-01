@@ -23,6 +23,7 @@ export async function POST(request: Request) {
                 nombre: true,
                 codigo: true,
                 tipo: true,
+                soloPagoTarjeta: true,
             },
         });
 

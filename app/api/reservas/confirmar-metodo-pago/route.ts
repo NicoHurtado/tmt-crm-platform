@@ -41,6 +41,14 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Aliados "solo tarjeta" (p. ej. Housy): no se permite cambiar a efectivo.
+        if (metodoPago === 'EFECTIVO' && reserva.aliado?.soloPagoTarjeta) {
+            return NextResponse.json(
+                { success: false, error: 'Este aliado solo acepta pago con tarjeta' },
+                { status: 400 }
+            );
+        }
+
         if (reserva.estado !== EstadoReserva.PENDING_PAYMENT) {
             return NextResponse.json(
                 { success: false, error: 'Esta reserva ya fue procesada' },

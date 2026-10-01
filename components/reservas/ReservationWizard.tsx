@@ -55,15 +55,19 @@ interface ReservationWizardProps {
     preciosPersonalizados?: any;
     clientePaga?: boolean;
     isStaffFlow?: boolean;
+    /** Aliado que solo acepta tarjeta (Bold): sin efectivo ni "no cobrar". */
+    soloPagoTarjeta?: boolean;
 }
 
-export default function ReservationWizard({ service, isOpen, onClose, initialStep = 0, aliadoId, aliadoTipo, aliadoNombre, preciosPersonalizados, clientePaga: clientePagaProp, isStaffFlow = false }: ReservationWizardProps) {
+export default function ReservationWizard({ service, isOpen, onClose, initialStep = 0, aliadoId, aliadoTipo, aliadoNombre, preciosPersonalizados, clientePaga: clientePagaProp, isStaffFlow = false, soloPagoTarjeta = false }: ReservationWizardProps) {
     const { language } = useLanguage();
     const [currentStep, setCurrentStep] = useState(0);
     const [maxStepReached, setMaxStepReached] = useState(0);
     const [errorMessage, setErrorMessage] = useState<string>('');
     // Internal clientePaga state — managed inside wizard when aliadoId is set
-    const [clientePaga, setClientePaga] = useState<boolean>(clientePagaProp !== undefined ? clientePagaProp : true);
+    const [clientePagaState, setClientePaga] = useState<boolean>(clientePagaProp !== undefined ? clientePagaProp : true);
+    // Aliados "solo tarjeta": el cliente siempre paga y siempre con tarjeta.
+    const clientePaga = soloPagoTarjeta ? true : clientePagaState;
     const aliadoNombreNormalizado = (aliadoNombre || '')
         .toLowerCase()
         .normalize('NFD')
@@ -138,11 +142,11 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
     // Reset payment method when modal opens or initial preference changes
     useEffect(() => {
         if (isOpen) {
-            setSelectedPaymentMethod(null);
+            setSelectedPaymentMethod(soloPagoTarjeta ? 'TARJETA' : null);
             setCurrentStep(initialStep);
             setMaxStepReached(initialStep);
         }
-    }, [isOpen, initialStep]);
+    }, [isOpen, initialStep, soloPagoTarjeta]);
 
     // Process service data to get localized text
     const processedService = {
@@ -342,6 +346,7 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                 esReservaAliado: !!aliadoId,
                 clientePaga: clientePaga !== undefined ? clientePaga : true,
                 metodoPago: selectedPaymentMethod,
+                soloPagoTarjeta,
             };
 
             // Obtener carrito actual del localStorage
@@ -387,6 +392,7 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                 esReservaAliado: !!aliadoId,
                 clientePaga: clientePaga !== undefined ? clientePaga : true,
                 metodoPago: selectedPaymentMethod,
+                soloPagoTarjeta,
             };
 
             // Obtener items del carrito
@@ -465,7 +471,7 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                 </button>
 
                 {/* Staff-only clientePaga toggle — visible only in staff portal flow */}
-                {isStaffFlow && (
+                {isStaffFlow && !soloPagoTarjeta && (
                     <div className="flex items-center justify-center gap-3 px-6 py-2.5 bg-neutral-50 border-b border-neutral-100">
                         <span className="text-xs text-neutral-500">
                             {language === 'es' ? '¿El cliente paga?' : 'Does client pay?'}
@@ -578,6 +584,7 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                             selectedPaymentMethod={selectedPaymentMethod}
                             onPaymentMethodChange={setSelectedPaymentMethod}
                             clientePaga={clientePaga}
+                            soloPagoTarjeta={soloPagoTarjeta}
                             preciosPersonalizados={preciosPersonalizados}
                         />
                     )}
@@ -598,6 +605,13 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                             <div className="flex justify-between items-center mb-3 px-1">
                                 <span className="text-sm text-gray-500">
                                     {t('reservas.paso1_cotizacion', language)}
+                                    {formData.recargoNocturno > 0 && (
+                                        <span className="block text-xs text-amber-700">
+                                            {language === 'es'
+                                                ? `Incluye recargo nocturno +${formatPrice(formData.recargoNocturno)}`
+                                                : `Includes night surcharge +${formatPrice(formData.recargoNocturno)}`}
+                                        </span>
+                                    )}
                                 </span>
                                 <span className="text-xl font-bold text-gray-900">
                                     {formatPrice(formData.precioTotal)}

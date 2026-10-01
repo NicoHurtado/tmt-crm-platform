@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Trash2, ShoppingCart, Calendar, Users, MapPin, ArrowRight, Banknote, CreditCard } from 'lucide-react'
+import { X, Trash2, ShoppingCart, Calendar, Users, MapPin, ArrowRight, Banknote, CreditCard, Moon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface CartItem {
@@ -35,6 +35,8 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'TARJETA' | 'EFECTIVO'>('EFECTIVO')
+  // Si algún servicio es de un aliado "solo tarjeta", el pedido completo se paga con tarjeta.
+  const soloPagoTarjeta = cartItems.some((item) => item.soloPagoTarjeta)
 
   useEffect(() => {
     if (isOpen) loadCart()
@@ -47,7 +49,9 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
         const items: CartItem[] = JSON.parse(stored)
         setCartItems(Array.isArray(items) ? items : [])
         const firstMethod = items[0]?.metodoPago
-        if (firstMethod === 'EFECTIVO' || firstMethod === 'TARJETA') {
+        if (Array.isArray(items) && items.some((item) => item.soloPagoTarjeta)) {
+          setSelectedPaymentMethod('TARJETA')
+        } else if (firstMethod === 'EFECTIVO' || firstMethod === 'TARJETA') {
           setSelectedPaymentMethod(firstMethod)
         }
       } else {
@@ -217,7 +221,13 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
                       )}
                     </div>
 
-                    <div className="mt-3 flex justify-end">
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      {Number(item.recargoNocturno) > 0 ? (
+                        <span className="flex items-center gap-1 text-[11px] text-amber-700">
+                          <Moon size={11} className="shrink-0" />
+                          Incluye recargo nocturno +{fmt(Number(item.recargoNocturno))}
+                        </span>
+                      ) : <span />}
                       <span className="text-sm font-semibold text-amber-600">
                         {fmt(item.precioTotal)}
                       </span>
@@ -239,6 +249,7 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
               </div>
 
               {/* Efectivo */}
+              {!soloPagoTarjeta && (
               <button
                 onClick={() => setSelectedPaymentMethod('EFECTIVO')}
                 className={`w-full flex items-center gap-3 px-4 py-3 border-b border-neutral-100 transition-colors text-left ${
@@ -263,6 +274,7 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
                 </div>
                 <span className="text-xs font-bold text-neutral-800 shrink-0">{fmt(subtotal)}</span>
               </button>
+              )}
 
               {/* Tarjeta */}
               <button

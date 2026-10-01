@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ConfirmarReservaPage({ params }: Props) {
     const reserva = await prisma.reserva.findUnique({
         where: { codigo: params.codigo },
-        include: { servicio: true, vehiculo: true },
+        include: { servicio: true, vehiculo: true, aliado: { select: { soloPagoTarjeta: true } } },
     });
 
     if (!reserva) notFound();
@@ -82,6 +82,7 @@ export default async function ConfirmarReservaPage({ params }: Props) {
                 estado: reserva.estado,
                 idioma: (reserva.idioma as 'ES' | 'EN') ?? 'ES',
                 vehiculo: reserva.vehiculo?.nombre ?? null,
+                soloPagoTarjeta: !!reserva.aliado?.soloPagoTarjeta,
             }}
             boldData={boldDataProp}
         />

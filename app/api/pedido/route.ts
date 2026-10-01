@@ -155,6 +155,25 @@ export async function POST(request: Request) {
 
         // Determinar método de pago y estado para el pedido completo
         const metodoPago = body.metodoPago === 'EFECTIVO' ? 'EFECTIVO' : 'TARJETA';
+
+        // Aliados "solo tarjeta" (p. ej. Housy): ni efectivo ni items sin cobro al cliente.
+        const aliadoIdsPedido = Array.from(new Set(
+            body.cartItems.map((item: any) => item.aliadoId).filter(Boolean)
+        )) as string[];
+        if (aliadoIdsPedido.length > 0 && (
+            metodoPago === 'EFECTIVO' || body.cartItems.some((item: any) => item.clientePaga === false)
+        )) {
+            const soloTarjeta = await prisma.aliado.count({
+                where: { id: { in: aliadoIdsPedido }, soloPagoTarjeta: true },
+            });
+            if (soloTarjeta > 0) {
+                return NextResponse.json(
+                    { error: 'Este aliado solo acepta pago con tarjeta' },
+                    { status: 400 }
+                );
+            }
+        }
+
         let estadoPago: EstadoPago | null = null;
         let comisionBold = 0;
         if (metodoPago === 'EFECTIVO') {

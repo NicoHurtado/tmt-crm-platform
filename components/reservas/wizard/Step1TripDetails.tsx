@@ -5,7 +5,7 @@ import { ReservationFormData } from '@/types/reservation';
 import { Municipio, Idioma } from '@prisma/client';
 import { calculateTotalPrice, isNightSurchargeApplicable, formatPrice } from '@/lib/pricing';
 import { FiAlertCircle, FiCheck, FiUsers, FiUser } from 'react-icons/fi';
-import { Plane } from 'lucide-react';
+import { Plane, Moon } from 'lucide-react';
 import Image from 'next/image';
 import DynamicFields from './DynamicFields';
 import { DynamicFieldValues } from '@/types/dynamic-fields';
@@ -48,6 +48,9 @@ interface Step1Props {
 export default function Step1TripDetails({ service, formData, updateFormData, onNext, onBack, preciosPersonalizados, aliadoTipo, aliadoNombre }: Step1Props) {
     const { language } = useLanguage();
     const [showNightSurcharge, setShowNightSurcharge] = useState(false);
+    // Franja y monto del recargo nocturno vigente (servicio o override del aliado), para avisar
+    // al cliente antes y después de elegir la hora.
+    const [nightWindow, setNightWindow] = useState<{ inicio: string; fin: string; monto: number } | null>(null);
     const [dynamicPrice, setDynamicPrice] = useState(0);
     const [isLanguageOpen, setIsLanguageOpen] = useState(false);
     const [isMunicipalityOpen, setIsMunicipalityOpen] = useState(false);
@@ -345,6 +348,11 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
             : 0;
 
         setShowNightSurcharge(nightSurcharge > 0);
+        setNightWindow(
+            aplicaRecargo && horaInicioRecargo && horaFinRecargo && Number(montoRecargo || 0) > 0
+                ? { inicio: horaInicioRecargo, fin: horaFinRecargo, monto: Number(montoRecargo) }
+                : null
+        );
 
         // ─── SHARED TOUR: precio base × pasajeros ───
         if (service.esCompartido) {
@@ -1367,9 +1375,28 @@ export default function Step1TripDetails({ service, formData, updateFormData, on
                             className={inputClass}
                             required
                         />
-                        {showNightSurcharge && (
-                            <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
-                                <FiAlertCircle size={12} /> +{formatPrice(formData.recargoNocturno)} {t('reservas.paso4_recargo', language)}
+                        {showNightSurcharge ? (
+                            <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                <Moon size={14} className="mt-0.5 shrink-0 text-amber-600" />
+                                <div>
+                                    <p className="font-semibold">
+                                        {language === 'es' ? 'Se agregará un recargo nocturno' : 'A night surcharge will be added'}: +{formatPrice(formData.recargoNocturno)}
+                                    </p>
+                                    {nightWindow && (
+                                        <p className="mt-0.5 text-amber-700">
+                                            {language === 'es'
+                                                ? `La hora elegida está en horario nocturno (${nightWindow.inicio} – ${nightWindow.fin}). Ya está incluido en el total.`
+                                                : `The selected time is within night hours (${nightWindow.inicio} – ${nightWindow.fin}). It is already included in the total.`}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ) : nightWindow && (
+                            <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1">
+                                <Moon size={12} className="shrink-0 text-gray-400" />
+                                {language === 'es'
+                                    ? `Entre ${nightWindow.inicio} y ${nightWindow.fin} aplica recargo nocturno de ${formatPrice(nightWindow.monto)}`
+                                    : `A ${formatPrice(nightWindow.monto)} night surcharge applies between ${nightWindow.inicio} and ${nightWindow.fin}`}
                             </p>
                         )}
                     </div>
