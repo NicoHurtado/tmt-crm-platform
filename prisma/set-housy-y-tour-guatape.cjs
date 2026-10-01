@@ -15,15 +15,15 @@ cloudinary.config({
  * Octubre 2026:
  *  1. Columna Aliado.soloPagoTarjeta (idempotente, igual a la migración 20261001120000).
  *  2. Housy → solo pago con tarjeta (Bold).
- *  3. Tour compartido Guatapé → nueva info comercial, precio $270.000/persona e imagen nueva.
+ *  3. Tour Guatapé PRIVADO → nueva info comercial e imagen; bote y almuerzo pasan a estar incluidos.
  *
  * Uso:  node prisma/set-housy-y-tour-guatape.cjs           (solo muestra lo que haría)
  *       node prisma/set-housy-y-tour-guatape.cjs --apply   (aplica)
  */
 
-const TOUR_GUATAPE_ID = 'cmkufhda00000129ncx1l621l';
-const PRECIO_ANTERIOR = 195_000;
-const PRECIO_NUEVO = 270_000;
+const TOUR_GUATAPE_ID = 'test-servicio-1'; // "Tour a Guatapé privado"
+// Extras que ahora vienen incluidos en el precio (bote de lujo y almuerzo a la carta).
+const EXTRAS_INCLUIDOS = ['almuerzoscarta', 'bote1a6', 'vueltabote7a15', 'bote16a22', 'bote23a30'];
 const IMAGEN_LOCAL = path.join(process.cwd(), 'public/images/servicios/tour-guatape-2026.jpg');
 
 const TOUR = {
@@ -70,18 +70,6 @@ const TOUR = {
         ],
     },
     duracion: '8.5 – 9 horas aprox',
-    infoCompartido: {
-        titulo: { es: 'Logística del tour', en: 'Tour logistics' },
-        encuentro: {
-            es: 'Recogida en tu dirección (Medellín). Escríbela en el paso de Notas.',
-            en: 'Pickup at your address (Medellín). Add it in the Notes step.',
-        },
-        salida: { es: '7:50 AM', en: '7:50 AM' },
-        nota: {
-            es: 'Salidas todos los días · Actividad sujeta a un mínimo de 3 personas.',
-            en: 'Daily departures · Activity subject to a minimum of 3 people.',
-        },
-    },
 };
 
 async function main() {
@@ -110,60 +98,34 @@ async function main() {
         }
     }
 
-    // 3. Tour Guatapé
+    // 3. Tour Guatapé PRIVADO (por persona en tramos; los precios 700k/350k/270k no cambian)
     const servicio = await prisma.servicio.findUnique({
         where: { id: TOUR_GUATAPE_ID },
-        select: {
-            id: true, nombre: true, imagen: true, configuracion: true,
-            vehiculosPermitidos: { select: { id: true, precio: true } },
-        },
+        select: { id: true, nombre: true, configuracion: true },
     });
     if (!servicio) throw new Error(`No existe el servicio ${TOUR_GUATAPE_ID}`);
     console.log(`Servicio: ${JSON.stringify(servicio.nombre)} → ${TOUR.nombre.es}`);
 
-    const preciosAliado = await prisma.precioVehiculoAliado.findMany({
-        where: { servicioAliado: { servicioId: TOUR_GUATAPE_ID } },
-        select: { id: true, precioBase: true, servicioAliado: { select: { aliado: { select: { nombre: true } } } } },
-    });
-    for (const p of preciosAliado) {
-        const actual = Number(p.precioBase);
-        const cambia = actual === PRECIO_ANTERIOR;
-        console.log(`  Precio aliado ${p.servicioAliado.aliado.nombre}: ${actual}${cambia ? ` → ${PRECIO_NUEVO}` : ' (se deja igual)'}`);
-    }
+    const cfg = (servicio.configuracion && typeof servicio.configuracion === 'object' ? servicio.configuracion : {});
+    const campos = Array.isArray(cfg.camposCustom) ? cfg.camposCustom : [];
+    const camposFinal = campos.filter((c) => !EXTRAS_INCLUIDOS.includes(c.clave));
+    console.log(`  Extras que se quitan (ya incluidos): ${campos.filter((c) => EXTRAS_INCLUIDOS.includes(c.clave)).map((c) => c.clave).join(', ') || 'ninguno'}`);
 
-    let imagen = servicio.imagen;
     if (apply) {
         const subida = await cloudinary.uploader.upload(IMAGEN_LOCAL, { folder: 'tmt/servicios' });
-        imagen = subida.secure_url;
-        console.log(`✓ Imagen subida: ${imagen}`);
-    }
-
-    if (apply) {
-        const cfg = (servicio.configuracion && typeof servicio.configuracion === 'object'
-            ? servicio.configuracion
-            : {});
-        await prisma.$transaction([
-            prisma.servicio.update({
-                where: { id: TOUR_GUATAPE_ID },
-                data: {
-                    nombre: TOUR.nombre,
-                    descripcion: TOUR.descripcion,
-                    incluye: TOUR.incluye,
-                    duracion: TOUR.duracion,
-                    imagen,
-                    configuracion: { ...cfg, infoCompartido: TOUR.infoCompartido },
-                },
-            }),
-            prisma.servicioVehiculo.updateMany({
-                where: { servicioId: TOUR_GUATAPE_ID },
-                data: { precio: PRECIO_NUEVO },
-            }),
-            prisma.precioVehiculoAliado.updateMany({
-                where: { servicioAliado: { servicioId: TOUR_GUATAPE_ID }, precioBase: PRECIO_ANTERIOR },
-                data: { precioBase: PRECIO_NUEVO },
-            }),
-        ]);
-        console.log(`✓ Tour Guatapé actualizado (precio ${PRECIO_NUEVO.toLocaleString('es-CO')} por persona)`);
+        console.log(`✓ Imagen subida: ${subida.secure_url}`);
+        await prisma.servicio.update({
+            where: { id: TOUR_GUATAPE_ID },
+            data: {
+                nombre: TOUR.nombre,
+                descripcion: TOUR.descripcion,
+                incluye: TOUR.incluye,
+                duracion: TOUR.duracion,
+                imagen: subida.secure_url,
+                configuracion: { ...cfg, camposCustom: camposFinal },
+            },
+        });
+        console.log('✓ Tour Guatapé privado actualizado');
     }
 }
 
