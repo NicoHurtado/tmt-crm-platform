@@ -73,6 +73,9 @@ export async function PUT(
         if (body.tipo !== undefined) updateData.tipo = body.tipo;
         if (body.activo !== undefined) updateData.activo = body.activo;
         if (body.soloPagoTarjeta !== undefined) updateData.soloPagoTarjeta = !!body.soloPagoTarjeta;
+        if (body.soloPagoEfectivo !== undefined) updateData.soloPagoEfectivo = !!body.soloPagoEfectivo;
+        // Excluyentes: si ambos llegan en true, gana tarjeta.
+        if (updateData.soloPagoTarjeta && updateData.soloPagoEfectivo) updateData.soloPagoEfectivo = false;
         if (body.comision !== undefined) updateData.comision = parseFloat(body.comision);
         if (body.ciudad !== undefined) updateData.ciudad = body.ciudad;
         if (body.direccion !== undefined) updateData.direccion = body.direccion;

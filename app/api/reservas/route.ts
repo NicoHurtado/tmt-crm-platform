@@ -141,15 +141,23 @@ export async function POST(request: Request) {
 
         const metodoPago = body.metodoPago === 'EFECTIVO' ? 'EFECTIVO' : 'TARJETA';
 
-        // Aliados "solo tarjeta" (p. ej. Housy): ni efectivo ni reservas sin cobro al cliente.
-        if (body.aliadoId && (metodoPago === 'EFECTIVO' || body.clientePaga === false)) {
+        // Métodos de pago restringidos por aliado:
+        // - "solo tarjeta" (p. ej. Housy): ni efectivo ni reservas sin cobro al cliente.
+        // - "solo efectivo": no se permite tarjeta (Bold) cuando el cliente paga.
+        if (body.aliadoId) {
             const aliadoPago = await prisma.aliado.findUnique({
                 where: { id: body.aliadoId },
-                select: { soloPagoTarjeta: true },
+                select: { soloPagoTarjeta: true, soloPagoEfectivo: true },
             });
-            if (aliadoPago?.soloPagoTarjeta) {
+            if (aliadoPago?.soloPagoTarjeta && (metodoPago === 'EFECTIVO' || body.clientePaga === false)) {
                 return NextResponse.json(
                     { error: 'Este aliado solo acepta pago con tarjeta' },
+                    { status: 400 }
+                );
+            }
+            if (aliadoPago?.soloPagoEfectivo && metodoPago === 'TARJETA' && body.clientePaga !== false) {
+                return NextResponse.json(
+                    { error: 'Este aliado solo acepta pago en efectivo' },
                     { status: 400 }
                 );
             }

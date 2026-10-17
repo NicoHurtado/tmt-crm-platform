@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ConfirmarReservaPage({ params }: Props) {
     const reserva = await prisma.reserva.findUnique({
         where: { codigo: params.codigo },
-        include: { servicio: true, vehiculo: true, aliado: { select: { soloPagoTarjeta: true } } },
+        include: { servicio: true, vehiculo: true, aliado: { select: { soloPagoTarjeta: true, soloPagoEfectivo: true } } },
     });
 
     if (!reserva) notFound();
@@ -57,7 +57,8 @@ export default async function ConfirmarReservaPage({ params }: Props) {
 
     const precioSinBold = Number(reserva.precioTotal) - Number(reserva.comisionBold ?? 0);
 
-    const boldDataProp = boldPublicKey
+    // Aliado "solo efectivo": no se ofrece Bold.
+    const boldDataProp = boldPublicKey && !reserva.aliado?.soloPagoEfectivo
         ? {
               publicKey: boldPublicKey,
               orderId: reserva.codigo,

@@ -37,6 +37,8 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'TARJETA' | 'EFECTIVO'>('EFECTIVO')
   // Si algún servicio es de un aliado "solo tarjeta", el pedido completo se paga con tarjeta.
   const soloPagoTarjeta = cartItems.some((item) => item.soloPagoTarjeta)
+  // Y si alguno es de un aliado "solo efectivo", se paga en efectivo (tarjeta gana si chocan).
+  const soloPagoEfectivo = !soloPagoTarjeta && cartItems.some((item) => item.soloPagoEfectivo)
 
   useEffect(() => {
     if (isOpen) loadCart()
@@ -51,6 +53,8 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
         const firstMethod = items[0]?.metodoPago
         if (Array.isArray(items) && items.some((item) => item.soloPagoTarjeta)) {
           setSelectedPaymentMethod('TARJETA')
+        } else if (Array.isArray(items) && items.some((item) => item.soloPagoEfectivo)) {
+          setSelectedPaymentMethod('EFECTIVO')
         } else if (firstMethod === 'EFECTIVO' || firstMethod === 'TARJETA') {
           setSelectedPaymentMethod(firstMethod)
         }
@@ -277,6 +281,7 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
               )}
 
               {/* Tarjeta */}
+              {!soloPagoEfectivo && (
               <button
                 onClick={() => setSelectedPaymentMethod('TARJETA')}
                 className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
@@ -305,6 +310,7 @@ export const CartModal = ({ isOpen, onClose }: CartModalProps) => {
                   <p className="text-xs font-bold text-neutral-800">{fmt(boldPreviewTotal)}</p>
                 </div>
               </button>
+              )}
             </div>
 
             {/* Price summary */}

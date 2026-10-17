@@ -47,6 +47,7 @@ interface Aliado {
   imagen?: string | null
   activo: boolean
   soloPagoTarjeta?: boolean
+  soloPagoEfectivo?: boolean
   _count?: { reservas: number }
 }
 
@@ -58,6 +59,7 @@ const EMPTY_FORM = {
   imagen: '',
   activo: true,
   soloPagoTarjeta: false,
+  soloPagoEfectivo: false,
 }
 
 const TIPO_BADGE: Record<string, string> = {
@@ -179,6 +181,7 @@ export default function AliadosPage() {
       imagen: aliado.imagen || '',
       activo: aliado.activo,
       soloPagoTarjeta: !!aliado.soloPagoTarjeta,
+      soloPagoEfectivo: !!aliado.soloPagoEfectivo,
     })
     setDialogOpen(true)
   }
@@ -700,16 +703,37 @@ export default function AliadosPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-between border border-neutral-200 rounded-lg p-3 bg-neutral-50">
-                <div>
-                  <p className="text-sm font-medium text-neutral-800">Solo pago con tarjeta</p>
-                  <p className="text-xs text-neutral-400">Oculta el pago en efectivo en sus reservas (solo Bold)</p>
+              <div className="border border-neutral-200 rounded-lg p-3 bg-neutral-50">
+                <p className="text-sm font-medium text-neutral-800">Métodos de pago aceptados</p>
+                <p className="text-xs text-neutral-400 mb-2">Qué opciones ven los clientes de este aliado al pagar</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([
+                    { value: 'AMBOS', label: 'Ambos' },
+                    { value: 'EFECTIVO', label: 'Solo efectivo' },
+                    { value: 'TARJETA', label: 'Solo tarjeta' },
+                  ] as const).map((opt) => {
+                    const actual = formData.soloPagoTarjeta ? 'TARJETA' : formData.soloPagoEfectivo ? 'EFECTIVO' : 'AMBOS'
+                    const selected = actual === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormData({
+                          ...formData,
+                          soloPagoTarjeta: opt.value === 'TARJETA',
+                          soloPagoEfectivo: opt.value === 'EFECTIVO',
+                        })}
+                        className={`text-xs font-medium rounded-md border px-2 py-1.5 transition-colors ${
+                          selected
+                            ? 'border-neutral-900 bg-neutral-900 text-white'
+                            : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-100'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
                 </div>
-                <Switch
-                  id="solo-tarjeta-aliado"
-                  checked={formData.soloPagoTarjeta}
-                  onCheckedChange={(checked) => setFormData({ ...formData, soloPagoTarjeta: checked })}
-                />
               </div>
             </div>
 

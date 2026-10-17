@@ -57,9 +57,11 @@ interface ReservationWizardProps {
     isStaffFlow?: boolean;
     /** Aliado que solo acepta tarjeta (Bold): sin efectivo ni "no cobrar". */
     soloPagoTarjeta?: boolean;
+    /** Aliado que solo acepta efectivo: sin opción de tarjeta. */
+    soloPagoEfectivo?: boolean;
 }
 
-export default function ReservationWizard({ service, isOpen, onClose, initialStep = 0, aliadoId, aliadoTipo, aliadoNombre, preciosPersonalizados, clientePaga: clientePagaProp, isStaffFlow = false, soloPagoTarjeta = false }: ReservationWizardProps) {
+export default function ReservationWizard({ service, isOpen, onClose, initialStep = 0, aliadoId, aliadoTipo, aliadoNombre, preciosPersonalizados, clientePaga: clientePagaProp, isStaffFlow = false, soloPagoTarjeta = false, soloPagoEfectivo = false }: ReservationWizardProps) {
     const { language } = useLanguage();
     const [currentStep, setCurrentStep] = useState(0);
     const [maxStepReached, setMaxStepReached] = useState(0);
@@ -142,11 +144,11 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
     // Reset payment method when modal opens or initial preference changes
     useEffect(() => {
         if (isOpen) {
-            setSelectedPaymentMethod(soloPagoTarjeta ? 'TARJETA' : null);
+            setSelectedPaymentMethod(soloPagoTarjeta ? 'TARJETA' : soloPagoEfectivo ? 'EFECTIVO' : null);
             setCurrentStep(initialStep);
             setMaxStepReached(initialStep);
         }
-    }, [isOpen, initialStep, soloPagoTarjeta]);
+    }, [isOpen, initialStep, soloPagoTarjeta, soloPagoEfectivo]);
 
     // Process service data to get localized text
     const processedService = {
@@ -347,6 +349,7 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                 clientePaga: clientePaga !== undefined ? clientePaga : true,
                 metodoPago: selectedPaymentMethod,
                 soloPagoTarjeta,
+                soloPagoEfectivo,
             };
 
             // Obtener carrito actual del localStorage
@@ -393,6 +396,7 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                 clientePaga: clientePaga !== undefined ? clientePaga : true,
                 metodoPago: selectedPaymentMethod,
                 soloPagoTarjeta,
+                soloPagoEfectivo,
             };
 
             // Obtener items del carrito
@@ -585,6 +589,7 @@ export default function ReservationWizard({ service, isOpen, onClose, initialSte
                             onPaymentMethodChange={setSelectedPaymentMethod}
                             clientePaga={clientePaga}
                             soloPagoTarjeta={soloPagoTarjeta}
+                            soloPagoEfectivo={soloPagoEfectivo}
                             preciosPersonalizados={preciosPersonalizados}
                         />
                     )}

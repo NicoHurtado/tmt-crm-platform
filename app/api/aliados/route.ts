@@ -92,6 +92,7 @@ export async function POST(request: Request) {
                 imagen: body.imagen || null,
                 activo: body.activo !== undefined ? body.activo : true,
                 soloPagoTarjeta: !!body.soloPagoTarjeta,
+                soloPagoEfectivo: !body.soloPagoTarjeta && !!body.soloPagoEfectivo,
             },
         });
 

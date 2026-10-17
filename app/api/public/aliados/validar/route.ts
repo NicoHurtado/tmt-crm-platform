@@ -24,6 +24,7 @@ export async function POST(request: Request) {
                 codigo: true,
                 tipo: true,
                 soloPagoTarjeta: true,
+                soloPagoEfectivo: true,
             },
         });
 

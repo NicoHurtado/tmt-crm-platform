@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { generateBoldHash } from '@/lib/bold';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { ocultarComisionAliado } from '@/lib/ocultar-comision';
 import { sendCambioEstadoEmail, sendPagoAprobadoEmail, sendConductorAsignadoEmail, sendServicioCompletadoEmail, sendCotizacionListaEmail, sendCancelacionEmail } from '@/lib/email-service';
 
 // Force dynamic rendering to prevent build-time execution
@@ -74,7 +75,9 @@ export async function GET(
 
         // CR-05: strip hashPago from public response to avoid leaking payment integrity secret
         const { hashPago, ...publicReserva } = reserva as any;
-        return NextResponse.json(publicReserva);
+        // La comisión del aliado solo la ve el admin; al cliente se le pliega en el precio base.
+        const session = await getServerSession(authOptions);
+        return NextResponse.json(session ? publicReserva : ocultarComisionAliado(publicReserva));
     } catch (error) {
         console.error('Get reserva error:', error);
         return NextResponse.json(

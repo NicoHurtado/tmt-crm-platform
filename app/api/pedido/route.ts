@@ -7,6 +7,9 @@ import { calculateBoldCommission } from '@/lib/bold';
 import { getConfiguracion, totalPorPersona, comisionPorPersona } from '@/types/servicio-config';
 import { recalcularPrecioWebDirecto } from '@/lib/priceCalculator';
 import crypto from 'crypto';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { ocultarComisionAliado, aliadoPublico } from '@/lib/ocultar-comision';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -169,6 +172,18 @@ export async function POST(request: Request) {
             if (soloTarjeta > 0) {
                 return NextResponse.json(
                     { error: 'Este aliado solo acepta pago con tarjeta' },
+                    { status: 400 }
+                );
+            }
+        }
+        if (aliadoIdsPedido.length > 0 && metodoPago === 'TARJETA' &&
+            body.cartItems.some((item: any) => item.clientePaga !== false)) {
+            const soloEfectivo = await prisma.aliado.count({
+                where: { id: { in: aliadoIdsPedido }, soloPagoEfectivo: true },
+            });
+            if (soloEfectivo > 0) {
+                return NextResponse.json(
+                    { error: 'Este aliado solo acepta pago en efectivo' },
                     { status: 400 }
                 );
             }
@@ -499,7 +514,16 @@ export async function GET(request: Request) {
             );
         }
 
-        return NextResponse.json({ data: pedido });
+        // Ruta pública (tracking): la comisión del aliado solo la ve el admin.
+        const session = await getServerSession(authOptions);
+        if (session) return NextResponse.json({ data: pedido });
+        return NextResponse.json({
+            data: {
+                ...pedido,
+                aliado: aliadoPublico(pedido.aliado as any),
+                reservas: pedido.reservas.map((r) => ocultarComisionAliado(r as any)),
+            },
+        });
     } catch (error) {
         console.error('Error fetching pedido:', error);
         return NextResponse.json(

@@ -48,6 +48,12 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             );
         }
+        if (metodoPago === 'TARJETA' && reserva.aliado?.soloPagoEfectivo) {
+            return NextResponse.json(
+                { success: false, error: 'Este aliado solo acepta pago en efectivo' },
+                { status: 400 }
+            );
+        }
 
         if (reserva.estado !== EstadoReserva.PENDING_PAYMENT) {
             return NextResponse.json(

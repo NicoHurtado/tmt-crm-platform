@@ -18,6 +18,7 @@ export type ReservaTemplate = {
   recargoNocturno?: { toNumber(): number } | number | null;
   tarifaMunicipio?: { toNumber(): number } | number | null;
   descuentoAliado?: { toNumber(): number } | number | null;
+  comisionAliado?: { toNumber(): number } | number | null;
   estado: string;
   notas?: string | null;
   clientePaga?: boolean | null;
@@ -250,7 +251,8 @@ export const getEmailLayout = (content: string, language: 'ES' | 'EN' = 'ES'): s
 // ─── Template helpers ─────────────────────────────────────────────────────────
 
 const buildPriceRows = (r: ReservaTemplate, isES: boolean): PriceRow[] => {
-  const base = toNum(r.precioBase);
+  // La comisión del aliado nunca se muestra: va plegada en el precio base para que cuadre el total.
+  const base = toNum(r.precioBase) + toNum(r.comisionAliado);
   const adicionales = toNum(r.precioAdicionales);
   const nocturno = toNum(r.recargoNocturno);
   const municipioFee = toNum(r.tarifaMunicipio);

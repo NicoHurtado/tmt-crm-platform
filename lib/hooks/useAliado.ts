@@ -8,6 +8,7 @@ export interface Aliado {
     codigo: string;
     tipo: string;
     soloPagoTarjeta?: boolean;
+    soloPagoEfectivo?: boolean;
 }
 
 const STORAGE_KEY = 'aliado';

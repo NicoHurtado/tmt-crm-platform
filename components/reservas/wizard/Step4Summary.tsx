@@ -17,6 +17,8 @@ interface Step4Props {
     clientePaga?: boolean;
     /** Aliado que solo acepta tarjeta: no se muestra la opción de efectivo. */
     soloPagoTarjeta?: boolean;
+    /** Aliado "solo efectivo": no se ofrece pagar con tarjeta. */
+    soloPagoEfectivo?: boolean;
     preciosPersonalizados?: any;
 }
 
@@ -30,6 +32,7 @@ export default function Step4Summary({
     onPaymentMethodChange,
     clientePaga,
     soloPagoTarjeta = false,
+    soloPagoEfectivo = false,
     preciosPersonalizados,
 }: Step4Props) {
     const { language } = useLanguage();
@@ -122,6 +125,11 @@ export default function Step4Summary({
     const totalToPay = subtotal + cardFee;
     const boldPreviewFee = subtotal * 0.06;
     const boldPreviewTotal = subtotal + boldPreviewFee;
+
+    // La comisión del aliado NUNCA se muestra al cliente: se suma al precio del vehículo
+    // para que el desglose cuadre con el total sin exponerla como línea aparte.
+    const comisionOculta = Number(formData.comisionAliado ?? 0);
+    const precioVehiculoCliente = Number(formData.precioBase || 0) + comisionOculta;
 
 
     return (
@@ -336,14 +344,16 @@ export default function Step4Summary({
                                     const vehicleName = resolvedVehicle ? resolvedVehicle.nombre : t('reservas.paso4_precio_base', language);
 
                                     if (service.esPorHoras && formData.cantidadHoras) {
-                                        const precioHora = resolvedVehicle ? Number(resolvedVehicle.precio ?? resolvedVehicle.precioBase ?? 0) : 0;
+                                        const precioHora = comisionOculta > 0
+                                            ? precioVehiculoCliente / Number(formData.cantidadHoras)
+                                            : resolvedVehicle ? Number(resolvedVehicle.precio ?? resolvedVehicle.precioBase ?? 0) : 0;
                                         return `${vehicleName} (${formatPrice(precioHora)} × ${formData.cantidadHoras} ${language === 'es' ? 'horas' : 'hours'})`;
                                     }
 
                                     return vehicleName;
                                 })()}
                             </span>
-                            <span className="font-medium">{formatPrice(formData.precioBase)}</span>
+                            <span className="font-medium">{formatPrice(precioVehiculoCliente)}</span>
                         </div>
 
 
@@ -416,13 +426,6 @@ export default function Step4Summary({
                             <div className="flex justify-between text-green-600">
                                 <span>{t('reservas.paso4_descuento', language)}</span>
                                 <span className="font-medium">-{formatPrice(formData.descuentoAliado)}</span>
-                            </div>
-                        )}
-
-                        {(formData.comisionAliado ?? 0) > 0 && (
-                            <div className="flex justify-between text-gray-700">
-                                <span>{language === 'es' ? 'Comisión aliado' : 'Ally commission'}</span>
-                                <span className="font-medium">{formatPrice(formData.comisionAliado ?? 0)}</span>
                             </div>
                         )}
 
@@ -505,6 +508,7 @@ export default function Step4Summary({
                     )}
 
                     {/* Tarjeta */}
+                    {!soloPagoEfectivo && (
                     <button
                         type="button"
                         onClick={() => onPaymentMethodChange('TARJETA')}
@@ -539,6 +543,7 @@ export default function Step4Summary({
                             <p className="text-[11px] text-gray-400">+{formatPrice(boldPreviewFee)}</p>
                         </div>
                     </button>
+                    )}
                 </div>
             ) : null}
 

@@ -323,6 +323,7 @@ export default function ReservasPage() {
                     aliadoTipo={aliado?.tipo || null}
                     aliadoNombre={aliado?.nombre || null}
                     soloPagoTarjeta={!!aliado?.soloPagoTarjeta}
+                    soloPagoEfectivo={!!aliado?.soloPagoEfectivo}
                     preciosPersonalizados={preciosPersonalizados}
                 />
             )}

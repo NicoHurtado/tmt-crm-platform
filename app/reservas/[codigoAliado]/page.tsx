@@ -46,6 +46,7 @@ interface Aliado {
     codigo: string;
     tipo: string;
     soloPagoTarjeta?: boolean;
+    soloPagoEfectivo?: boolean;
 }
 
 export default function ReservaAliadoPage() {
@@ -270,6 +271,7 @@ export default function ReservaAliadoPage() {
                     aliadoTipo={aliado?.tipo || null}
                     aliadoNombre={aliado?.nombre || null}
                     soloPagoTarjeta={!!aliado?.soloPagoTarjeta}
+                    soloPagoEfectivo={!!aliado?.soloPagoEfectivo}
                     preciosPersonalizados={preciosPersonalizados}
                     isStaffFlow={false}
                 />

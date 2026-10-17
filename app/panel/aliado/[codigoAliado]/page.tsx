@@ -43,6 +43,7 @@ interface AliadoData {
     codigo: string;
     tipo: string;
     soloPagoTarjeta?: boolean;
+    soloPagoEfectivo?: boolean;
 }
 
 export default function PanelAliadoPage() {
@@ -245,6 +246,7 @@ export default function PanelAliadoPage() {
                     aliadoTipo={aliado?.tipo || null}
                     aliadoNombre={aliado?.nombre || null}
                     soloPagoTarjeta={!!aliado?.soloPagoTarjeta}
+                    soloPagoEfectivo={!!aliado?.soloPagoEfectivo}
                     preciosPersonalizados={preciosPersonalizados}
                     isStaffFlow={true}
                 />
