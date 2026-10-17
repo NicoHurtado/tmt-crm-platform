@@ -43,7 +43,7 @@ import {
 } from '@/components/admin/responsive'
 import { getStateLabel, getStateBadge } from '@/lib/state-transitions'
 import { getLocalizedText } from '@/types/multi-language'
-import ReservaDetailSheet, { type ReservaDetail } from '@/components/admin/ReservaDetailSheet'
+import ReservaDetailSheet, { CorporativoBadge, type ReservaDetail } from '@/components/admin/ReservaDetailSheet'
 import TourCompartidoView from '@/components/admin/TourCompartidoView'
 import type { EstadoReserva } from '@prisma/client'
 import { exportarReservasExcel } from '@/lib/exportUtils'
@@ -102,7 +102,7 @@ export default function ReservasPage() {
 
   const servicioIdParam = searchParams.get('servicioId') ?? ''
 
-  const [activeTab, setActiveTab] = useState<'todas' | 'tour-compartido'>('todas')
+  const [activeTab, setActiveTab] = useState<'todas' | 'tour-compartido' | 'corporativo'>('todas')
   const [reservas, setReservas] = useState<Reserva[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -145,7 +145,7 @@ export default function ReservasPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, estado, pago, clientePagaFilter, servicioFilter, aliadoFilter, socioFilter, fechaDesde, fechaHasta, servicioIdParam])
+  }, [search, estado, pago, clientePagaFilter, servicioFilter, aliadoFilter, socioFilter, fechaDesde, fechaHasta, servicioIdParam, activeTab])
 
   // Unique services for dropdown
   const serviciosUnicos = useMemo(() => {
@@ -189,6 +189,7 @@ export default function ReservasPage() {
   const filtered = useMemo(() => {
     return reservas
       .filter((r) => {
+        if (activeTab === 'corporativo' && !r.turnoCorporativo) return false
         if (servicioIdParam && r.servicioId !== servicioIdParam) return false
         if (estado !== 'ALL' && r.estado !== estado) return false
         if (pago !== 'ALL' && r.metodoPago !== pago) return false
@@ -213,7 +214,9 @@ export default function ReservasPage() {
         return true
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [reservas, search, estado, pago, clientePagaFilter, servicioFilter, aliadoFilter, socioFilter, fechaDesde, fechaHasta, servicioIdParam])
+  }, [reservas, search, estado, pago, clientePagaFilter, servicioFilter, aliadoFilter, socioFilter, fechaDesde, fechaHasta, servicioIdParam, activeTab])
+
+  const corporativasCount = useMemo(() => reservas.filter((r) => r.turnoCorporativo).length, [reservas])
 
   const tourCompartidoReservas = useMemo(
     () => reservas.filter((r) => (r.servicio as any)?.esCompartido),
@@ -348,13 +351,13 @@ export default function ReservasPage() {
         title="Reservas"
         subtitle={
           !loading &&
-          (activeTab === 'todas'
+          (activeTab !== 'tour-compartido'
             ? `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''}`
             : `${tourCompartidoReservas.length} reserva${tourCompartidoReservas.length !== 1 ? 's' : ''} de tour compartido`)
         }
         actions={
           <>
-            {activeTab === 'todas' && !loading && filtered.length > 0 && (
+            {activeTab !== 'tour-compartido' && !loading && filtered.length > 0 && (
               <Button
                 variant="outline"
                 onClick={() => exportarReservasExcel(filtered, 'nueva')}
@@ -395,6 +398,14 @@ export default function ReservasPage() {
             </span>
           )}
         </AdminTab>
+        <AdminTab active={activeTab === 'corporativo'} onClick={() => setActiveTab('corporativo')}>
+          Corporativo
+          {!loading && corporativasCount > 0 && (
+            <span className="text-[11px] bg-indigo-100 text-indigo-700 rounded-full px-1.5 py-0.5 font-semibold">
+              {corporativasCount}
+            </span>
+          )}
+        </AdminTab>
       </AdminTabs>
 
       {activeTab === 'tour-compartido' && (
@@ -404,7 +415,7 @@ export default function ReservasPage() {
         />
       )}
 
-      {activeTab === 'todas' && <>
+      {activeTab !== 'tour-compartido' && <>
       <FilterShell
         chips={chips}
         onClearAll={clearFilters}
@@ -594,6 +605,7 @@ export default function ReservasPage() {
                         Cotización
                       </span>
                     )}
+                    {r.turnoCorporativo && <CorporativoBadge turno={r.turnoCorporativo} compacta />}
                   </>
                 }
                 subtitle={
@@ -785,6 +797,7 @@ export default function ReservasPage() {
                           Cotización
                         </span>
                       )}
+                      {r.turnoCorporativo && <CorporativoBadge turno={r.turnoCorporativo} compacta />}
                     </div>
                   </TableCell>
                   <TableCell className="py-3">

@@ -34,7 +34,7 @@ export async function GET(request: Request) {
             where,
             include: {
                 _count: {
-                    select: { reservas: true },
+                    select: { reservas: true, eventosCorporativos: true },
                 },
             },
             orderBy: {

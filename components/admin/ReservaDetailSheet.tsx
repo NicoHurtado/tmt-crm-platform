@@ -40,6 +40,14 @@ export interface ReservaDetail {
   notas?: string
   datos?: Record<string, any>
   pagoConductor?: boolean
+  turnoCorporativo?: TurnoCorporativoInfo | null
+}
+
+export interface TurnoCorporativoInfo {
+  id: string
+  capacidad: number
+  evento: { id: string; empresa: string; codigo: string }
+  cupos: { id: string; nombre: string; telefono: string; email: string; numeroVuelo: string | null }[]
 }
 
 interface ReservaDetailSheetProps {
@@ -94,6 +102,7 @@ export default function ReservaDetailSheet({
                     Cotización
                   </span>
                 )}
+                {reserva.turnoCorporativo && <CorporativoBadge turno={reserva.turnoCorporativo} />}
                 <Button
                   variant="outline"
                   size="sm"
@@ -111,6 +120,45 @@ export default function ReservaDetailSheet({
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+              {reserva.turnoCorporativo && (
+                <>
+                  <Section title={`Corporativo · ${reserva.turnoCorporativo.evento.empresa}`}>
+                    <Field
+                      label="Cupos"
+                      value={`${reserva.turnoCorporativo.cupos.length} de ${reserva.turnoCorporativo.capacidad} puestos`}
+                    />
+                    {reserva.turnoCorporativo.cupos.length === 0 ? (
+                      <p className="text-xs text-neutral-400">Aún nadie reservó en esta hora.</p>
+                    ) : (
+                      <ol className="space-y-1.5">
+                        {reserva.turnoCorporativo.cupos.map((c, i) => (
+                          <li key={c.id} className="text-xs text-neutral-700 flex gap-2">
+                            <span className="text-neutral-400 w-4 text-right">{i + 1}.</span>
+                            <span className="flex-1">
+                              <span className="font-medium text-neutral-900">{c.nombre}</span>
+                              <span className="text-neutral-500"> · {c.telefono}</span>
+                              {c.numeroVuelo && <span className="text-neutral-500"> · vuelo {c.numeroVuelo}</span>}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1.5 border-neutral-200 w-full"
+                      onClick={() => {
+                        onClose()
+                        router.push(`/admin/dashboard/corporativo/${reserva.turnoCorporativo!.evento.id}`)
+                      }}
+                    >
+                      Gestionar cupos, horas y precios
+                      <ExternalLink size={12} />
+                    </Button>
+                  </Section>
+                  <Separator />
+                </>
+              )}
               {/* Cliente */}
               <Section title="Cliente">
                 <Field label="Nombre" value={reserva.nombreCliente} />
@@ -219,5 +267,19 @@ function Field({ label, value }: { label: string; value: string }) {
       <span className="text-xs text-neutral-500 w-28 flex-shrink-0">{label}</span>
       <span className="text-sm font-medium text-neutral-900 text-right">{value}</span>
     </div>
+  )
+}
+
+/** Etiqueta de salida corporativa: empresa + ocupación. Se usa también en la tabla de Reservas. */
+export function CorporativoBadge({ turno, compacta }: { turno: TurnoCorporativoInfo; compacta?: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded border border-indigo-200 bg-indigo-50 font-medium text-indigo-700 whitespace-nowrap ${
+        compacta ? 'text-[10px] px-1.5' : 'text-xs px-2.5 py-1 rounded-md'
+      }`}
+      title={`Salida corporativa de ${turno.evento.empresa}`}
+    >
+      Corporativo · {turno.evento.empresa} · {turno.cupos.length}/{turno.capacidad}
+    </span>
   )
 }

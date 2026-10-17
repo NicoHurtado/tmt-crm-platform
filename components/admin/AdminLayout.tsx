@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   ScrollText,
+  Building2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { name: 'Servicios',    href: '/admin/dashboard/servicios',    icon: Package   },
   { name: 'Vehículos',    href: '/admin/dashboard/vehiculos',    icon: Truck    },
   { name: 'Aliados',      href: '/admin/dashboard/aliados',      icon: Users    },
+  { name: 'Corporativo',  href: '/admin/dashboard/corporativo',  icon: Building2 },
   { name: 'Conductores',  href: '/admin/dashboard/conductores',  icon: User     },
   { name: 'Estado General', href: '/admin/dashboard/estado-general', icon: FileSpreadsheet },
 ]

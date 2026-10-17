@@ -303,3 +303,43 @@ export async function sendConductorAutoRegistradoEmail(
     html: tplConductorAutoRegistrado(conductor),
   });
 }
+
+/**
+ * Confirmación al funcionario de un evento corporativo (sin pago: se factura a la empresa).
+ * Copia oculta al admin, como el resto de correos al cliente.
+ */
+export async function sendCupoCorporativoEmail(datos: {
+  to: string;
+  nombre: string;
+  empresa: string;
+  titulo: string;
+  origen: string;
+  destino: string;
+  salida: string;
+  numeroVuelo?: string | null;
+  linkEvento: string;
+}) {
+  const fila = (k: string, v: string) =>
+    `<tr><td style="padding:6px 0;color:#6b7280;font-size:13px;width:140px;">${k}</td><td style="padding:6px 0;color:#111827;font-size:14px;font-weight:600;">${v}</td></tr>`;
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+  const html = getEmailLayout(`
+    <p style="margin:0 0 8px;font-size:20px;font-weight:700;color:#111827;">¡Cupo confirmado, ${esc(datos.nombre)}!</p>
+    <p style="margin:0 0 20px;font-size:14px;color:#4b5563;">Tu puesto en el transporte de <strong>${esc(datos.empresa)}</strong> quedó reservado. No tienes que pagar nada: el servicio se factura a la empresa.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin-bottom:20px;">
+      ${fila('Servicio', esc(datos.titulo))}
+      ${fila('Salida', esc(datos.salida))}
+      ${fila('Desde', esc(datos.origen))}
+      ${fila('Hacia', esc(datos.destino))}
+      ${datos.numeroVuelo ? fila('Tu vuelo', esc(datos.numeroVuelo)) : ''}
+    </table>
+    <p style="margin:0 0 20px;font-size:13px;color:#4b5563;">Preséntate en el punto de encuentro unos minutos antes de la hora de salida. Si tu vuelo cambia, escríbenos por WhatsApp para moverte de turno.</p>
+    <p style="margin:0 0 24px;"><a href="${datos.linkEvento}" style="color:#D6A75D;font-size:13px;">Ver horarios del evento</a></p>
+  `);
+  await transporter.sendMail({
+    from: FROM,
+    to: datos.to,
+    bcc: ADMIN_EMAIL,
+    subject: `Cupo confirmado — ${datos.titulo} · ${datos.salida}`,
+    html,
+  });
+}

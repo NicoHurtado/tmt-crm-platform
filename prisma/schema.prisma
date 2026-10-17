@@ -33,11 +33,14 @@ model Aliado {
   // Si es true, solo se acepta efectivo: se oculta la opción de tarjeta (Bold).
   // Excluyente con soloPagoTarjeta (ambos false = el cliente elige).
   soloPagoEfectivo Boolean         @default(false)
+  /// Servicio corporativo por cupos: link donde sus funcionarios reservan puesto por hora.
+  corporativoActivo Boolean        @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   pedidos         Pedido[]
   reservas        Reserva[]
   serviciosAliado ServicioAliado[]
+  eventosCorporativos EventoCorporativo[]
 
   @@index([codigo])
 }
@@ -193,6 +196,8 @@ model Reserva {
   asistentes            Asistente[]
   calificacion          Calificacion?
   socioReserva          SocioReserva?
+  /// Si existe, esta reserva es la salida de un turno corporativo (un vehículo, N cupos).
+  turnoCorporativo      TurnoCorporativo?
   aliado                Aliado?            @relation(fields: [aliadoId], references: [id])
   conductor             Conductor?         @relation(fields: [conductorId], references: [id])
   municipioConfig       MunicipioConfig?   @relation(fields: [municipioConfigId], references: [id])
@@ -367,6 +372,80 @@ model SocioReserva {
 
   @@unique([socioId, refExterna])
   @@index([socioId])
+}
+
+/// Evento corporativo: una empresa (sin perfil) recibe un link público donde cada
+/// funcionario escoge el turno (hora de salida del aeropuerto) que le sirve según su
+/// vuelo y reserva su cupo. No paga nada: se factura a la empresa (cupos × precio).
+model EventoCorporativo {
+  id               String             @id @default(cuid())
+  /// Código del link público `/corporativo/<codigo>`. Único y difícil de adivinar.
+  codigo           String             @unique
+  /// Perfil (aliado) de la empresa: de ahí salen nombre y datos de facturación.
+  aliadoId         String?
+  aliado           Aliado?            @relation(fields: [aliadoId], references: [id], onDelete: SetNull)
+  /// Nombre visible de la empresa (se copia del aliado al crear; editable).
+  empresa          String
+  /// Título visible en el link (ej. "Traslado Aeropuerto → Medellín").
+  titulo           String
+  descripcion      String?
+  origen           String             @default("Aeropuerto José María Córdova")
+  destino          String             @default("Medellín")
+  /// Costo por persona (COP) que se factura a la empresa. Editable.
+  precioPorPersona Float              @default(0)
+  /// Servicio con el que se crean las reservas de cada salida (por defecto, uno de aeropuerto).
+  servicioId       String?
+  contactoNombre   String?
+  contactoEmail    String?
+  activo           Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  turnos           TurnoCorporativo[]
+  cupos            CupoCorporativo[]
+
+  @@index([aliadoId])
+}
+
+/// Salida de un vehículo a una hora concreta (ej. 14 puestos a las 15:00).
+model TurnoCorporativo {
+  id        String            @id @default(cuid())
+  eventoId  String
+  /// Instante de salida. El admin lo ingresa en hora Colombia (UTC-5) y se muestra en America/Bogota.
+  fechaHora DateTime
+  capacidad Int               @default(14)
+  vehiculo  String?           @default("Van 14 pasajeros")
+  activo    Boolean           @default(true)
+  /// Costo por persona de esta hora. Null = usa el precio por defecto del evento.
+  precioPorPersona Float?
+  /// Reserva operativa de esta salida (aparece en Reservas y se le asigna conductor).
+  reservaId String?           @unique
+  reserva   Reserva?          @relation(fields: [reservaId], references: [id], onDelete: SetNull)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  evento    EventoCorporativo @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  cupos     CupoCorporativo[]
+
+  @@index([eventoId])
+}
+
+/// Cupo reservado por un funcionario en un turno.
+model CupoCorporativo {
+  id          String            @id @default(cuid())
+  eventoId    String
+  turnoId     String
+  nombre      String
+  documento   String?
+  email       String
+  telefono    String
+  numeroVuelo String?
+  notas       String?
+  createdAt   DateTime          @default(now())
+  evento      EventoCorporativo @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  turno       TurnoCorporativo  @relation(fields: [turnoId], references: [id], onDelete: Restrict)
+
+  /// Un funcionario = un cupo por evento.
+  @@unique([eventoId, email])
+  @@index([turnoId])
 }
 
 model SiteContent {

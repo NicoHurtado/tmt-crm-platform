@@ -64,6 +64,18 @@ export async function GET(request: Request) {
                 aliado: true,
                 calificacion: true,
                 asistentes: true,
+                // Salidas corporativas: empresa, puestos y la lista de pasajeros (cupos).
+                turnoCorporativo: {
+                    select: {
+                        id: true,
+                        capacidad: true,
+                        evento: { select: { id: true, empresa: true, codigo: true } },
+                        cupos: {
+                            select: { id: true, nombre: true, telefono: true, email: true, numeroVuelo: true },
+                            orderBy: { createdAt: 'asc' },
+                        },
+                    },
+                },
             },
             orderBy: {
                 fecha: 'desc',

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Trash2, Copy, Check, Settings, X, Search, Link, QrCode, ImageIcon } from 'lucide-react'
+import NextLink from 'next/link'
+import { Plus, Trash2, Copy, Check, Settings, X, Search, Link, QrCode, ImageIcon, Pencil, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -48,7 +49,8 @@ interface Aliado {
   activo: boolean
   soloPagoTarjeta?: boolean
   soloPagoEfectivo?: boolean
-  _count?: { reservas: number }
+  corporativoActivo?: boolean
+  _count?: { reservas: number; eventosCorporativos?: number }
 }
 
 const EMPTY_FORM = {
@@ -156,6 +158,21 @@ export default function AliadosPage() {
       if (res.ok) await fetchAliados()
     } catch (error) {
       console.error('Error toggling aliado status:', error)
+    }
+  }
+
+  const handleToggleCorporativo = async (aliado: Aliado) => {
+    // Optimista: el interruptor responde al instante y se revierte si falla.
+    setAliados((prev) => prev.map((a) => (a.id === aliado.id ? { ...a, corporativoActivo: !a.corporativoActivo } : a)))
+    try {
+      const res = await fetch(`/api/aliados/${aliado.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ corporativoActivo: !aliado.corporativoActivo }),
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      setAliados((prev) => prev.map((a) => (a.id === aliado.id ? { ...a, corporativoActivo: aliado.corporativoActivo } : a)))
     }
   }
 
@@ -411,6 +428,8 @@ export default function AliadosPage() {
                 </div>
               </div>
 
+              <CorporativoCelda aliado={aliado} onToggle={() => handleToggleCorporativo(aliado)} className="mt-3 pt-3 border-t border-neutral-100" />
+
               <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-neutral-100">
                 <Button
                   variant="outline"
@@ -459,12 +478,13 @@ export default function AliadosPage() {
           ))}
         </div>
 
-        {/* Escritorio: la tabla de siempre */}
-        <div className="hidden lg:block border border-neutral-200 rounded-lg overflow-hidden bg-white">
+        {/* Escritorio: cada acción va en su propia columna con su nombre en el encabezado,
+            para que se entienda qué hace cada botón sin pasar el mouse por encima. */}
+        <div className="hidden lg:block border border-neutral-200 rounded-lg overflow-x-auto bg-white">
           <Table>
             <TableHeader>
               <TableRow className="bg-neutral-50 hover:bg-neutral-50">
-                {['Nombre', 'Tipo', 'Código', 'Email', 'Contacto', 'Reservas', 'Estado', 'Acciones'].map((h) => (
+                {['Nombre', 'Tipo', 'Código', 'Email', 'Contacto', 'Reservas', 'Estado', 'Corporativo (cupos)', 'Editar', 'Precios', 'Link aliado', 'QR', 'Link público', 'Eliminar'].map((h) => (
                   <TableHead
                     key={h}
                     className="text-xs font-semibold text-neutral-500 py-2.5 first:pl-5 last:pr-5 whitespace-nowrap"
@@ -517,7 +537,7 @@ export default function AliadosPage() {
                     </div>
                   </TableCell>
                   <TableCell className="py-3">
-                    <span className="text-xs text-neutral-600">{aliado.email}</span>
+                    <span className="text-xs text-neutral-600 block max-w-[200px] truncate" title={aliado.email}>{aliado.email}</span>
                   </TableCell>
                   <TableCell className="py-3">
                     <span className="text-xs text-neutral-600">{aliado.contacto}</span>
@@ -526,75 +546,54 @@ export default function AliadosPage() {
                     <span className="text-xs text-neutral-500">{aliado._count?.reservas ?? 0}</span>
                   </TableCell>
                   <TableCell className="py-3">
-                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded border ${
-                      aliado.activo
-                        ? 'bg-green-50 text-green-700 border-green-200'
-                        : 'bg-neutral-100 text-neutral-500 border-neutral-200'
-                    }`}>
-                      {aliado.activo ? 'Activo' : 'Inactivo'}
-                    </span>
+                    <label className="flex items-center gap-2 cursor-pointer" title={aliado.activo ? 'Desactivar aliado' : 'Activar aliado'}>
+                      <Switch checked={aliado.activo} onCheckedChange={() => handleToggleActivo(aliado)} />
+                      <span className={`text-[11px] font-medium ${aliado.activo ? 'text-green-700' : 'text-neutral-500'}`}>
+                        {aliado.activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </label>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <CorporativoCelda aliado={aliado} onToggle={() => handleToggleCorporativo(aliado)} />
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <AccionBtn onClick={() => openEdit(aliado)} icon={<Pencil size={13} />} label="Editar" />
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <AccionBtn
+                      onClick={() => {
+                        setConfiguringAliadoId(aliado.id)
+                        setConfigDialogOpen(true)
+                      }}
+                      icon={<Settings size={13} />}
+                      label="Precios"
+                    />
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <AccionBtn
+                      onClick={() => handleGenerarLink(aliado.id)}
+                      disabled={generatingLinkId === aliado.id}
+                      icon={<Link size={13} />}
+                      label="Generar"
+                    />
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <AccionBtn onClick={() => setQrAliado(aliado)} icon={<QrCode size={13} />} label="Ver QR" />
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <AccionBtn
+                      onClick={() => copyLink(aliado.codigo)}
+                      icon={copiedCodigo === `LINK-${aliado.codigo}` ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
+                      label={copiedCodigo === `LINK-${aliado.codigo}` ? 'Copiado' : 'Copiar'}
+                    />
                   </TableCell>
                   <TableCell className="py-3 pr-5">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => openEdit(aliado)}
-                        className="px-2.5 py-1.5 rounded text-xs font-medium text-neutral-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => {
-                          setConfiguringAliadoId(aliado.id)
-                          setConfigDialogOpen(true)
-                        }}
-                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-                        title="Configurar precios"
-                      >
-                        <Settings size={13} />
-                      </button>
-                      <button
-                        onClick={() => handleGenerarLink(aliado.id)}
-                        disabled={generatingLinkId === aliado.id}
-                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
-                        title="Generar link de aliado"
-                      >
-                        <Link size={13} />
-                      </button>
-                      <button
-                        onClick={() => setQrAliado(aliado)}
-                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                        title="QR del perfil del aliado"
-                      >
-                        <QrCode size={13} />
-                      </button>
-                      <button
-                        onClick={() => copyLink(aliado.codigo)}
-                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-                        title="Copiar link público"
-                      >
-                        {copiedCodigo === `LINK-${aliado.codigo}`
-                          ? <Check size={13} className="text-green-600" />
-                          : <Copy size={13} />}
-                      </button>
-                      <button
-                        onClick={() => handleToggleActivo(aliado)}
-                        className={`area-tactil-completa p-1.5 rounded transition-colors ${
-                          aliado.activo
-                            ? 'text-green-600 hover:bg-green-50'
-                            : 'text-red-400 hover:bg-red-50'
-                        }`}
-                        title={aliado.activo ? 'Desactivar' : 'Activar'}
-                      >
-                        {aliado.activo ? <Check size={13} /> : <X size={13} />}
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(aliado)}
-                        className="area-tactil-completa p-1.5 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Eliminar"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
+                    <AccionBtn
+                      onClick={() => setDeleteTarget(aliado)}
+                      icon={<Trash2 size={13} />}
+                      label="Eliminar"
+                      peligro
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -840,6 +839,70 @@ export default function AliadosPage() {
         onClose={() => setQrAliado(null)}
         aliado={qrAliado ? { nombre: qrAliado.nombre, codigo: qrAliado.codigo } : null}
       />
+    </div>
+  )
+}
+
+function AccionBtn({
+  onClick,
+  icon,
+  label,
+  disabled,
+  peligro,
+}: {
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+  disabled?: boolean
+  peligro?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-40 ${
+        peligro ? 'text-neutral-500 hover:text-red-600 hover:bg-red-50' : 'text-neutral-600 hover:text-amber-700 hover:bg-amber-50'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+}
+
+/**
+ * Servicio corporativo por cupos: interruptor + acceso a su configuración (horas,
+ * precio por persona de cada hora y link para compartir con los funcionarios).
+ */
+function CorporativoCelda({
+  aliado,
+  onToggle,
+  className = '',
+}: {
+  aliado: Aliado
+  onToggle: () => void
+  className?: string
+}) {
+  const activo = !!aliado.corporativoActivo
+  const eventos = aliado._count?.eventosCorporativos ?? 0
+  return (
+    <div className={`flex flex-col gap-1 ${className}`}>
+      <label className="flex items-center gap-2 cursor-pointer">
+        <Switch checked={activo} onCheckedChange={onToggle} aria-label="Servicio corporativo por cupos" />
+        <span className={`text-[11px] font-medium whitespace-nowrap ${activo ? 'text-amber-700' : 'text-neutral-400'}`}>
+          <span className="lg:hidden">Corporativo (cupos): </span>
+          {activo ? 'Activado' : 'Desactivado'}
+        </span>
+      </label>
+      {activo && (
+        <NextLink
+          href={`/admin/dashboard/corporativo?aliado=${aliado.id}`}
+          className="inline-flex items-center gap-1 text-[11px] text-amber-700 hover:underline whitespace-nowrap"
+        >
+          <Building2 size={11} />
+          {eventos > 0 ? 'Configurar horas, precios y link' : 'Crear horas, precios y link'}
+        </NextLink>
+      )}
     </div>
   )
 }

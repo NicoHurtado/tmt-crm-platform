@@ -428,6 +428,21 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
             </div>
 
             <div className="px-6 py-6">
+                {reserva.turnoCorporativo && (
+                    <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+                        <p className="text-sm text-indigo-800">
+                            <strong>Salida corporativa · {reserva.turnoCorporativo.evento.empresa}</strong>
+                            {' · '}{reserva.turnoCorporativo._count.cupos} de {reserva.turnoCorporativo.capacidad} puestos reservados.
+                            {' '}Pasajeros y total se actualizan solos con los cupos.
+                        </p>
+                        <a
+                            href={`/admin/dashboard/corporativo/${reserva.turnoCorporativo.evento.id}`}
+                            className="text-xs font-medium text-indigo-700 underline underline-offset-2"
+                        >
+                            Gestionar cupos, horas y precios
+                        </a>
+                    </div>
+                )}
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
 
                     {/* ── Left Column ── */}

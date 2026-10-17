@@ -23,6 +23,13 @@ export async function GET(
                 calificacion: true,
                 aliado: true,
                 asistentes: true,
+                turnoCorporativo: {
+                    select: {
+                        capacidad: true,
+                        evento: { select: { id: true, empresa: true } },
+                        _count: { select: { cupos: true } },
+                    },
+                },
             },
         });
 

@@ -101,6 +101,9 @@ export default function Footer() {
 
                 <div className="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
                     <p>&copy; {new Date().getFullYear()} Transportes Medellín Travel. {t('landing.footer_derechos', language)}</p>
+                    <Link href="/corporativo" className="mt-2 inline-block text-xs text-gray-600 hover:text-[#D6A75D] transition-colors">
+                        Acceso corporativo
+                    </Link>
                 </div>
             </div>
         </footer>
