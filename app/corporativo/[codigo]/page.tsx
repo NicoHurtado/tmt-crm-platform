@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
-import ReservaCupoCorporativo, { type TurnoPublico } from './ReservaCupoCorporativo';
+import ReservaCupoCorporativo from './ReservaCupoCorporativo';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: { codigo: string } 
     });
     if (!evento) return { title: 'Transportes Medellín Travel', robots: { index: false, follow: false } };
     const title = `${evento.empresa} · Reserva tu cupo de transporte`;
-    const description = `${evento.titulo}: ${evento.origen} → ${evento.destino}. Escoge la hora que mejor se ajuste a tu vuelo. Sin costo para ti.`;
+    const description = `${evento.titulo}: ${evento.origen} → ${evento.destino}. Escoge el día y la hora que mejor se ajusten a tu vuelo. Sin costo para ti.`;
     return {
         title,
         description,
@@ -27,29 +27,15 @@ export default async function EventoCorporativoPage({ params }: { params: { codi
         where: { codigo: params.codigo },
         include: {
             aliado: { select: { corporativoActivo: true } },
-            turnos: {
-                where: { activo: true },
-                orderBy: { fechaHora: 'asc' },
-                include: { _count: { select: { cupos: true } } },
-            },
+            _count: { select: { horarios: { where: { activo: true } } } },
         },
     });
     if (!evento) notFound();
 
-    const ahora = Date.now();
-    const turnos: TurnoPublico[] = evento.turnos.map((t) => ({
-        id: t.id,
-        fechaHora: t.fechaHora.toISOString(),
-        capacidad: t.capacidad,
-        disponibles: Math.max(0, t.capacidad - t._count.cupos),
-        vehiculo: t.vehiculo,
-        yaSalio: t.fechaHora.getTime() < ahora,
-    }));
-
     return (
         <ReservaCupoCorporativo
             codigo={evento.codigo}
-            activo={evento.activo && (evento.aliado ? evento.aliado.corporativoActivo : true)}
+            activo={evento.activo && (evento.aliado ? evento.aliado.corporativoActivo : true) && evento._count.horarios > 0}
             empresa={evento.empresa}
             titulo={evento.titulo}
             descripcion={evento.descripcion}
@@ -57,7 +43,7 @@ export default async function EventoCorporativoPage({ params }: { params: { codi
             destino={evento.destino}
             aeropuertoNombre={evento.aeropuertoNombre}
             aeropuertoTipo={evento.aeropuertoTipo}
-            turnos={turnos}
+            reglas={{ fechaDesde: evento.fechaDesde, fechaHasta: evento.fechaHasta, diasSemana: evento.diasSemana }}
         />
     );
 }

@@ -1,20 +1,30 @@
 import { randomInt } from 'crypto';
 import { AeropuertoNombre, AeropuertoTipo, EstadoReserva, Idioma, MetodoPago, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { TZ_COLOMBIA, partesColombia, ladoCiudad, etiquetaRuta } from '@/lib/corporativo-horarios';
+import {
+    TZ_COLOMBIA,
+    partesColombia,
+    ladoCiudad,
+    etiquetaRuta,
+    fechaReservable,
+    type ReglasDisponibilidad,
+} from '@/lib/corporativo-horarios';
 import { categoriaDeServicio, modeloPrecioDeServicio } from '@/lib/servicio-categoria';
 
 /**
  * Servicio corporativo por cupos.
  *
- * Un aliado con `corporativoActivo` tiene uno o más eventos. Cada evento publica un link
- * (`/corporativo/<codigo>`) donde sus funcionarios escogen una hora de salida (turno) y
- * reservan su puesto. No pagan: se factura a la empresa = Σ cupos × precio de su hora.
+ * Un aliado con `corporativoActivo` tiene uno o más eventos (un link por aeropuerto +
+ * sentido). Cada evento tiene un **horario diario** (`HorarioCorporativo`: las horas que se
+ * repiten cada día, con puestos y precio) y una disponibilidad (rango de fechas y días de
+ * la semana). El funcionario escoge **fecha** y **hora** y reserva su puesto.
  *
- * Cada turno es UN vehículo, así que tiene su propia `Reserva` (origen `corporativo:<codigo>`):
- * así aparece en Reservas/Calendario, se le asigna conductor y queda ligada al aliado.
- * Esa reserva la mantiene `sincronizarReservaDeTurno` — pasajeros, precio y lista de
- * nombres se recalculan cada vez que cambia un cupo o el turno.
+ * La salida concreta de esa fecha/hora (`TurnoCorporativo`) se crea al reservar el primer
+ * cupo y desaparece si se liberan todos. Cada salida es UN vehículo con su propia `Reserva`
+ * (origen `corporativo:<codigo>`): aparece en Reservas, se le asigna conductor y queda
+ * ligada al aliado. `sincronizarReservaDeTurno` mantiene pasajeros, total y lista de nombres.
+ *
+ * No hay pago: se factura a la empresa = Σ cupos × precio de su salida.
  */
 
 export { partesColombia };
@@ -23,13 +33,19 @@ export const PREFIJO_ORIGEN = 'corporativo:';
 type Tx = Prisma.TransactionClient;
 const TX_OPTS = { timeout: 20000, maxWait: 10000 };
 
+export class CupoError extends Error {
+    constructor(message: string, public status = 400) {
+        super(message);
+    }
+}
+
 /** Colombia no tiene horario de verano: siempre UTC-5. */
 export function fechaHoraColombia(fecha: string, hora: string): Date {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !/^\d{2}:\d{2}$/.test(hora)) {
         throw new CupoError('Fecha u hora inválida');
     }
     const d = new Date(`${fecha}T${hora}:00-05:00`);
-    if (isNaN(d.getTime())) throw new CupoError('Fecha u hora inválida');
+    if (isNaN(d.getTime()) || partesColombia(d).fecha !== fecha) throw new CupoError('Fecha u hora inválida');
     return d;
 }
 
@@ -44,8 +60,8 @@ export function slugify(texto: string): string {
 }
 
 /**
- * Código del link a partir del nombre (ej. `lovelytics`). Si ya está tomado se le agrega
- * `-2`, `-3`… para que el link siga siendo legible.
+ * Código del link a partir del nombre (ej. `lovelytics-jmc-bajada`). Si ya está tomado se
+ * le agrega `-2`, `-3`… para que el link siga siendo legible.
  */
 export async function codigoEventoDisponible(base: string, excluirEventoId?: string): Promise<string> {
     const raiz = slugify(base) || 'evento';
@@ -73,16 +89,6 @@ export function parseSentido(v: unknown): AeropuertoTipo {
     throw new CupoError('Sentido inválido (bajada o subida)');
 }
 
-export interface TurnoInput {
-    id?: string;
-    fecha: string;
-    hora: string;
-    capacidad?: number;
-    vehiculo?: string | null;
-    activo?: boolean;
-    precioPorPersona?: number | null;
-}
-
 export function parsePrecio(v: unknown, campo = 'Precio por persona'): number | null {
     if (v === undefined || v === null || v === '') return null;
     const n = Number(v);
@@ -90,30 +96,64 @@ export function parsePrecio(v: unknown, campo = 'Precio por persona'): number | 
     return n;
 }
 
-export function parseTurnos(raw: unknown): TurnoInput[] {
+// ─── Horario diario y disponibilidad ─────────────────────────────────────────
+
+export interface HorarioInput {
+    id?: string;
+    hora: string;
+    capacidad: number;
+    precioPorPersona: number | null;
+    vehiculo: string | null;
+    activo: boolean;
+}
+
+export function parseHorarios(raw: unknown): HorarioInput[] {
     if (!Array.isArray(raw)) return [];
-    return raw.map((t) => {
-        const capacidad = Number(t?.capacidad ?? 14);
+    const horas = new Set<string>();
+    return raw.map((h) => {
+        const hora = String(h?.hora ?? '');
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) throw new CupoError(`Hora inválida: ${hora || '(vacía)'}`);
+        if (horas.has(hora)) throw new CupoError(`La hora ${hora} está repetida`);
+        horas.add(hora);
+        const capacidad = Number(h?.capacidad ?? 15);
         if (!Number.isInteger(capacidad) || capacidad < 1 || capacidad > 100) {
-            throw new CupoError('Capacidad inválida (1–100)');
+            throw new CupoError('Puestos inválidos (1–100)');
         }
         return {
-            id: typeof t?.id === 'string' ? t.id : undefined,
-            fecha: String(t?.fecha ?? ''),
-            hora: String(t?.hora ?? ''),
+            id: typeof h?.id === 'string' && h.id ? h.id : undefined,
+            hora,
             capacidad,
-            vehiculo: t?.vehiculo ? String(t.vehiculo).trim() : null,
-            activo: t?.activo !== undefined ? Boolean(t.activo) : true,
-            precioPorPersona: parsePrecio(t?.precioPorPersona, 'Precio de la hora'),
+            precioPorPersona: parsePrecio(h?.precioPorPersona, `Precio de las ${hora}`),
+            vehiculo: h?.vehiculo ? String(h.vehiculo).trim() : null,
+            activo: h?.activo !== undefined ? Boolean(h.activo) : true,
         };
     });
 }
 
-export class CupoError extends Error {
-    constructor(message: string, public status = 400) {
-        super(message);
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function parseDisponibilidad(body: any): Partial<ReglasDisponibilidad> {
+    const out: Partial<ReglasDisponibilidad> = {};
+    for (const k of ['fechaDesde', 'fechaHasta'] as const) {
+        if (body[k] === undefined) continue;
+        const v = body[k] ? String(body[k]) : null;
+        if (v && !FECHA_RE.test(v)) throw new CupoError('Fecha de disponibilidad inválida');
+        out[k] = v;
     }
+    if (out.fechaDesde && out.fechaHasta && out.fechaDesde > out.fechaHasta) {
+        throw new CupoError('La fecha "desde" no puede ser después de "hasta"');
+    }
+    if (body.diasSemana !== undefined) {
+        const dias = Array.isArray(body.diasSemana) ? body.diasSemana.map(Number) : [];
+        if (dias.length === 0 || dias.some((d: number) => !Number.isInteger(d) || d < 0 || d > 6)) {
+            throw new CupoError('Escoge al menos un día de la semana');
+        }
+        out.diasSemana = Array.from(new Set<number>(dias)).sort();
+    }
+    return out;
 }
+
+// ─── Cupos ───────────────────────────────────────────────────────────────────
 
 export interface CupoInput {
     nombre: string;
@@ -145,13 +185,21 @@ export function parseCupo(body: any): CupoInput {
     };
 }
 
-/** Precio por persona efectivo de un turno (el de la hora o, si no tiene, el del evento). */
+/** Precio por persona efectivo de una salida (el suyo o, si no tiene, el del evento). */
 export function precioDeTurno(turno: { precioPorPersona: number | null }, evento: { precioPorPersona: number }) {
     return turno.precioPorPersona ?? evento.precioPorPersona;
 }
 
 export function formatHoraColombia(d: Date | string, opts: Intl.DateTimeFormatOptions = {}) {
     return new Date(d).toLocaleString('es-CO', { timeZone: TZ_COLOMBIA, ...opts });
+}
+
+/** Total a facturar: cada cupo al precio de su salida. */
+export function totalFacturar(
+    evento: { precioPorPersona: number },
+    turnos: { precioPorPersona: number | null; cupos: number }[]
+) {
+    return turnos.reduce((s, t) => s + t.cupos * precioDeTurno(t, evento), 0);
 }
 
 // ─── Reserva operativa de cada salida ────────────────────────────────────────
@@ -180,9 +228,9 @@ async function servicioParaEvento(tx: Tx, servicioId: string | null) {
 }
 
 /**
- * Crea o actualiza la `Reserva` de un turno a partir de su estado actual (evento, aliado,
- * cupos). No toca estado, conductor ni vehículo: eso lo maneja la operación normal.
- * Un turno oculto y sin cupos no necesita carro: su reserva se borra si aún no se asignó.
+ * Pone la `Reserva` de una salida al día con sus cupos. Sin cupos, la salida no necesita
+ * carro: se borran la reserva (si nadie la tomó aún) y la salida. No toca estado,
+ * conductor ni vehículo: eso lo maneja la operación normal.
  */
 export async function sincronizarReservaDeTurno(tx: Tx, turnoId: string) {
     const turno = await tx.turnoCorporativo.findUnique({
@@ -190,17 +238,22 @@ export async function sincronizarReservaDeTurno(tx: Tx, turnoId: string) {
         include: {
             evento: { include: { aliado: true } },
             cupos: { orderBy: { createdAt: 'asc' } },
-            reserva: { select: { id: true, estado: true } },
+            reserva: { select: { id: true, estado: true, conductorId: true } },
         },
     });
     if (!turno) return;
     const { evento } = turno;
 
-    if (!turno.activo && turno.cupos.length === 0) {
-        if (turno.reserva && turno.reserva.estado === EstadoReserva.CONFIRMED_UNASSIGNED) {
+    if (turno.cupos.length === 0) {
+        const libre =
+            !turno.reserva ||
+            (turno.reserva.estado === EstadoReserva.CONFIRMED_UNASSIGNED && !turno.reserva.conductorId);
+        if (!libre) return; // ya tiene conductor: se deja para que el admin decida
+        if (turno.reserva) {
             await tx.turnoCorporativo.update({ where: { id: turno.id }, data: { reservaId: null } });
             await tx.reserva.delete({ where: { id: turno.reserva.id } });
         }
+        await tx.turnoCorporativo.delete({ where: { id: turno.id } });
         return;
     }
 
@@ -214,8 +267,7 @@ export async function sincronizarReservaDeTurno(tx: Tx, turnoId: string) {
         .join('\n');
     const notas =
         `Corporativo ${evento.empresa} · ${etiquetaRuta(evento.aeropuertoNombre, evento.aeropuertoTipo)} · ${evento.origen} → ${evento.destino}\n` +
-        `Vehículo: ${turno.vehiculo || '—'} · Pasajeros ${turno.cupos.length}/${turno.capacidad}` +
-        (lista ? `\n${lista}` : '\nAún sin pasajeros');
+        `Vehículo: ${turno.vehiculo || '—'} · Pasajeros ${turno.cupos.length}/${turno.capacidad}\n${lista}`;
 
     const data = {
         servicioId: servicio.id,
@@ -263,7 +315,7 @@ export async function sincronizarReservaDeTurno(tx: Tx, turnoId: string) {
             comisionAliado: 0,
             comisionBold: 0,
             estado: EstadoReserva.CONFIRMED_UNASSIGNED,
-            // Nadie paga al conductor: se factura a la empresa.
+            // Nadie le paga al conductor: se factura a la empresa.
             metodoPago: MetodoPago.EFECTIVO,
             clientePaga: false,
         },
@@ -271,91 +323,155 @@ export async function sincronizarReservaDeTurno(tx: Tx, turnoId: string) {
     await tx.turnoCorporativo.update({ where: { id: turno.id }, data: { reservaId: reserva.id } });
 }
 
-/** Reservas que ya están en curso o terminadas no se borran ni se mueven desde aquí. */
+/** Reservas que ya están en curso o terminadas no se borran desde aquí. */
 const ESTADOS_INTOCABLES: EstadoReserva[] = [EstadoReserva.IN_PROGRESS, EstadoReserva.COMPLETED];
 
-async function borrarReservasDeTurnos(tx: Tx, turnoIds: string[]) {
-    if (turnoIds.length === 0) return;
-    const turnos = await tx.turnoCorporativo.findMany({
-        where: { id: { in: turnoIds }, reservaId: { not: null } },
-        include: { reserva: { select: { id: true, estado: true, codigo: true } } },
+// ─── Salidas por fecha + hora ────────────────────────────────────────────────
+
+type HorarioConEvento = Prisma.HorarioCorporativoGetPayload<{
+    include: { evento: { include: { aliado: { select: { corporativoActivo: true } } } } };
+}>;
+
+async function cargarHorario(horarioId: string): Promise<HorarioConEvento> {
+    const horario = await prisma.horarioCorporativo.findUnique({
+        where: { id: horarioId },
+        include: { evento: { include: { aliado: { select: { corporativoActivo: true } } } } },
     });
-    const bloqueada = turnos.find((t) => t.reserva && ESTADOS_INTOCABLES.includes(t.reserva.estado));
-    if (bloqueada) {
-        throw new CupoError(`La salida con reserva ${bloqueada.reserva!.codigo} ya está en curso o completada`);
-    }
-    const ids = turnos.map((t) => t.reserva!.id);
-    await tx.turnoCorporativo.updateMany({ where: { id: { in: turnoIds } }, data: { reservaId: null } });
-    await tx.reserva.deleteMany({ where: { id: { in: ids } } });
+    if (!horario) throw new CupoError('Hora no encontrada', 404);
+    return horario;
 }
-
-export async function sincronizarEvento(tx: Tx, eventoId: string) {
-    const turnos = await tx.turnoCorporativo.findMany({ where: { eventoId }, select: { id: true } });
-    for (const t of turnos) await sincronizarReservaDeTurno(tx, t.id);
-}
-
-/** Recalcula todas las reservas de un evento (tras cambiar precio, empresa, servicio…). */
-export function resincronizarEvento(eventoId: string) {
-    return prisma.$transaction((tx) => sincronizarEvento(tx, eventoId), TX_OPTS);
-}
-
-// ─── Cupos ───────────────────────────────────────────────────────────────────
 
 /**
- * Reserva (o mueve) un cupo en un turno sin sobrevender: bloquea la fila del turno
- * (`FOR UPDATE`) antes de contar, así dos funcionarios que reservan a la vez el último
- * puesto no quedan ambos adentro.
+ * Devuelve la salida de `fecha` + hora del horario, creándola si es la primera reserva de
+ * ese día/hora (con foto de puestos, precio y vehículo). Dos reservas simultáneas no crean
+ * dos salidas: el índice único (evento, fechaHora) hace que la segunda reutilice la primera.
  */
-export async function asignarCupoEnTurno(
+async function salidaParaFecha(horario: HorarioConEvento, fecha: string) {
+    const fechaHora = fechaHoraColombia(fecha, horario.hora);
+    const where = { eventoId_fechaHora: { eventoId: horario.eventoId, fechaHora } };
+    const existente = await prisma.turnoCorporativo.findUnique({ where });
+    if (existente) return existente;
+    try {
+        return await prisma.turnoCorporativo.create({
+            data: {
+                eventoId: horario.eventoId,
+                horarioId: horario.id,
+                fechaHora,
+                capacidad: horario.capacidad,
+                precioPorPersona: horario.precioPorPersona ?? horario.evento.precioPorPersona,
+                vehiculo: horario.vehiculo,
+            },
+        });
+    } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+            return prisma.turnoCorporativo.findUniqueOrThrow({ where });
+        }
+        throw e;
+    }
+}
+
+/**
+ * Mete un cupo en una salida sin sobrevender: bloquea la fila de la salida (`FOR UPDATE`)
+ * antes de contar, así dos personas que reservan a la vez el último puesto no quedan ambas.
+ */
+async function ocuparSalida(
     turnoId: string,
-    opts: { crear?: { eventoId: string; datos: CupoInput }; moverCupoId?: string; validarPublico?: boolean }
+    accion: { crear: { eventoId: string; datos: CupoInput } } | { moverCupoId: string }
 ) {
     return prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT id FROM "TurnoCorporativo" WHERE id = ${turnoId} FOR UPDATE`;
         const turno = await tx.turnoCorporativo.findUnique({
             where: { id: turnoId },
-            include: {
-                _count: { select: { cupos: true } },
-                evento: { select: { id: true, activo: true, aliado: { select: { corporativoActivo: true } } } },
-            },
+            include: { _count: { select: { cupos: true } } },
         });
-        if (!turno) throw new CupoError('Turno no encontrado', 404);
-        if (opts.validarPublico) {
-            const aliadoOk = turno.evento.aliado ? turno.evento.aliado.corporativoActivo : true;
-            if (!turno.evento.activo || !turno.activo || !aliadoOk) throw new CupoError('Este turno no está disponible');
-            if (turno.fechaHora.getTime() < Date.now()) throw new CupoError('Este turno ya salió');
-        }
+        if (!turno) throw new CupoError('La salida ya no existe, intenta de nuevo', 409);
         if (turno._count.cupos >= turno.capacidad) {
-            throw new CupoError('Este turno ya está lleno, escoge otra hora', 409);
+            throw new CupoError('Esta hora ya está llena, escoge otra', 409);
         }
 
-        if (opts.moverCupoId) {
-            const cupo = await tx.cupoCorporativo.findUnique({ where: { id: opts.moverCupoId } });
+        if ('moverCupoId' in accion) {
+            const cupo = await tx.cupoCorporativo.findUnique({ where: { id: accion.moverCupoId } });
             if (!cupo) throw new CupoError('Cupo no encontrado', 404);
-            if (cupo.eventoId !== turno.eventoId) throw new CupoError('El turno es de otro evento');
+            if (cupo.eventoId !== turno.eventoId) throw new CupoError('La hora es de otro evento');
             if (cupo.turnoId === turnoId) return cupo;
             const movido = await tx.cupoCorporativo.update({ where: { id: cupo.id }, data: { turnoId } });
-            await sincronizarReservaDeTurno(tx, cupo.turnoId);
             await sincronizarReservaDeTurno(tx, turnoId);
+            await sincronizarReservaDeTurno(tx, cupo.turnoId);
             return movido;
         }
 
-        const { eventoId, datos } = opts.crear!;
-        if (turno.eventoId !== eventoId) throw new CupoError('El turno es de otro evento');
+        const { eventoId, datos } = accion.crear;
+        if (turno.eventoId !== eventoId) throw new CupoError('La hora es de otro evento');
         const existente = await tx.cupoCorporativo.findUnique({
             where: { eventoId_email: { eventoId, email: datos.email } },
-            select: { id: true },
+            include: { turno: { select: { fechaHora: true } } },
         });
-        if (existente) throw new CupoError('Ya hay un cupo reservado con este email para este evento', 409);
+        if (existente) {
+            const cuando = formatHoraColombia(existente.turno.fechaHora, {
+                day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: true,
+            });
+            throw new CupoError(`Ya tienes un cupo reservado con este correo (${cuando}). Si cambió tu vuelo, escríbenos.`, 409);
+        }
         const cupo = await tx.cupoCorporativo.create({ data: { ...datos, eventoId, turnoId } });
         await sincronizarReservaDeTurno(tx, turnoId);
         return cupo;
-    }, TX_OPTS).catch((e) => {
+    }, TX_OPTS).catch(async (e) => {
+        // Si la salida quedó vacía porque la transacción falló justo al crearla, se limpia.
+        await limpiarSalidaVacia(turnoId);
         if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-            throw new CupoError('Ya hay un cupo reservado con este email para este evento', 409);
+            throw new CupoError('Ya hay un cupo reservado con este correo para este servicio', 409);
         }
         throw e;
     });
+}
+
+async function limpiarSalidaVacia(turnoId: string) {
+    try {
+        await prisma.$transaction((tx) => sincronizarReservaDeTurno(tx, turnoId), TX_OPTS);
+    } catch {
+        /* no bloqueante */
+    }
+}
+
+export interface ReservaCupoInput {
+    horarioId: string;
+    fecha: string;
+    datos: CupoInput;
+}
+
+/** Reserva de un funcionario desde el link público: valida fecha, hora y disponibilidad. */
+export async function reservarCupoPublico(codigo: string, { horarioId, fecha, datos }: ReservaCupoInput) {
+    const horario = await cargarHorario(horarioId);
+    const { evento } = horario;
+    if (evento.codigo !== codigo) throw new CupoError('Hora no encontrada', 404);
+    const aliadoOk = evento.aliado ? evento.aliado.corporativoActivo : true;
+    if (!evento.activo || !aliadoOk) throw new CupoError('Este link ya no está disponible', 404);
+    if (!horario.activo) throw new CupoError('Esa hora ya no está disponible');
+    if (!fechaReservable(fecha, evento)) throw new CupoError('No se puede reservar para esa fecha');
+    if (fechaHoraColombia(fecha, horario.hora).getTime() <= Date.now()) {
+        throw new CupoError('Esa hora ya pasó, escoge otra');
+    }
+    const salida = await salidaParaFecha(horario, fecha);
+    const cupo = await ocuparSalida(salida.id, { crear: { eventoId: evento.id, datos } });
+    return { cupo, evento, salida };
+}
+
+/** El admin agrega un pasajero a mano (sin restricciones de fecha ni de link abierto). */
+export async function agregarCupoAdmin(eventoId: string, { horarioId, fecha, datos }: ReservaCupoInput) {
+    const horario = await cargarHorario(horarioId);
+    if (horario.eventoId !== eventoId) throw new CupoError('La hora es de otro evento');
+    const salida = await salidaParaFecha(horario, fecha);
+    return ocuparSalida(salida.id, { crear: { eventoId, datos } });
+}
+
+/** Mueve un pasajero a otra fecha y/o hora del mismo evento. */
+export async function moverCupo(cupoId: string, horarioId: string, fecha: string) {
+    const horario = await cargarHorario(horarioId);
+    const cupo = await prisma.cupoCorporativo.findUnique({ where: { id: cupoId } });
+    if (!cupo) throw new CupoError('Cupo no encontrado', 404);
+    if (cupo.eventoId !== horario.eventoId) throw new CupoError('La hora es de otro evento');
+    const salida = await salidaParaFecha(horario, fecha);
+    return ocuparSalida(salida.id, { moverCupoId: cupoId });
 }
 
 export async function eliminarCupo(cupoId: string) {
@@ -365,93 +481,107 @@ export async function eliminarCupo(cupoId: string) {
     }, TX_OPTS);
 }
 
-// ─── Turnos y eventos ────────────────────────────────────────────────────────
+// ─── Configuración del evento ────────────────────────────────────────────────
 
-const dataTurno = (t: TurnoInput) => ({
-    fechaHora: fechaHoraColombia(t.fecha, t.hora),
-    capacidad: t.capacidad ?? 14,
-    vehiculo: t.vehiculo ?? null,
-    activo: t.activo ?? true,
-    precioPorPersona: t.precioPorPersona ?? null,
-});
-
-/** Crea los turnos iniciales de un evento recién creado (con su reserva cada uno). */
-export async function crearTurnos(eventoId: string, turnos: TurnoInput[]) {
-    await prisma.$transaction(async (tx) => {
-        for (const t of turnos) {
-            const creado = await tx.turnoCorporativo.create({ data: { ...dataTurno(t), eventoId } });
-            await sincronizarReservaDeTurno(tx, creado.id);
-        }
-    }, TX_OPTS);
+/** Crea el horario diario de un evento recién creado. */
+export async function crearHorarios(eventoId: string, horarios: HorarioInput[]) {
+    if (horarios.length === 0) return;
+    await prisma.horarioCorporativo.createMany({
+        data: horarios.map(({ id: _id, ...h }) => ({ ...h, eventoId })),
+    });
 }
 
 /**
- * Sincroniza los turnos de un evento con la lista editada en el admin:
- * actualiza los existentes, crea los nuevos y borra los que se quitaron
- * (solo si no tienen cupos). No deja bajar la capacidad por debajo de lo reservado.
- * Después recalcula la reserva de cada salida.
+ * Aplica el horario diario editado en el admin (crear, editar, quitar horas) y pasa los
+ * cambios de puestos, precio y vehículo a las salidas que aún no han salido. Las salidas
+ * pasadas conservan su precio, para que la facturación no cambie hacia atrás.
  */
-export async function sincronizarTurnos(eventoId: string, turnos: TurnoInput[]) {
-    const actuales = await prisma.turnoCorporativo.findMany({
-        where: { eventoId },
-        include: { _count: { select: { cupos: true } } },
-    });
-    const idsEnviados = new Set(turnos.filter((t) => t.id).map((t) => t.id!));
-
-    for (const t of actuales) {
-        if (!idsEnviados.has(t.id) && t._count.cupos > 0) {
-            throw new CupoError(
-                `No se puede eliminar un horario con ${t._count.cupos} cupo(s) reservado(s). Mueve o elimina esos cupos primero.`
-            );
-        }
-    }
-    for (const t of turnos) {
-        if (!t.id) continue;
-        const actual = actuales.find((a) => a.id === t.id);
-        if (!actual) throw new CupoError('Horario no pertenece a este evento');
-        if ((t.capacidad ?? 14) < actual._count.cupos) {
-            throw new CupoError(`La capacidad no puede ser menor a los ${actual._count.cupos} cupos ya reservados`);
-        }
-    }
-
+export async function guardarHorarios(eventoId: string, horarios: HorarioInput[] | undefined) {
+    const ahora = new Date();
     await prisma.$transaction(async (tx) => {
-        const quitados = actuales.filter((a) => !idsEnviados.has(a.id)).map((a) => a.id);
-        await borrarReservasDeTurnos(tx, quitados);
-        await tx.turnoCorporativo.deleteMany({ where: { id: { in: quitados } } });
-        for (const t of turnos) {
-            if (t.id) await tx.turnoCorporativo.update({ where: { id: t.id }, data: dataTurno(t) });
-            else await tx.turnoCorporativo.create({ data: { ...dataTurno(t), eventoId } });
+        if (horarios) {
+            const actuales = await tx.horarioCorporativo.findMany({
+                where: { eventoId },
+                include: { turnos: { where: { fechaHora: { gte: ahora } }, include: { _count: { select: { cupos: true } } } } },
+            });
+            const enviados = new Set(horarios.filter((h) => h.id).map((h) => h.id!));
+            for (const a of actuales) {
+                const futuros = a.turnos.reduce((s, t) => s + t._count.cupos, 0);
+                const nuevo = horarios.find((h) => h.id === a.id);
+                if (!nuevo && futuros > 0) {
+                    throw new CupoError(`Las ${a.hora} tienen ${futuros} cupo(s) en fechas próximas: muévelos o libéralos antes de quitar esa hora`);
+                }
+                if (nuevo && nuevo.hora !== a.hora && futuros > 0) {
+                    throw new CupoError(`Las ${a.hora} tienen cupos en fechas próximas: no se puede cambiar la hora (crea una hora nueva)`);
+                }
+                if (nuevo) {
+                    const maxOcupado = Math.max(0, ...a.turnos.map((t) => t._count.cupos));
+                    if (nuevo.capacidad < maxOcupado) {
+                        throw new CupoError(`Las ${a.hora} ya tienen ${maxOcupado} cupos en una fecha: los puestos no pueden ser menos`);
+                    }
+                }
+            }
+            for (const h of horarios) {
+                if (h.id && !actuales.some((a) => a.id === h.id)) throw new CupoError('Hora no pertenece a este evento');
+            }
+            const quitados = actuales.filter((a) => !enviados.has(a.id)).map((a) => a.id);
+            await tx.horarioCorporativo.deleteMany({ where: { id: { in: quitados } } });
+            // Primero se liberan las horas que cambian (evita choques con el índice único).
+            for (const h of horarios.filter((x) => x.id)) {
+                await tx.horarioCorporativo.update({ where: { id: h.id }, data: { hora: `tmp-${h.id}` } });
+            }
+            for (const { id, ...h } of horarios) {
+                if (id) await tx.horarioCorporativo.update({ where: { id }, data: h });
+                else await tx.horarioCorporativo.create({ data: { ...h, eventoId } });
+            }
         }
-        await sincronizarEvento(tx, eventoId);
+
+        // Salidas que no han salido: se actualizan desde su hora del horario y el precio por defecto.
+        const evento = await tx.eventoCorporativo.findUniqueOrThrow({ where: { id: eventoId } });
+        const futuras = await tx.turnoCorporativo.findMany({
+            where: { eventoId, fechaHora: { gte: ahora } },
+            include: { horario: true },
+        });
+        for (const t of futuras) {
+            if (t.horario) {
+                await tx.turnoCorporativo.update({
+                    where: { id: t.id },
+                    data: {
+                        capacidad: t.horario.capacidad,
+                        precioPorPersona: t.horario.precioPorPersona ?? evento.precioPorPersona,
+                        vehiculo: t.horario.vehiculo,
+                    },
+                });
+            }
+            await sincronizarReservaDeTurno(tx, t.id);
+        }
     }, TX_OPTS);
 }
 
-/** Borra el evento, sus horarios, cupos y las reservas de sus salidas. */
+/** Borra el evento, sus cupos, salidas y las reservas de sus salidas. */
 export async function eliminarEvento(eventoId: string) {
     await prisma.$transaction(async (tx) => {
-        const turnos = await tx.turnoCorporativo.findMany({ where: { eventoId }, select: { id: true } });
-        await borrarReservasDeTurnos(tx, turnos.map((t) => t.id));
+        const turnos = await tx.turnoCorporativo.findMany({
+            where: { eventoId },
+            include: { reserva: { select: { id: true, estado: true, codigo: true } } },
+        });
+        const bloqueada = turnos.find((t) => t.reserva && ESTADOS_INTOCABLES.includes(t.reserva.estado));
+        if (bloqueada) {
+            throw new CupoError(`La salida con reserva ${bloqueada.reserva!.codigo} ya está en curso o completada`);
+        }
+        const reservas = turnos.flatMap((t) => (t.reserva ? [t.reserva.id] : []));
+        await tx.turnoCorporativo.updateMany({ where: { eventoId }, data: { reservaId: null } });
+        await tx.reserva.deleteMany({ where: { id: { in: reservas } } });
         await tx.cupoCorporativo.deleteMany({ where: { eventoId } });
         await tx.eventoCorporativo.delete({ where: { id: eventoId } });
     }, TX_OPTS);
 }
 
-/**
- * Resuelve el perfil (aliado) de la empresa. Si viene `aliadoId`, los datos que no se
- * enviaron (empresa, contacto, email) se toman del aliado.
- */
+/** Perfil (aliado) de la empresa. `undefined` = no vino en el body. */
 export async function datosDesdeAliado(aliadoId: unknown) {
     if (aliadoId === undefined) return undefined;
     if (aliadoId === null || aliadoId === '') return null;
     const aliado = await prisma.aliado.findUnique({ where: { id: String(aliadoId) } });
     if (!aliado) throw new CupoError('Perfil de aliado no encontrado');
     return aliado;
-}
-
-/** Total a facturar: cada cupo al precio de su hora. */
-export function totalFacturar(
-    evento: { precioPorPersona: number },
-    turnos: { precioPorPersona: number | null; cupos: number }[]
-) {
-    return turnos.reduce((s, t) => s + t.cupos * precioDeTurno(t, evento), 0);
 }

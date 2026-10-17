@@ -404,16 +404,45 @@ model EventoCorporativo {
   activo           Boolean            @default(true)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
+  /// Disponibilidad del link: rango de fechas ('YYYY-MM-DD', null = sin límite) y días
+  /// de la semana (0 = domingo … 6 = sábado) en que se puede reservar.
+  fechaDesde       String?
+  fechaHasta       String?
+  diasSemana       Int[]              @default([0, 1, 2, 3, 4, 5, 6])
+  /// Horario diario: las horas que se repiten cada día disponible.
+  horarios         HorarioCorporativo[]
+  /// Salidas concretas (fecha + hora). Se crean al reservar el primer cupo.
   turnos           TurnoCorporativo[]
   cupos            CupoCorporativo[]
 
   @@index([aliadoId])
 }
 
-/// Salida de un vehículo a una hora concreta (ej. 14 puestos a las 15:00).
+/// Hora del horario diario de un evento (ej. 14:00, 15 puestos, $45.000 por persona).
+model HorarioCorporativo {
+  id               String             @id @default(cuid())
+  eventoId         String
+  /// 'HH:mm' en hora Colombia.
+  hora             String
+  capacidad        Int                @default(15)
+  /// Null = usa el precio por defecto del evento.
+  precioPorPersona Float?
+  vehiculo         String?
+  activo           Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  evento           EventoCorporativo  @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  turnos           TurnoCorporativo[]
+
+  @@unique([eventoId, hora])
+}
+
+/// Salida de un vehículo en una fecha y hora concreta. Se crea al reservar el primer
+/// cupo de ese día/hora y guarda una foto de puestos y precio de ese momento.
 model TurnoCorporativo {
   id        String            @id @default(cuid())
   eventoId  String
+  horarioId String?
   /// Instante de salida. El admin lo ingresa en hora Colombia (UTC-5) y se muestra en America/Bogota.
   fechaHora DateTime
   capacidad Int               @default(14)
@@ -427,9 +456,12 @@ model TurnoCorporativo {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   evento    EventoCorporativo @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  horario   HorarioCorporativo? @relation(fields: [horarioId], references: [id], onDelete: SetNull)
   cupos     CupoCorporativo[]
 
+  @@unique([eventoId, fechaHora])
   @@index([eventoId])
+  @@index([horarioId])
 }
 
 /// Cupo reservado por un funcionario en un turno.

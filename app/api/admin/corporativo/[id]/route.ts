@@ -6,12 +6,12 @@ import {
     CupoError,
     datosDesdeAliado,
     eliminarEvento,
+    guardarHorarios,
     parseAeropuerto,
+    parseDisponibilidad,
+    parseHorarios,
     parsePrecio,
     parseSentido,
-    parseTurnos,
-    resincronizarEvento,
-    sincronizarTurnos,
     validarCodigoLink,
 } from '@/lib/corporativo';
 
@@ -25,7 +25,7 @@ const errorResponse = (error: unknown, fallback: string) => {
     return NextResponse.json({ error: fallback }, { status: 500 });
 };
 
-/** GET /api/admin/corporativo/[id] — evento con horarios, pasajeros y la reserva de cada salida. */
+/** GET /api/admin/corporativo/[id] — evento, horario diario y salidas con sus pasajeros. */
 export async function GET(_req: NextRequest, { params }: Ctx) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
@@ -34,6 +34,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
         where: { id: params.id },
         include: {
             aliado: { select: { id: true, nombre: true, codigo: true, email: true, contacto: true, corporativoActivo: true } },
+            horarios: { orderBy: { hora: 'asc' } },
             turnos: {
                 orderBy: { fechaHora: 'asc' },
                 include: {
@@ -42,7 +43,6 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
                         select: {
                             id: true, codigo: true, estado: true,
                             conductor: { select: { nombre: true } },
-                            vehiculo: { select: { nombre: true } },
                         },
                     },
                 },
@@ -53,7 +53,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ success: true, data: evento });
 }
 
-/** PUT /api/admin/corporativo/[id] — edita el evento y (si viene) la lista de horarios. */
+/** PUT /api/admin/corporativo/[id] — edita el evento, su disponibilidad y su horario diario. */
 export async function PUT(req: NextRequest, { params }: Ctx) {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
@@ -63,7 +63,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
         const existe = await prisma.eventoCorporativo.findUnique({ where: { id: params.id } });
         if (!existe) return NextResponse.json({ error: 'Evento no encontrado' }, { status: 404 });
 
-        const data: Record<string, unknown> = {};
+        const data: Record<string, unknown> = { ...parseDisponibilidad(body) };
         for (const k of ['empresa', 'titulo', 'origen', 'destino'] as const) {
             if (body[k] !== undefined) {
                 const v = String(body[k]).trim();
@@ -89,9 +89,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
         const nuevoSentido = body.aeropuertoTipo !== undefined ? parseSentido(body.aeropuertoTipo) : existe.aeropuertoTipo;
         if (nuevoAeropuerto !== existe.aeropuertoNombre || nuevoSentido !== existe.aeropuertoTipo) {
             const cupos = await prisma.cupoCorporativo.count({ where: { eventoId: existe.id } });
-            if (cupos > 0) {
-                throw new CupoError('Este link ya tiene cupos: para otro aeropuerto o sentido crea un evento nuevo');
-            }
+            if (cupos > 0) throw new CupoError('Este link ya tiene cupos: para otro aeropuerto o sentido crea un evento nuevo');
             data.aeropuertoNombre = nuevoAeropuerto;
             data.aeropuertoTipo = nuevoSentido;
         }
@@ -100,12 +98,12 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
             if (!aliado) throw new CupoError('El evento debe tener un aliado');
             data.aliadoId = aliado.id;
         }
+        const horarios = body.horarios !== undefined ? parseHorarios(body.horarios) : undefined;
+        if (horarios && horarios.length === 0) throw new CupoError('El horario debe tener al menos una hora');
 
         const evento = await prisma.eventoCorporativo.update({ where: { id: params.id }, data });
-        // Los horarios recalculan sus reservas; si no vienen, se recalculan igual
-        // porque precio, empresa, servicio o link pudieron cambiar.
-        if (body.turnos !== undefined) await sincronizarTurnos(params.id, parseTurnos(body.turnos));
-        else await resincronizarEvento(params.id);
+        // Recalcula las salidas próximas (puestos, precio, empresa, link…) y sus reservas.
+        await guardarHorarios(params.id, horarios);
         return NextResponse.json({ success: true, data: evento });
     } catch (error) {
         return errorResponse(error, 'Error al actualizar el evento');

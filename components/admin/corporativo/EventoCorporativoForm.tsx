@@ -10,9 +10,9 @@ import { Switch } from '@/components/ui/switch'
 import {
   AEROPUERTOS,
   SENTIDOS,
-  generarTurnos,
+  NOMBRES_DIAS,
+  generarHorarios,
   ladoCiudad,
-  mananaColombia,
   rutaPorDefecto,
   sufijoLink,
   type AeropuertoCorp,
@@ -20,17 +20,14 @@ import {
 } from '@/lib/corporativo-horarios'
 import { getLocalizedText } from '@/types/multi-language'
 
-export interface TurnoForm {
+export interface HorarioForm {
   id?: string
-  fecha: string
   hora: string
   capacidad: number
   vehiculo: string
   activo: boolean
   /** Costo por persona de esta hora; '' = usa el precio por defecto del evento. */
   precioPorPersona: string
-  /** Solo lectura: cupos ya reservados (limita borrar / bajar capacidad). */
-  reservados?: number
 }
 
 export interface EventoFormData {
@@ -48,11 +45,15 @@ export interface EventoFormData {
   contactoNombre: string
   contactoEmail: string
   activo: boolean
-  turnos: TurnoForm[]
+  horarios: HorarioForm[]
+  /** 'YYYY-MM-DD' o '' (sin límite). */
+  fechaDesde: string
+  fechaHasta: string
+  diasSemana: number[]
 }
 
-const nuevosTurnos = (...args: Parameters<typeof generarTurnos>): TurnoForm[] =>
-  generarTurnos(...args).map((t) => ({ ...t, precioPorPersona: '' }))
+const nuevosHorarios = (...args: Parameters<typeof generarHorarios>): HorarioForm[] =>
+  generarHorarios(...args).map((h) => ({ ...h, precioPorPersona: '' }))
 
 export const EVENTO_VACIO = (aliadoId = ''): EventoFormData => ({
   aliadoId,
@@ -67,7 +68,10 @@ export const EVENTO_VACIO = (aliadoId = ''): EventoFormData => ({
   contactoNombre: '',
   contactoEmail: '',
   activo: true,
-  turnos: nuevosTurnos(mananaColombia(), '14:00', 4, 60, 14),
+  horarios: nuevosHorarios('14:00', 4, 60, 15),
+  fechaDesde: '',
+  fechaHasta: '',
+  diasSemana: [0, 1, 2, 3, 4, 5, 6],
 })
 
 interface AliadoPerfil {
@@ -86,8 +90,7 @@ interface ServicioOpcion {
 const slug = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
 
-const ordenar = (t: TurnoForm[]) =>
-  [...t].sort((a, b) => `${a.fecha}${a.hora}`.localeCompare(`${b.fecha}${b.hora}`))
+const ordenar = (h: HorarioForm[]) => [...h].sort((a, b) => a.hora.localeCompare(b.hora))
 
 export default function EventoCorporativoForm({
   value,
@@ -99,7 +102,7 @@ export default function EventoCorporativoForm({
   /** Con cupos ya inscritos no se cambia aeropuerto ni sentido (sería mezclar servicios). */
   bloquearRuta?: boolean
 }) {
-  const [gen, setGen] = useState({ fecha: value.turnos[0]?.fecha || mananaColombia(), hora: '14:00', cantidad: 4, intervalo: 60, capacidad: 14 })
+  const [gen, setGen] = useState({ hora: '14:00', cantidad: 4, intervalo: 60, capacidad: 15 })
   const [aliados, setAliados] = useState<AliadoPerfil[]>([])
   const [servicios, setServicios] = useState<ServicioOpcion[]>([])
   const [origin, setOrigin] = useState('')
@@ -161,21 +164,27 @@ export default function EventoCorporativoForm({
   }
 
   const set = <K extends keyof EventoFormData>(k: K, v: EventoFormData[K]) => onChange({ ...value, [k]: v })
-  const setTurno = (i: number, patch: Partial<TurnoForm>) =>
-    set('turnos', value.turnos.map((t, j) => (j === i ? { ...t, ...patch } : t)))
+  const setHorario = (i: number, patch: Partial<HorarioForm>) =>
+    set('horarios', value.horarios.map((h, j) => (j === i ? { ...h, ...patch } : h)))
 
-  const agregarTurno = () => {
-    const ult = value.turnos[value.turnos.length - 1]
+  const agregarHorario = () => {
+    const ult = value.horarios[value.horarios.length - 1]
     const base = ult
-      ? { ...nuevosTurnos(ult.fecha, ult.hora, 2, 60, ult.capacidad)[1], precioPorPersona: ult.precioPorPersona }
-      : nuevosTurnos(gen.fecha, gen.hora, 1, 60, 14)[0]
-    set('turnos', [...value.turnos, base])
+      ? { ...nuevosHorarios(ult.hora, 2, 60, ult.capacidad)[1], precioPorPersona: ult.precioPorPersona, vehiculo: ult.vehiculo }
+      : nuevosHorarios(gen.hora, 1, 60, gen.capacidad)[0]
+    set('horarios', [...value.horarios, base])
   }
 
+  /** Reemplaza las horas nuevas (sin guardar); las que ya existen se conservan con sus datos. */
   const aplicarGenerador = () => {
-    const conCupos = value.turnos.filter((t) => (t.reservados ?? 0) > 0)
-    set('turnos', ordenar([...conCupos, ...nuevosTurnos(gen.fecha, gen.hora, gen.cantidad, gen.intervalo, gen.capacidad)]))
+    const generadas = nuevosHorarios(gen.hora, gen.cantidad, gen.intervalo, gen.capacidad)
+    const existentes = value.horarios.filter((h) => h.id)
+    const nuevas = generadas.filter((g) => !existentes.some((e) => e.hora === g.hora))
+    set('horarios', ordenar([...existentes, ...nuevas]))
   }
+
+  const toggleDia = (d: number) =>
+    set('diasSemana', value.diasSemana.includes(d) ? value.diasSemana.filter((x) => x !== d) : [...value.diasSemana, d].sort())
 
   const selectCls = 'flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm'
 
@@ -307,22 +316,60 @@ export default function EventoCorporativoForm({
         </div>
       </div>
 
+      {/* Disponibilidad: qué fechas puede escoger el funcionario */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-neutral-900">¿Qué días se puede reservar?</h3>
+        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_2fr] items-end">
+          <div className="space-y-1">
+            <Label className="text-xs">Desde</Label>
+            <Input type="date" value={value.fechaDesde} onChange={(e) => set('fechaDesde', e.target.value)} className="h-9" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Hasta</Label>
+            <Input type="date" value={value.fechaHasta} onChange={(e) => set('fechaHasta', e.target.value)} className="h-9" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Días de la semana</Label>
+            <div className="flex flex-wrap gap-1">
+              {[1, 2, 3, 4, 5, 6, 0].map((d) => {
+                const on = value.diasSemana.includes(d)
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => toggleDia(d)}
+                    aria-pressed={on}
+                    className={`h-9 min-w-[44px] px-2 rounded-md border text-xs font-medium transition-colors ${
+                      on ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white border-neutral-200 text-neutral-500 hover:border-neutral-400'
+                    }`}
+                  >
+                    {NOMBRES_DIAS[d]}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-neutral-500">
+          Vacío = sin límite de fechas. El funcionario solo ve los días marcados, desde hoy en adelante.
+        </p>
+      </div>
+
+      {/* Horario diario: las mismas horas se repiten cada día disponible */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-neutral-900">Horarios de salida ({value.turnos.length})</h3>
-          <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={agregarTurno}>
-            <Plus size={14} /> Agregar horario
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-900">Horario diario ({value.horarios.length} horas)</h3>
+            <p className="text-xs text-neutral-500">Estas horas se repiten todos los días disponibles. Cada hora = un carro.</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={agregarHorario}>
+            <Plus size={14} /> Agregar hora
           </Button>
         </div>
 
-        {/* Generador rápido: N carros cada X minutos */}
         <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-3">
-          <p className="text-xs font-medium text-neutral-600 mb-2">Generar horarios automáticamente</p>
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end">
-            <div className="col-span-2 sm:col-span-1 space-y-1">
-              <Label className="text-xs">Fecha</Label>
-              <Input type="date" value={gen.fecha} onChange={(e) => setGen({ ...gen, fecha: e.target.value })} className="h-9" />
-            </div>
+          <p className="text-xs font-medium text-neutral-600 mb-2">Generar horas automáticamente</p>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">
             <div className="space-y-1">
               <Label className="text-xs">Primera salida</Label>
               <Input type="time" value={gen.hora} onChange={(e) => setGen({ ...gen, hora: e.target.value })} className="h-9" />
@@ -343,59 +390,55 @@ export default function EventoCorporativoForm({
               <Wand2 size={14} /> Generar
             </Button>
           </div>
-          <p className="text-[11px] text-neutral-500 mt-2">Reemplaza los horarios sin reservas; los que ya tienen cupos se conservan.</p>
         </div>
 
-        <div className="hidden sm:grid grid-cols-[150px_120px_70px_120px_1fr_auto_auto] gap-2 px-2 text-[11px] font-medium text-neutral-500">
-          <span>Fecha</span><span>Hora</span><span>Puestos</span><span>$ por persona</span><span>Vehículo</span><span>Visible</span><span />
+        <div className="hidden sm:grid grid-cols-[120px_80px_130px_1fr_auto_auto] gap-2 px-2 text-[11px] font-medium text-neutral-500">
+          <span>Hora</span><span>Puestos</span><span>$ por persona</span><span>Vehículo</span><span>Visible</span><span />
         </div>
         <div className="space-y-2">
-          {value.turnos.map((t, i) => {
-            const reservados = t.reservados ?? 0
-            return (
-              <div key={t.id ?? `nuevo-${i}`} className="grid grid-cols-2 sm:grid-cols-[150px_120px_70px_120px_1fr_auto_auto] gap-2 items-center rounded-md border border-neutral-200 p-2">
-                <Input type="date" value={t.fecha} onChange={(e) => setTurno(i, { fecha: e.target.value })} className="h-9" aria-label="Fecha" />
-                <Input type="time" value={t.hora} onChange={(e) => setTurno(i, { hora: e.target.value })} className="h-9" aria-label="Hora" />
-                <Input
-                  type="number"
-                  min={Math.max(1, reservados)}
-                  max={100}
-                  value={t.capacidad}
-                  onChange={(e) => setTurno(i, { capacidad: Number(e.target.value) })}
-                  className="h-9"
-                  aria-label="Puestos"
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  step={1000}
-                  value={t.precioPorPersona}
-                  onChange={(e) => setTurno(i, { precioPorPersona: e.target.value })}
-                  placeholder={String(value.precioPorPersona || 0)}
-                  className="h-9"
-                  aria-label="Costo por persona de esta hora"
-                  title="Vacío = usa el costo por defecto"
-                />
-                <Input value={t.vehiculo} onChange={(e) => setTurno(i, { vehiculo: e.target.value })} className="h-9" placeholder="Vehículo" aria-label="Vehículo" />
-                <div className="flex items-center gap-1.5 text-xs text-neutral-500" title="Visible en el link">
-                  <Switch checked={t.activo} onCheckedChange={(v) => setTurno(i, { activo: v })} />
-                  {reservados > 0 && <span className="whitespace-nowrap">{reservados} res.</span>}
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 w-9 p-0 justify-self-end text-neutral-400 hover:text-red-600"
-                  disabled={reservados > 0}
-                  title={reservados > 0 ? 'Tiene cupos reservados: muévelos o elimínalos primero' : 'Quitar horario'}
-                  onClick={() => set('turnos', value.turnos.filter((_, j) => j !== i))}
-                >
-                  <Trash2 size={14} />
-                </Button>
+          {value.horarios.map((h, i) => (
+            <div key={h.id ?? `nuevo-${i}`} className="grid grid-cols-2 sm:grid-cols-[120px_80px_130px_1fr_auto_auto] gap-2 items-center rounded-md border border-neutral-200 p-2">
+              <Input type="time" value={h.hora} onChange={(e) => setHorario(i, { hora: e.target.value })} className="h-9" aria-label="Hora" />
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={h.capacidad}
+                onChange={(e) => setHorario(i, { capacidad: Number(e.target.value) })}
+                className="h-9"
+                aria-label="Puestos"
+              />
+              <Input
+                type="number"
+                min={0}
+                step={1000}
+                value={h.precioPorPersona}
+                onChange={(e) => setHorario(i, { precioPorPersona: e.target.value })}
+                placeholder={String(value.precioPorPersona || 0)}
+                className="h-9"
+                aria-label="Costo por persona de esta hora"
+                title="Vacío = usa el costo por defecto"
+              />
+              <Input value={h.vehiculo} onChange={(e) => setHorario(i, { vehiculo: e.target.value })} className="h-9" placeholder="Vehículo" aria-label="Vehículo" />
+              <div className="flex items-center gap-1.5" title="Visible en el link">
+                <Switch checked={h.activo} onCheckedChange={(v) => setHorario(i, { activo: v })} />
               </div>
-            )
-          })}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 justify-self-end text-neutral-400 hover:text-red-600"
+                title="Quitar hora"
+                onClick={() => set('horarios', value.horarios.filter((_, j) => j !== i))}
+              >
+                <Trash2 size={14} />
+              </Button>
+            </div>
+          ))}
         </div>
+        <p className="text-[11px] text-neutral-500">
+          Los cambios de puestos y precio aplican a las salidas que aún no han salido. Las ya realizadas conservan su precio.
+        </p>
       </div>
     </div>
   )

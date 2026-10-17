@@ -20,11 +20,12 @@ interface EventoResumen {
   titulo: string
   activo: boolean
   precioPorPersona: number
-  totalTurnos: number
-  capacidadTotal: number
+  horarios: { hora: string; capacidad: number; activo: boolean }[]
   cuposReservados: number
+  cuposProximos: number
+  diasConReservas: number
   totalFacturar: number
-  primeraSalida: string | null
+  proximaSalida: { fechaHora: string; cupos: number; capacidad: number } | null
   aeropuertoNombre: AeropuertoCorp
   aeropuertoTipo: SentidoCorp
   aliado: { id: string; nombre: string; codigo: string; corporativoActivo: boolean } | null
@@ -113,7 +114,7 @@ export default function CorporativoPage() {
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {eventos.map((e) => {
-            const pct = e.capacidadTotal ? Math.round((e.cuposReservados / e.capacidadTotal) * 100) : 0
+            const horas = e.horarios.filter((h) => h.activo)
             return (
               <div key={e.id} className="rounded-lg border border-neutral-200 bg-white p-4 flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-2">
@@ -134,19 +135,37 @@ export default function CorporativoPage() {
                   </Badge>
                 </div>
 
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-600">
-                  <span className="flex items-center gap-1"><Clock size={12} /> {e.totalTurnos} horarios
-                    {e.primeraSalida && ` · ${new Date(e.primeraSalida).toLocaleDateString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'short' })}`}
+                <p className="flex items-start gap-1.5 text-xs text-neutral-600">
+                  <Clock size={12} className="mt-0.5 shrink-0" />
+                  <span>
+                    {horas.length} horas diarias: {horas.map((h) => h.hora).join(' · ') || '—'}
+                    {horas[0] && ` (${horas[0].capacidad} puestos)`}
                   </span>
-                  <span className="flex items-center gap-1"><Users size={12} /> {e.cuposReservados}/{e.capacidadTotal} cupos</span>
+                </p>
+                <div className="grid grid-cols-3 gap-2 rounded-md bg-neutral-50 p-2.5 text-center">
+                  <div>
+                    <p className="text-base font-semibold text-neutral-900">{e.cuposReservados}</p>
+                    <p className="text-[10px] text-neutral-500">cupos reservados</p>
+                  </div>
+                  <div>
+                    <p className="text-base font-semibold text-neutral-900">{e.diasConReservas}</p>
+                    <p className="text-[10px] text-neutral-500">días con reservas</p>
+                  </div>
+                  <div>
+                    <p className="text-base font-semibold text-neutral-900">{e.cuposProximos}</p>
+                    <p className="text-[10px] text-neutral-500">cupos próximos</p>
+                  </div>
                 </div>
-                <div className="h-1.5 rounded-full bg-neutral-100 overflow-hidden">
-                  <div className="h-full bg-amber-500" style={{ width: `${pct}%` }} />
-                </div>
+                <p className="flex items-center gap-1.5 text-xs text-neutral-600">
+                  <Users size={12} />
+                  {e.proximaSalida
+                    ? `Próxima salida: ${new Date(e.proximaSalida.fechaHora).toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })} · ${e.proximaSalida.cupos}/${e.proximaSalida.capacidad}`
+                    : 'Sin reservas próximas'}
+                </p>
 
                 <div className="flex items-end justify-between">
                   <div>
-                    <p className="text-[11px] text-neutral-500">A facturar ({cop(e.precioPorPersona)} c/u)</p>
+                    <p className="text-[11px] text-neutral-500">Total a facturar</p>
                     <p className="text-base font-semibold text-neutral-900">{cop(e.totalFacturar)}</p>
                   </div>
                   <div className="flex gap-1.5">
@@ -159,7 +178,7 @@ export default function CorporativoPage() {
                   </div>
                 </div>
                 <Link href={`/admin/dashboard/corporativo/${e.id}`} className="text-xs text-amber-700 hover:underline">
-                  Ver pasajeros y editar →
+                  Ver reservas por día y configuración →
                 </Link>
               </div>
             )
