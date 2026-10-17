@@ -210,3 +210,40 @@ export const exportarAsistentesTourCompartido = (
     // Descargar
     XLSX.writeFile(wb, `Asistentes_${servicioNombre.replace(/\s+/g, '_')}_${fechaFormateada}.xlsx`);
 };
+
+/** Pasajeros corporativos de un día (o rango), una fila por pasajero, para facturar u operar. */
+export const exportarPasajerosCorporativo = (
+    filas: Array<{
+        fecha: string;
+        hora: string;
+        empresa: string;
+        ruta: string;
+        reserva: string;
+        conductor: string;
+        nombre: string;
+        whatsapp: string;
+        email: string;
+        vuelo: string;
+        valor: number;
+    }>,
+    nombreArchivo: string
+) => {
+    const excelData = filas.map((f, i) => ({
+        '#': i + 1,
+        'FECHA': f.fecha,
+        'HORA': f.hora,
+        'EMPRESA': f.empresa,
+        'RUTA': f.ruta,
+        'RESERVA': f.reserva,
+        'CONDUCTOR': f.conductor,
+        'PASAJERO': f.nombre,
+        'WHATSAPP': f.whatsapp,
+        'CORREO': f.email,
+        'VUELO': f.vuelo,
+        'VALOR': f.valor,
+    }));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Pasajeros');
+    XLSX.writeFile(wb, `${nombreArchivo}.xlsx`);
+};

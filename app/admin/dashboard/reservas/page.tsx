@@ -45,6 +45,7 @@ import { getStateLabel, getStateBadge } from '@/lib/state-transitions'
 import { getLocalizedText } from '@/types/multi-language'
 import ReservaDetailSheet, { CorporativoBadge, type ReservaDetail } from '@/components/admin/ReservaDetailSheet'
 import TourCompartidoView from '@/components/admin/TourCompartidoView'
+import CorporativoReservasView from '@/components/admin/CorporativoReservasView'
 import type { EstadoReserva } from '@prisma/client'
 import { exportarReservasExcel } from '@/lib/exportUtils'
 
@@ -189,7 +190,6 @@ export default function ReservasPage() {
   const filtered = useMemo(() => {
     return reservas
       .filter((r) => {
-        if (activeTab === 'corporativo' && !r.turnoCorporativo) return false
         if (servicioIdParam && r.servicioId !== servicioIdParam) return false
         if (estado !== 'ALL' && r.estado !== estado) return false
         if (pago !== 'ALL' && r.metodoPago !== pago) return false
@@ -214,7 +214,7 @@ export default function ReservasPage() {
         return true
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [reservas, search, estado, pago, clientePagaFilter, servicioFilter, aliadoFilter, socioFilter, fechaDesde, fechaHasta, servicioIdParam, activeTab])
+  }, [reservas, search, estado, pago, clientePagaFilter, servicioFilter, aliadoFilter, socioFilter, fechaDesde, fechaHasta, servicioIdParam])
 
   const corporativasCount = useMemo(() => reservas.filter((r) => r.turnoCorporativo).length, [reservas])
 
@@ -351,13 +351,15 @@ export default function ReservasPage() {
         title="Reservas"
         subtitle={
           !loading &&
-          (activeTab !== 'tour-compartido'
+          (activeTab === 'corporativo'
+            ? `${corporativasCount} salida${corporativasCount !== 1 ? 's' : ''} corporativa${corporativasCount !== 1 ? 's' : ''}`
+            : activeTab === 'todas'
             ? `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''}`
             : `${tourCompartidoReservas.length} reserva${tourCompartidoReservas.length !== 1 ? 's' : ''} de tour compartido`)
         }
         actions={
           <>
-            {activeTab !== 'tour-compartido' && !loading && filtered.length > 0 && (
+            {activeTab === 'todas' && !loading && filtered.length > 0 && (
               <Button
                 variant="outline"
                 onClick={() => exportarReservasExcel(filtered, 'nueva')}
@@ -415,7 +417,9 @@ export default function ReservasPage() {
         />
       )}
 
-      {activeTab !== 'tour-compartido' && <>
+      {activeTab === 'corporativo' && !loading && <CorporativoReservasView reservas={reservas as any} />}
+
+      {activeTab === 'todas' && <>
       <FilterShell
         chips={chips}
         onClearAll={clearFilters}
