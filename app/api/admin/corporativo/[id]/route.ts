@@ -6,7 +6,9 @@ import {
     CupoError,
     datosDesdeAliado,
     eliminarEvento,
+    parseAeropuerto,
     parsePrecio,
+    parseSentido,
     parseTurnos,
     resincronizarEvento,
     sincronizarTurnos,
@@ -80,6 +82,18 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
             const otro = await prisma.eventoCorporativo.findUnique({ where: { codigo } });
             if (otro && otro.id !== existe.id) throw new CupoError(`El link /corporativo/${codigo} ya está en uso`);
             data.codigo = codigo;
+        }
+        // Cambiar aeropuerto o sentido con gente ya inscrita mezclaría dos servicios
+        // distintos en el mismo link: en ese caso se crea un link nuevo.
+        const nuevoAeropuerto = body.aeropuertoNombre !== undefined ? parseAeropuerto(body.aeropuertoNombre) : existe.aeropuertoNombre;
+        const nuevoSentido = body.aeropuertoTipo !== undefined ? parseSentido(body.aeropuertoTipo) : existe.aeropuertoTipo;
+        if (nuevoAeropuerto !== existe.aeropuertoNombre || nuevoSentido !== existe.aeropuertoTipo) {
+            const cupos = await prisma.cupoCorporativo.count({ where: { eventoId: existe.id } });
+            if (cupos > 0) {
+                throw new CupoError('Este link ya tiene cupos: para otro aeropuerto o sentido crea un evento nuevo');
+            }
+            data.aeropuertoNombre = nuevoAeropuerto;
+            data.aeropuertoTipo = nuevoSentido;
         }
         if (body.aliadoId !== undefined) {
             const aliado = await datosDesdeAliado(body.aliadoId);

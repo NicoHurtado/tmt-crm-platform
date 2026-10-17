@@ -55,6 +55,8 @@ export default async function EventoCorporativoPage({ params }: { params: { codi
             descripcion={evento.descripcion}
             origen={evento.origen}
             destino={evento.destino}
+            aeropuertoNombre={evento.aeropuertoNombre}
+            aeropuertoTipo={evento.aeropuertoTipo}
             turnos={turnos}
         />
     );

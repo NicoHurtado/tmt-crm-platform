@@ -68,3 +68,22 @@ describe('corporativo — validaciones', () => {
         expect(() => parseTurnos([{ fecha: '2026-10-20', hora: '14:00', precioPorPersona: '-5' }])).toThrow(CupoError);
     });
 });
+
+describe('corporativo — aeropuerto y sentido', () => {
+    it('arma origen, destino y sufijo de link para cada combinación', async () => {
+        const { rutaPorDefecto, sufijoLink, ladoCiudad } = await import('@/lib/corporativo-horarios');
+        expect(rutaPorDefecto('JOSE_MARIA_CORDOVA', 'DESDE')).toMatchObject({ origen: 'Aeropuerto José María Córdova', destino: 'Medellín' });
+        expect(rutaPorDefecto('OLAYA_HERRERA', 'HACIA')).toMatchObject({ origen: 'Medellín', destino: 'Aeropuerto Olaya Herrera' });
+        expect(sufijoLink('JOSE_MARIA_CORDOVA', 'DESDE')).toBe('jmc-bajada');
+        expect(sufijoLink('OLAYA_HERRERA', 'HACIA')).toBe('olaya-subida');
+        expect(ladoCiudad('DESDE', 'Aeropuerto', 'Hotel X')).toBe('Hotel X');
+        expect(ladoCiudad('HACIA', 'Hotel X', 'Aeropuerto')).toBe('Hotel X');
+    });
+
+    it('valida aeropuerto y sentido', async () => {
+        const { parseAeropuerto, parseSentido } = await import('@/lib/corporativo');
+        expect(parseAeropuerto('OLAYA_HERRERA')).toBe('OLAYA_HERRERA');
+        expect(() => parseAeropuerto('EL_DORADO')).toThrow(CupoError);
+        expect(() => parseSentido('IDA')).toThrow(CupoError);
+    });
+});

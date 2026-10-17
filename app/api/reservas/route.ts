@@ -69,7 +69,7 @@ export async function GET(request: Request) {
                     select: {
                         id: true,
                         capacidad: true,
-                        evento: { select: { id: true, empresa: true, codigo: true } },
+                        evento: { select: { id: true, empresa: true, codigo: true, aeropuertoNombre: true, aeropuertoTipo: true } },
                         cupos: {
                             select: { id: true, nombre: true, telefono: true, email: true, numeroVuelo: true },
                             orderBy: { createdAt: 'asc' },

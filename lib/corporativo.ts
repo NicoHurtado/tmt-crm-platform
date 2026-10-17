@@ -1,7 +1,7 @@
 import { randomInt } from 'crypto';
-import { EstadoReserva, Idioma, MetodoPago, Prisma } from '@prisma/client';
+import { AeropuertoNombre, AeropuertoTipo, EstadoReserva, Idioma, MetodoPago, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { TZ_COLOMBIA, partesColombia } from '@/lib/corporativo-horarios';
+import { TZ_COLOMBIA, partesColombia, ladoCiudad, etiquetaRuta } from '@/lib/corporativo-horarios';
 import { categoriaDeServicio, modeloPrecioDeServicio } from '@/lib/servicio-categoria';
 
 /**
@@ -61,6 +61,16 @@ export function validarCodigoLink(codigo: string): string {
     const c = slugify(codigo);
     if (c.length < 3) throw new CupoError('El link debe tener al menos 3 letras o números');
     return c;
+}
+
+export function parseAeropuerto(v: unknown): AeropuertoNombre {
+    if (v === AeropuertoNombre.JOSE_MARIA_CORDOVA || v === AeropuertoNombre.OLAYA_HERRERA) return v;
+    throw new CupoError('Aeropuerto inválido (JMC u Olaya Herrera)');
+}
+
+export function parseSentido(v: unknown): AeropuertoTipo {
+    if (v === AeropuertoTipo.DESDE || v === AeropuertoTipo.HACIA) return v;
+    throw new CupoError('Sentido inválido (bajada o subida)');
 }
 
 export interface TurnoInput {
@@ -203,7 +213,7 @@ export async function sincronizarReservaDeTurno(tx: Tx, turnoId: string) {
         .map((c, i) => `${i + 1}. ${c.nombre} — ${c.telefono}${c.numeroVuelo ? ` — vuelo ${c.numeroVuelo}` : ''}`)
         .join('\n');
     const notas =
-        `Corporativo ${evento.empresa} · ${evento.origen} → ${evento.destino}\n` +
+        `Corporativo ${evento.empresa} · ${etiquetaRuta(evento.aeropuertoNombre, evento.aeropuertoTipo)} · ${evento.origen} → ${evento.destino}\n` +
         `Vehículo: ${turno.vehiculo || '—'} · Pasajeros ${turno.cupos.length}/${turno.capacidad}` +
         (lista ? `\n${lista}` : '\nAún sin pasajeros');
 
@@ -223,12 +233,13 @@ export async function sincronizarReservaDeTurno(tx: Tx, turnoId: string) {
         aliadoId: evento.aliadoId,
         esReservaAliado: !!evento.aliadoId,
         origen: `${PREFIJO_ORIGEN}${evento.codigo}`,
-        aeropuertoNombre: servicio.esAeropuerto ? ('JOSE_MARIA_CORDOVA' as const) : null,
+        aeropuertoNombre: evento.aeropuertoNombre,
         datos: {
-            ...(servicio.esAeropuerto && { aeropuertoTipo: 'DESDE', aeropuertoNombre: 'JOSE_MARIA_CORDOVA' }),
-            // En traslados DESDE el aeropuerto, `lugarRecogida` es la dirección a la que se
-            // lleva al pasajero (así lo leen el admin y los correos), no el aeropuerto.
-            lugarRecogida: servicio.esAeropuerto ? evento.destino : evento.origen,
+            aeropuertoTipo: evento.aeropuertoTipo,
+            aeropuertoNombre: evento.aeropuertoNombre,
+            // En traslados de aeropuerto `lugarRecogida` es el punto en la ciudad (destino si
+            // bajan del aeropuerto, origen si suben): así lo leen el admin y los correos.
+            lugarRecogida: ladoCiudad(evento.aeropuertoTipo, evento.origen, evento.destino),
             trasladoDestino: evento.destino,
             corporativo: { eventoId: evento.id, turnoId: turno.id, capacidad: turno.capacidad, precioPorPersona: precio },
         } as Prisma.InputJsonValue,

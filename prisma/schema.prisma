@@ -389,6 +389,10 @@ model EventoCorporativo {
   /// Título visible en el link (ej. "Traslado Aeropuerto → Medellín").
   titulo           String
   descripcion      String?
+  /// Cada combinación aeropuerto + sentido es un link distinto (no se mezclan servicios).
+  aeropuertoNombre AeropuertoNombre   @default(JOSE_MARIA_CORDOVA)
+  /// DESDE = llegan en vuelo y bajan a la ciudad · HACIA = suben de la ciudad a tomar vuelo.
+  aeropuertoTipo   AeropuertoTipo     @default(DESDE)
   origen           String             @default("Aeropuerto José María Córdova")
   destino          String             @default("Medellín")
   /// Costo por persona (COP) que se factura a la empresa. Editable.

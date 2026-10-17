@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { etiquetaRuta, type AeropuertoCorp, type SentidoCorp } from '@/lib/corporativo-horarios'
 import { ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -46,7 +47,7 @@ export interface ReservaDetail {
 export interface TurnoCorporativoInfo {
   id: string
   capacidad: number
-  evento: { id: string; empresa: string; codigo: string }
+  evento: { id: string; empresa: string; codigo: string; aeropuertoNombre?: AeropuertoCorp; aeropuertoTipo?: SentidoCorp }
   cupos: { id: string; nombre: string; telefono: string; email: string; numeroVuelo: string | null }[]
 }
 
@@ -279,7 +280,9 @@ export function CorporativoBadge({ turno, compacta }: { turno: TurnoCorporativoI
       }`}
       title={`Salida corporativa de ${turno.evento.empresa}`}
     >
-      Corporativo · {turno.evento.empresa} · {turno.cupos.length}/{turno.capacidad}
+      Corporativo · {turno.evento.empresa}
+      {turno.evento.aeropuertoNombre && turno.evento.aeropuertoTipo && ` · ${etiquetaRuta(turno.evento.aeropuertoNombre, turno.evento.aeropuertoTipo)}`}
+      {` · ${turno.cupos.length}/${turno.capacidad}`}
     </span>
   )
 }

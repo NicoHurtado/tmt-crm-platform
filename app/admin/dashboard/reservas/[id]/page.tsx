@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { etiquetaRuta } from '@/lib/corporativo-horarios';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
@@ -431,7 +432,10 @@ export default function AdminReservaDetails({ params }: { params: { id: string }
                 {reserva.turnoCorporativo && (
                     <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
                         <p className="text-sm text-indigo-800">
-                            <strong>Salida corporativa · {reserva.turnoCorporativo.evento.empresa}</strong>
+                            <strong>
+                                Salida corporativa · {reserva.turnoCorporativo.evento.empresa} ·{' '}
+                                {etiquetaRuta(reserva.turnoCorporativo.evento.aeropuertoNombre, reserva.turnoCorporativo.evento.aeropuertoTipo)}
+                            </strong>
                             {' · '}{reserva.turnoCorporativo._count.cupos} de {reserva.turnoCorporativo.capacidad} puestos reservados.
                             {' '}Pasajeros y total se actualizan solos con los cupos.
                         </p>

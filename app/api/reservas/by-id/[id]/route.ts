@@ -26,7 +26,7 @@ export async function GET(
                 turnoCorporativo: {
                     select: {
                         capacidad: true,
-                        evento: { select: { id: true, empresa: true } },
+                        evento: { select: { id: true, empresa: true, aeropuertoNombre: true, aeropuertoTipo: true } },
                         _count: { select: { cupos: true } },
                     },
                 },

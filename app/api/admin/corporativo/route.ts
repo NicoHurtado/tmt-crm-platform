@@ -7,11 +7,14 @@ import {
     codigoEventoDisponible,
     crearTurnos,
     datosDesdeAliado,
+    parseAeropuerto,
     parsePrecio,
+    parseSentido,
     parseTurnos,
     totalFacturar,
     validarCodigoLink,
 } from '@/lib/corporativo';
+import { rutaPorDefecto, sufijoLink } from '@/lib/corporativo-horarios';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,12 +67,16 @@ export async function POST(req: NextRequest) {
             throw new CupoError(`${aliado.nombre} no tiene activo el servicio corporativo. Actívalo en Aliados.`);
         }
         const empresa = String(body.empresa ?? '').trim() || aliado.nombre;
-        const titulo = String(body.titulo ?? '').trim() || 'Traslado Aeropuerto → Medellín';
+        // Cada combinación aeropuerto + sentido es su propio link: no se mezclan servicios.
+        const aeropuertoNombre = parseAeropuerto(body.aeropuertoNombre ?? 'JOSE_MARIA_CORDOVA');
+        const aeropuertoTipo = parseSentido(body.aeropuertoTipo ?? 'DESDE');
+        const ruta = rutaPorDefecto(aeropuertoNombre, aeropuertoTipo);
+        const titulo = String(body.titulo ?? '').trim() || ruta.titulo;
         const precio = parsePrecio(body.precioPorPersona) ?? 0;
         const turnos = parseTurnos(body.turnos);
         const codigo = body.codigo
             ? validarCodigoLink(String(body.codigo))
-            : await codigoEventoDisponible(aliado.nombre);
+            : await codigoEventoDisponible(`${aliado.nombre}-${sufijoLink(aeropuertoNombre, aeropuertoTipo)}`);
         if (body.codigo && (await prisma.eventoCorporativo.findUnique({ where: { codigo } }))) {
             throw new CupoError(`El link /corporativo/${codigo} ya está en uso`);
         }
@@ -81,8 +88,10 @@ export async function POST(req: NextRequest) {
                 empresa,
                 titulo,
                 descripcion: body.descripcion?.trim() || null,
-                origen: body.origen?.trim() || undefined,
-                destino: body.destino?.trim() || undefined,
+                aeropuertoNombre,
+                aeropuertoTipo,
+                origen: body.origen?.trim() || ruta.origen,
+                destino: body.destino?.trim() || ruta.destino,
                 precioPorPersona: precio,
                 servicioId: body.servicioId || null,
                 contactoNombre: body.contactoNombre?.trim() || aliado.contacto || null,

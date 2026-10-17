@@ -7,7 +7,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import { generarTurnos, mananaColombia } from '@/lib/corporativo-horarios'
+import {
+  AEROPUERTOS,
+  SENTIDOS,
+  generarTurnos,
+  ladoCiudad,
+  mananaColombia,
+  rutaPorDefecto,
+  sufijoLink,
+  type AeropuertoCorp,
+  type SentidoCorp,
+} from '@/lib/corporativo-horarios'
 import { getLocalizedText } from '@/types/multi-language'
 
 export interface TurnoForm {
@@ -25,6 +35,8 @@ export interface TurnoForm {
 
 export interface EventoFormData {
   aliadoId: string
+  aeropuertoNombre: AeropuertoCorp
+  aeropuertoTipo: SentidoCorp
   codigo: string
   empresa: string
   titulo: string
@@ -44,12 +56,12 @@ const nuevosTurnos = (...args: Parameters<typeof generarTurnos>): TurnoForm[] =>
 
 export const EVENTO_VACIO = (aliadoId = ''): EventoFormData => ({
   aliadoId,
+  aeropuertoNombre: 'JOSE_MARIA_CORDOVA',
+  aeropuertoTipo: 'DESDE',
   codigo: '',
   empresa: '',
-  titulo: 'Traslado Aeropuerto → Medellín',
   descripcion: '',
-  origen: 'Aeropuerto José María Córdova',
-  destino: 'Medellín',
+  ...rutaPorDefecto('JOSE_MARIA_CORDOVA', 'DESDE'),
   precioPorPersona: 0,
   servicioId: '',
   contactoNombre: '',
@@ -80,9 +92,12 @@ const ordenar = (t: TurnoForm[]) =>
 export default function EventoCorporativoForm({
   value,
   onChange,
+  bloquearRuta = false,
 }: {
   value: EventoFormData
   onChange: (v: EventoFormData) => void
+  /** Con cupos ya inscritos no se cambia aeropuerto ni sentido (sería mezclar servicios). */
+  bloquearRuta?: boolean
 }) {
   const [gen, setGen] = useState({ fecha: value.turnos[0]?.fecha || mananaColombia(), hora: '14:00', cantidad: 4, intervalo: 60, capacidad: 14 })
   const [aliados, setAliados] = useState<AliadoPerfil[]>([])
@@ -105,9 +120,29 @@ export default function EventoCorporativoForm({
   useEffect(() => {
     if (!value.aliadoId || value.empresa) return
     const a = aliados.find((x) => x.id === value.aliadoId)
-    if (a) onChange({ ...value, empresa: a.nombre, contactoNombre: a.contacto, contactoEmail: a.email, codigo: value.codigo || slug(a.nombre) })
+    if (a) onChange({ ...value, empresa: a.nombre, contactoNombre: a.contacto, contactoEmail: a.email, codigo: value.codigo || linkSugerido(a.nombre) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aliados, value.aliadoId])
+
+  const linkSugerido = (nombre: string, aero = value.aeropuertoNombre, sent = value.aeropuertoTipo) =>
+    slug(`${nombre}-${sufijoLink(aero, sent)}`)
+  const nombreAliado = aliados.find((x) => x.id === value.aliadoId)?.nombre ?? value.empresa
+
+  /** Cambia aeropuerto/sentido y reacomoda origen, destino, título y link (si no los tocaron a mano). */
+  const cambiarRuta = (aero: AeropuertoCorp, sent: SentidoCorp) => {
+    const anterior = rutaPorDefecto(value.aeropuertoNombre, value.aeropuertoTipo, ladoCiudad(value.aeropuertoTipo, value.origen, value.destino))
+    const nueva = rutaPorDefecto(aero, sent, ladoCiudad(value.aeropuertoTipo, value.origen, value.destino))
+    const linkAuto = !value.codigo || value.codigo === linkSugerido(nombreAliado)
+    onChange({
+      ...value,
+      aeropuertoNombre: aero,
+      aeropuertoTipo: sent,
+      origen: nueva.origen,
+      destino: nueva.destino,
+      titulo: value.titulo === anterior.titulo ? nueva.titulo : value.titulo,
+      codigo: linkAuto && nombreAliado ? linkSugerido(nombreAliado, aero, sent) : value.codigo,
+    })
+  }
 
   const elegibles = aliados.filter((a) => a.corporativoActivo || a.id === value.aliadoId)
 
@@ -120,7 +155,7 @@ export default function EventoCorporativoForm({
         empresa: a.nombre,
         contactoNombre: a.contacto,
         contactoEmail: a.email,
-        codigo: value.codigo || slug(a.nombre),
+        codigo: value.codigo || linkSugerido(a.nombre),
       }),
     })
   }
@@ -160,6 +195,38 @@ export default function EventoCorporativoForm({
           </p>
         </div>
 
+        <div className="space-y-1.5">
+          <Label>Aeropuerto *</Label>
+          <select
+            value={value.aeropuertoNombre}
+            disabled={bloquearRuta}
+            onChange={(e) => cambiarRuta(e.target.value as AeropuertoCorp, value.aeropuertoTipo)}
+            className={selectCls}
+          >
+            {(Object.keys(AEROPUERTOS) as AeropuertoCorp[]).map((k) => (
+              <option key={k} value={k}>{AEROPUERTOS[k].nombre}</option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Sentido *</Label>
+          <select
+            value={value.aeropuertoTipo}
+            disabled={bloquearRuta}
+            onChange={(e) => cambiarRuta(value.aeropuertoNombre, e.target.value as SentidoCorp)}
+            className={selectCls}
+          >
+            {(Object.keys(SENTIDOS) as SentidoCorp[]).map((k) => (
+              <option key={k} value={k}>{SENTIDOS[k].label}</option>
+            ))}
+          </select>
+        </div>
+        <p className="text-xs text-neutral-500 sm:col-span-2 -mt-2">
+          {bloquearRuta
+            ? 'Este link ya tiene cupos: para otro aeropuerto o sentido crea un evento nuevo.'
+            : 'Cada combinación de aeropuerto y sentido es un link aparte, para que no se mezclen los servicios.'}
+        </p>
+
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Link para compartir</Label>
           <div className="flex items-center rounded-md border border-input overflow-hidden">
@@ -169,7 +236,7 @@ export default function EventoCorporativoForm({
             <input
               value={value.codigo}
               onChange={(e) => set('codigo', slug(e.target.value))}
-              placeholder="lovelytics"
+              placeholder="lovelytics-jmc-bajada"
               className="h-9 flex-1 min-w-0 px-2 text-sm outline-none bg-transparent"
               aria-label="Nombre del link"
             />

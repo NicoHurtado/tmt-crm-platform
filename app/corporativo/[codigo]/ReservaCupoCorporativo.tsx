@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { FiArrowRight, FiCheckCircle, FiClock, FiMapPin, FiUsers, FiLoader } from 'react-icons/fi';
+import { AEROPUERTOS, SENTIDOS, type AeropuertoCorp, type SentidoCorp } from '@/lib/corporativo-horarios';
 
 export interface TurnoPublico {
     id: string;
@@ -22,6 +23,8 @@ interface Props {
     descripcion: string | null;
     origen: string;
     destino: string;
+    aeropuertoNombre: AeropuertoCorp;
+    aeropuertoTipo: SentidoCorp;
     turnos: TurnoPublico[];
 }
 
@@ -111,9 +114,14 @@ export default function ReservaCupoCorporativo(props: Props) {
                         {props.descripcion}
                     </p>
                 )}
-                <p className="mt-4 inline-block rounded-full border border-[#D6A75D]/40 bg-[#D6A75D]/10 px-3 py-1 text-xs text-[#F2C94C]">
-                    Sin costo para ti · se factura a {props.empresa}
-                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                    <p className="rounded-full border border-white/20 px-3 py-1 text-xs text-white/80">
+                        {props.aeropuertoTipo === 'DESDE' ? 'Llegas en vuelo a' : 'Tomas tu vuelo en'} {AEROPUERTOS[props.aeropuertoNombre].nombre}
+                    </p>
+                    <p className="rounded-full border border-[#D6A75D]/40 bg-[#D6A75D]/10 px-3 py-1 text-xs text-[#F2C94C]">
+                        Sin costo para ti · se factura a {props.empresa}
+                    </p>
+                </div>
 
                 {confirmado && (
                     <div className="mt-8 rounded-2xl border border-[#D6A75D]/50 bg-[#D6A75D]/10 p-5" role="status">
@@ -145,7 +153,7 @@ export default function ReservaCupoCorporativo(props: Props) {
                         <section>
                             <h2 className="text-lg mb-1">1. Escoge tu hora de salida</h2>
                             <p className="text-sm text-white/50 mb-4 font-[family-name:var(--font-sans)]">
-                                Elige el turno que mejor se ajuste a la llegada de tu vuelo.
+                                Elige el turno que mejor se ajuste a {SENTIDOS[props.aeropuertoTipo].vuelo}.
                             </p>
                             {porDia.length === 0 && (
                                 <p className="text-white/50 text-sm">Aún no hay horarios publicados.</p>

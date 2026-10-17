@@ -16,7 +16,7 @@ import {
   AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 import EventoCorporativoForm, { type EventoFormData } from '@/components/admin/corporativo/EventoCorporativoForm'
-import { partesColombia } from '@/lib/corporativo-horarios'
+import { partesColombia, etiquetaRuta, type AeropuertoCorp, type SentidoCorp } from '@/lib/corporativo-horarios'
 import { cop } from '@/components/admin/corporativo/link'
 import CompartirLink from '@/components/admin/corporativo/CompartirLink'
 
@@ -52,6 +52,8 @@ interface Evento {
   aliadoId: string | null
   aliado: { id: string; nombre: string; codigo: string; corporativoActivo: boolean } | null
   servicioId: string | null
+  aeropuertoNombre: AeropuertoCorp
+  aeropuertoTipo: SentidoCorp
   empresa: string
   titulo: string
   descripcion: string | null
@@ -70,6 +72,8 @@ const fmtTurno = (iso: string) =>
 
 const aForm = (e: Evento): EventoFormData => ({
   aliadoId: e.aliadoId ?? '',
+  aeropuertoNombre: e.aeropuertoNombre,
+  aeropuertoTipo: e.aeropuertoTipo,
   codigo: e.codigo,
   servicioId: e.servicioId ?? '',
   empresa: e.empresa,
@@ -232,7 +236,12 @@ export default function EventoCorporativoDetalle() {
               {evento.activo ? 'Activo' : 'Cerrado'}
             </Badge>
           </h1>
-          <p className="text-sm text-neutral-500">{evento.titulo} · {evento.origen} → {evento.destino}</p>
+          <p className="text-sm text-neutral-500 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded border bg-indigo-50 text-indigo-700 border-indigo-200">
+              {etiquetaRuta(evento.aeropuertoNombre, evento.aeropuertoTipo)}
+            </span>
+            {evento.origen} → {evento.destino}
+          </p>
           {evento.aliado && (
             <Link href="/admin/dashboard/aliados" className="text-xs text-amber-700 hover:underline">
               Perfil: {evento.aliado.nombre} ({evento.aliado.codigo})
@@ -287,7 +296,7 @@ export default function EventoCorporativoDetalle() {
         </div>
         {editando && (
           <div className="p-4">
-            <EventoCorporativoForm value={form} onChange={setForm} />
+            <EventoCorporativoForm value={form} onChange={setForm} bloquearRuta={reservados > 0} />
           </div>
         )}
       </div>

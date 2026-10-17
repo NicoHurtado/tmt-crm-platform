@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { copiarLink, cop } from '@/components/admin/corporativo/link'
+import { etiquetaRuta, type AeropuertoCorp, type SentidoCorp } from '@/lib/corporativo-horarios'
 import EventoCorporativoForm, { EVENTO_VACIO, type EventoFormData } from '@/components/admin/corporativo/EventoCorporativoForm'
 
 interface EventoResumen {
@@ -24,6 +25,8 @@ interface EventoResumen {
   cuposReservados: number
   totalFacturar: number
   primeraSalida: string | null
+  aeropuertoNombre: AeropuertoCorp
+  aeropuertoTipo: SentidoCorp
   aliado: { id: string; nombre: string; codigo: string; corporativoActivo: boolean } | null
 }
 
@@ -116,6 +119,9 @@ export default function CorporativoPage() {
                 <div className="flex items-start justify-between gap-2">
                   <Link href={`/admin/dashboard/corporativo/${e.id}`} className="min-w-0 group">
                     <p className="font-semibold text-neutral-900 truncate group-hover:underline">{e.empresa}</p>
+                    <span className="inline-block mt-0.5 text-[11px] font-medium px-2 py-0.5 rounded border bg-indigo-50 text-indigo-700 border-indigo-200">
+                      {etiquetaRuta(e.aeropuertoNombre, e.aeropuertoTipo)}
+                    </span>
                     <p className="text-xs text-neutral-500 truncate">
                       {e.titulo} · /corporativo/{e.codigo}
                     </p>
