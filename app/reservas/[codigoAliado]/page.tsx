@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { FiAlertCircle } from 'react-icons/fi';
+import Link from 'next/link';
+import { FiAlertCircle, FiArrowRight, FiUsers } from 'react-icons/fi';
+import { AEROPUERTOS, type AeropuertoCorp, type SentidoCorp } from '@/lib/corporativo-horarios';
 import ReservationWizard from '@/components/reservas/ReservationWizard';
 import TransporteMunicipalModal from '@/components/reservas/TransporteMunicipalModal';
 import ServiceCatalog from '@/components/reservas/ServiceCatalog';
@@ -40,6 +42,18 @@ interface Service {
     precioDesde?: PrecioDesde | null;
 }
 
+/** Link corporativo por cupos del aliado (si tiene el servicio corporativo activo). */
+interface LinkCorporativo {
+    codigo: string;
+    titulo: string;
+    empresa: string;
+    origen: string;
+    destino: string;
+    descripcion: string | null;
+    aeropuertoNombre: AeropuertoCorp;
+    aeropuertoTipo: SentidoCorp;
+}
+
 interface Aliado {
     id: string;
     nombre: string;
@@ -56,6 +70,7 @@ export default function ReservaAliadoPage() {
 
     const [aliado, setAliado] = useState<Aliado | null>(null);
     const [services, setServices] = useState<Service[]>([]);
+    const [corporativos, setCorporativos] = useState<LinkCorporativo[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -87,7 +102,8 @@ export default function ReservaAliadoPage() {
             // 2. Load Configuration & Services
             await Promise.all([
                 fetchAliadoConfig(aliadoData.id),
-                fetchServices(aliadoData.id, aliadoData.tipo)
+                fetchServices(aliadoData.id, aliadoData.tipo),
+                fetchCorporativos(aliadoData.codigo),
             ]);
 
         } catch (err: any) {
@@ -154,6 +170,17 @@ export default function ReservaAliadoPage() {
             setServices(activeServices as Service[]);
         } catch (error) {
             console.error('Error loading services:', error);
+        }
+    };
+
+    // Aliados con servicio corporativo: sus funcionarios reservan cupo en /corporativo/<codigo>.
+    const fetchCorporativos = async (codigo: string) => {
+        try {
+            const res = await fetch(`/api/public/corporativo?aliado=${encodeURIComponent(codigo)}`, { cache: 'no-store' });
+            const data = await res.json();
+            setCorporativos(data.data || []);
+        } catch (error) {
+            console.error('Error loading corporate links:', error);
         }
     };
 
@@ -227,11 +254,50 @@ export default function ReservaAliadoPage() {
                         </p>
                     </div>
 
+                    {/* Transporte corporativo por cupos (sin pago: se factura a la empresa) */}
+                    {corporativos.length > 0 && (
+                        <section className="max-w-3xl mx-auto mb-12">
+                            <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                                {language === 'en' ? 'Corporate transportation' : 'Transporte corporativo'}
+                            </h2>
+                            <p className="text-sm text-gray-500 mb-4">
+                                {language === 'en'
+                                    ? 'Choose the day and time that best fits your flight and book your seat. No cost to you.'
+                                    : 'Escoge el día y la hora que mejor se ajusten a tu vuelo y reserva tu cupo. Sin costo para ti.'}
+                            </p>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                {corporativos.map((c) => (
+                                    <Link
+                                        key={c.codigo}
+                                        href={`/corporativo/${c.codigo}`}
+                                        className="group rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-[#D6A75D] hover:shadow-md"
+                                    >
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-[#B8873A]">
+                                            {c.aeropuertoTipo === 'DESDE'
+                                                ? language === 'en' ? 'Arriving flight' : 'Llegada en vuelo'
+                                                : language === 'en' ? 'Departing flight' : 'Salida de vuelo'}
+                                            {' · '}{AEROPUERTOS[c.aeropuertoNombre].corto}
+                                        </p>
+                                        <p className="mt-1 text-lg font-semibold text-gray-900">{c.titulo}</p>
+                                        <p className="mt-1 text-sm text-gray-500">{c.origen} → {c.destino}</p>
+                                        <span className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#D6A75D] px-4 py-2 text-sm font-semibold text-black transition group-hover:bg-[#C5964A]">
+                                            <FiUsers />
+                                            {language === 'en' ? 'Book my seat' : 'Reservar mi cupo'}
+                                            <FiArrowRight />
+                                        </span>
+                                    </Link>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
                     {/* Services Catalog — plantilla unificada por categorías */}
                     {services.length === 0 ? (
+                        corporativos.length > 0 ? null : (
                         <div className="text-center py-12">
                             <p className="text-gray-500 text-lg">{t('hotel.no_servicios', language)}</p>
                         </div>
+                        )
                     ) : (
                         <ServiceCatalog
                             services={services}
