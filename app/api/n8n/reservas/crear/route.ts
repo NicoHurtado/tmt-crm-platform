@@ -238,7 +238,8 @@ export async function POST(request: NextRequest) {
         if (!Number.isFinite(subtotal) || subtotal <= 0) {
             return fail('El servicio no tiene precio configurado para estos datos', 400, { status: 'sin_precio' });
         }
-        const comisionBold = calculateBoldCommission(subtotal);
+        // Bold cobra montos enteros en COP: se redondea la comisión para que el total sea entero.
+        const comisionBold = Math.round(calculateBoldCommission(subtotal));
         const precioTotal = subtotal + comisionBold;
 
         const datos = buildDatosFromBody({

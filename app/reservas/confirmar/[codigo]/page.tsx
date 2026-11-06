@@ -81,9 +81,9 @@ export default async function ConfirmarReservaPage({ params }: Props) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.medellintransportes.com';
 
     // CR-02: Bold public key validation — degrade gracefully if key is missing
-    const boldPublicKey = boldConfig.publicKeyClient;
+    const boldPublicKey = boldConfig.publicKey || boldConfig.publicKeyClient;
     const boldHash = boldPublicKey
-        ? generateBoldHash(reserva.codigo, Number(reserva.precioTotal), 'COP')
+        ? generateBoldHash(reserva.codigo, Math.round(Number(reserva.precioTotal)), 'COP')
         : '';
 
     const nombreServicio =
@@ -99,7 +99,7 @@ export default async function ConfirmarReservaPage({ params }: Props) {
         ? {
               publicKey: boldPublicKey,
               orderId: reserva.codigo,
-              amount: Number(reserva.precioTotal),
+              amount: Math.round(Number(reserva.precioTotal)),
               currency: 'COP',
               integrity: boldHash,
               // /payment/result confirma el pago al volver de Bold (con reintentos) y muestra el resultado.

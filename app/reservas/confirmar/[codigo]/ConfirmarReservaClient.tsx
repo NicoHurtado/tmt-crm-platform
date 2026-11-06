@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import Script from 'next/script';
+import { useMemo, useState } from 'react';
+import { BoldButton } from '@/components/bold/BoldButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -81,25 +81,6 @@ function formatHora(hhmm: string, isES: boolean) {
     return `${h12}:${m[2]} ${suf}`;
 }
 
-declare global {
-    namespace JSX {
-        interface IntrinsicElements {
-            'bold-button': React.DetailedHTMLProps<
-                React.HTMLAttributes<HTMLElement> & {
-                    'data-bold-button'?: boolean;
-                    'data-order-id'?: string;
-                    'data-currency'?: string;
-                    'data-amount'?: string;
-                    'data-api-key'?: string;
-                    'data-integrity-signature'?: string;
-                    'data-redirection-url'?: string;
-                },
-                HTMLElement
-            >;
-        }
-    }
-}
-
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <div className="flex justify-between gap-4">
@@ -122,6 +103,11 @@ export function ConfirmarReservaClient({
     // Fix 4: any non-PENDING_PAYMENT state shows already-processed screen
     const [confirmed, setConfirmed] = useState(reserva.estado !== 'PENDING_PAYMENT');
     const [error, setError] = useState<string | null>(null);
+    // Objeto estable: BoldButton reinyecta el script de Bold si cambia la referencia.
+    const customerData = useMemo(
+        () => (detalle ? { email: detalle.email, fullName: reserva.nombreCliente } : undefined),
+        [detalle?.email, reserva.nombreCliente] // eslint-disable-line react-hooks/exhaustive-deps
+    );
 
     const isES = reserva.idioma !== 'EN';
     const t = {
@@ -327,20 +313,16 @@ export function ConfirmarReservaClient({
                     {boldData && (
                         <div>
                             {d && <p className="text-xs text-gray-300 text-center mb-2">{t.payHint}</p>}
-                            <bold-button
-                                data-bold-button
-                                data-order-id={boldData.orderId}
-                                data-currency={boldData.currency}
-                                data-amount={String(boldData.amount)}
-                                data-api-key={boldData.publicKey}
-                                data-integrity-signature={boldData.integrity}
-                                data-redirection-url={boldData.redirectionUrl}
-                                style={{ width: '100%' }}
-                            />
-                            {/* IM-03: Next.js Script avoids re-appending on re-render */}
-                            <Script
-                                src="https://checkout.bold.co/library/boldPaymentButton.js"
-                                strategy="lazyOnload"
+                            {/* La librería de Bold se configura con atributos en su <script> (igual que en /tracking). */}
+                            <BoldButton
+                                orderId={boldData.orderId}
+                                amount={String(Math.round(boldData.amount))}
+                                currency={boldData.currency}
+                                apiKey={boldData.publicKey}
+                                integritySignature={boldData.integrity}
+                                redirectionUrl={boldData.redirectionUrl}
+                                description={`${reserva.servicio} - ${reserva.codigo}`.slice(0, 100)}
+                                customerData={customerData}
                             />
                             <p className="text-xs text-gray-400 text-center mt-1">{t.cardNote}</p>
                         </div>
