@@ -94,6 +94,16 @@ export const getTrackingUrl = (codigo: string, lang: 'ES' | 'EN'): string => {
   return `${appUrl}/tracking/${codigo}?lang=${lang.toLowerCase()}`;
 };
 
+/** Enlace de pago: las cotizaciones del agente de WhatsApp van a su página de cotización
+ *  (anticipo del 30 % o total); el resto, a la página de seguimiento. */
+export const getPagoUrl = (r: { codigo: string; origen?: string | null }, lang: 'ES' | 'EN'): string => {
+  if (r.origen === 'whatsapp_bot') {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    return `${appUrl}/reservas/confirmar/${r.codigo}`;
+  }
+  return getTrackingUrl(r.codigo, lang);
+};
+
 // ─── HTML Helpers ─────────────────────────────────────────────────────────────
 
 const bilingualDivider = (): string => `
@@ -337,7 +347,7 @@ export const tplPendientePago = (r: ReservaTemplate, lang: 'ES' | 'EN'): string 
       ${detailsTable(serviceDetailsRows(r, isES))}
       ${alertBox(`<strong>${isES ? 'Total a pagar:' : 'Total to pay:'}</strong> <span style="font-size:18px;font-weight:700;color:#0A0A0A;">${formatPrice(total)}</span>`, 'warning')}
       ${r.notas ? alertBox(`<strong>${isES ? 'Notas:' : 'Notes:'}</strong> ${r.notas}`, 'info') : ''}
-      ${ctaBtn(isES ? 'Completar Pago' : 'Complete Payment', getTrackingUrl(r.codigo, l))}
+      ${ctaBtn(isES ? 'Completar Pago' : 'Complete Payment', getPagoUrl(r, l))}
       <p style="text-align:center;margin:4px 0 28px;font-size:12px;color:#9ca3af;">
         ${isES ? 'Tu cupo queda asegurado una vez procesado el pago' : 'Your spot is secured once payment is processed'}
       </p>`;
