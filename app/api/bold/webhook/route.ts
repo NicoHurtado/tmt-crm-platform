@@ -6,6 +6,7 @@ import {
     parseBoldWebhookEvent,
 } from '@/lib/bold';
 import { sendPagoAprobadoEmail, sendCambioEstadoEmail } from '@/lib/email-service';
+import { parseOrderId, cambiosPorAnticipo, datosPagoTotal } from '@/lib/anticipo';
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic';
@@ -200,8 +201,10 @@ export async function POST(req: NextRequest) {
 
         } else {
             // MANEJO DE RESERVA INDIVIDUAL (código existente)
+            // El anticipo del 30 % llega con orderId `{codigo}-A30` (ver lib/anticipo.ts).
+            const { codigo: codigoReserva, esAnticipo } = parseOrderId(order_id);
             const reserva = await prisma.reserva.findUnique({
-                where: { codigo: order_id },
+                where: { codigo: codigoReserva },
                 include: {
                     servicio: true,
                     conductor: true,
@@ -254,13 +257,27 @@ export async function POST(req: NextRequest) {
             // Actualizar reserva
             const estadoAnterior = reserva.estado;
 
+            // Anticipo aprobado: se deja constancia del monto pagado y del saldo; el precio y la
+            // comisión de la reserva no cambian (la comisión del anticipo ya va en su cobro).
+            const extrasPago: Record<string, unknown> = {};
+            if (payment_status === 'approved') {
+                if (esAnticipo) {
+                    const c = cambiosPorAnticipo(reserva as any, amount ? Number(amount) : null);
+                    extrasPago.datos = c.datos;
+                    extrasPago.notas = c.notas;
+                } else {
+                    extrasPago.datos = datosPagoTotal(reserva.datos, amount ? Number(amount) : null);
+                }
+            }
+
             await prisma.reserva.update({
                 where: { id: reserva.id },
                 data: {
                     ...(nuevoEstado && { estado: nuevoEstado as any }),
                     ...(nuevoEstadoPago && { estadoPago: nuevoEstadoPago as any }),
                     ...(transaction_id && { pagoId: transaction_id }),
-                    ...(amount && { comisionBold: calculateBoldCommission(Number(amount)) }),
+                    ...(amount && !esAnticipo && { comisionBold: calculateBoldCommission(Number(amount)) }),
+                    ...(extrasPago as any),
                 },
             });
 

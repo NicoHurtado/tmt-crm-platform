@@ -45,8 +45,13 @@ function formatReserva(r: any) {
             id: r.conductor.id,
             nombre: r.conductor.nombre,
             whatsapp: r.conductor.whatsapp,
+            telefono: r.conductor.telefono,
             placa: r.conductor.placa,
         } : null,
+        // Modalidad y monto del pago (anticipo 30 % o total), si ya se pagó. Ver lib/anticipo.ts.
+        pago: (getDatos(r.datos) as any).pago ?? null,
+        origen: r.origen,
+        datos: getDatos(r.datos),
         aliado: r.aliado ? {
             id: r.aliado.id,
             nombre: r.aliado.nombre,

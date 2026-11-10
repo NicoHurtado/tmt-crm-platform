@@ -45,6 +45,15 @@ export interface DetalleCotizacion {
     vigencia: string;
 }
 
+/** Opción de pagar el 30 % de anticipo (cotizaciones del agente de WhatsApp). */
+export interface OpcionAnticipo {
+    boldData: BoldData;
+    /** Lo que se cobra ahora con tarjeta (anticipo + comisión). */
+    anticipoCobro: number;
+    /** Lo que queda por pagar al llegar. */
+    saldo: number;
+}
+
 interface BoldData {
     publicKey: string;
     orderId: string;
@@ -94,11 +103,14 @@ export function ConfirmarReservaClient({
     reserva,
     boldData,
     detalle,
+    anticipo,
 }: {
     reserva: ReservaData;
     boldData: BoldData | null;
     detalle?: DetalleCotizacion;
+    anticipo?: OpcionAnticipo | null;
 }) {
+    const [modalidad, setModalidad] = useState<'ANTICIPO' | 'TOTAL'>(anticipo ? 'ANTICIPO' : 'TOTAL');
     const [loading, setLoading] = useState(false);
     // Fix 4: any non-PENDING_PAYMENT state shows already-processed screen
     const [confirmed, setConfirmed] = useState(reserva.estado !== 'PENDING_PAYMENT');
@@ -145,6 +157,16 @@ export function ConfirmarReservaClient({
         cardFee: isES ? 'Comisión pago con tarjeta' : 'Card payment fee',
         total: 'Total',
         payCash: isES ? '💵 Pagaré en efectivo' : '💵 Pay in cash',
+        payHow: isES ? '¿Cómo quiere pagar?' : 'How would you like to pay?',
+        optDeposit: (v: string) => isES ? `Anticipo del 30 %: ${v}` : `30% deposit: ${v}`,
+        optDepositNote: (v: string) => isES
+            ? `Asegura su reserva. El saldo (${v}) se paga al llegar en efectivo (pesos o dólares) o con tarjeta.`
+            : `Secures your booking. The balance (${v}) is paid on arrival in cash (pesos or dollars) or by card.`,
+        optFull: (v: string) => isES ? `Pago total: ${v}` : `Full payment: ${v}`,
+        optFullNote: isES ? 'Paga todo ahora y no queda saldo pendiente.' : 'Pay everything now with no balance due.',
+        depositNote: (v: string, s: string) => isES
+            ? `Hoy paga ${v} (incluye comisión). Saldo al llegar: ${s}.`
+            : `Today you pay ${v} (includes fee). Balance on arrival: ${s}.`,
         payHint: isES
             ? 'Presiona el botón para confirmar y pagar con Bold de forma segura.'
             : 'Press the button to confirm and pay securely with Bold.',
@@ -310,21 +332,51 @@ export function ConfirmarReservaClient({
                 )}
 
                 <div className="space-y-3">
+                    {boldData && anticipo && (
+                        <div className="space-y-2" role="radiogroup" aria-label={t.payHow}>
+                            <p className="text-sm text-white font-semibold text-center">{t.payHow}</p>
+                            {([
+                                ['ANTICIPO', t.optDeposit(formatCOP(anticipo.anticipoCobro)), t.optDepositNote(formatCOP(anticipo.saldo))],
+                                ['TOTAL', t.optFull(formatCOP(reserva.precioConTarjeta)), t.optFullNote],
+                            ] as const).map(([val, titulo, nota]) => (
+                                <button
+                                    key={val}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={modalidad === val}
+                                    onClick={() => setModalidad(val)}
+                                    className={`w-full text-left rounded-lg border px-4 py-3 transition ${modalidad === val ? 'border-[#D6A75D] bg-[#D6A75D]/10' : 'border-white/15 hover:border-white/30'}`}
+                                >
+                                    <span className="block text-sm font-semibold text-white">{titulo}</span>
+                                    <span className="block text-xs text-gray-400 mt-0.5">{nota}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
                     {boldData && (
                         <div>
                             {d && <p className="text-xs text-gray-300 text-center mb-2">{t.payHint}</p>}
                             {/* La librería de Bold se configura con atributos en su <script> (igual que en /tracking). */}
+                            {(() => {
+                                const b = anticipo && modalidad === 'ANTICIPO' ? anticipo.boldData : boldData;
+                                return (
                             <BoldButton
-                                orderId={boldData.orderId}
-                                amount={String(Math.round(boldData.amount))}
-                                currency={boldData.currency}
-                                apiKey={boldData.publicKey}
-                                integritySignature={boldData.integrity}
-                                redirectionUrl={boldData.redirectionUrl}
+                                key={b.orderId}
+                                orderId={b.orderId}
+                                amount={String(Math.round(b.amount))}
+                                currency={b.currency}
+                                apiKey={b.publicKey}
+                                integritySignature={b.integrity}
+                                redirectionUrl={b.redirectionUrl}
                                 description={`${reserva.servicio} - ${reserva.codigo}`.slice(0, 100)}
                                 customerData={customerData}
                             />
-                            <p className="text-xs text-gray-400 text-center mt-1">{t.cardNote}</p>
+                                );
+                            })()}
+                            <p className="text-xs text-gray-400 text-center mt-1">
+                                {anticipo && modalidad === 'ANTICIPO' ? t.depositNote(formatCOP(anticipo.anticipoCobro), formatCOP(anticipo.saldo)) : t.cardNote}
+                            </p>
                         </div>
                     )}
 

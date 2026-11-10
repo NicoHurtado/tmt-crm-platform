@@ -19,6 +19,7 @@ import {
   X,
   ScrollText,
   Building2,
+  MessageCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,6 +32,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { name: 'Reservas',     href: '/admin/dashboard/reservas',    icon: BookOpen },
   { name: 'Cotizaciones', href: '/admin/dashboard/cotizaciones', icon: FileText },
+  { name: 'WhatsApp',     href: '/admin/dashboard/whatsapp',     icon: MessageCircle },
   { name: 'Calendario',   href: '/admin/dashboard/calendario',   icon: Calendar  },
   { name: 'Estadísticas', href: '/admin/dashboard/estadisticas', icon: BarChart2 },
   { name: 'Servicios',    href: '/admin/dashboard/servicios',    icon: Package   },

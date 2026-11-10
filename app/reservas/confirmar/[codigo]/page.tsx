@@ -5,6 +5,7 @@ import { getConfiguracion } from '@/types/servicio-config';
 import { validateDynamicFieldsSafe } from '@/types/dynamic-fields';
 import { getDatos } from '@/types/reserva-datos';
 import { ConfirmarReservaClient, type DetalleCotizacion } from './ConfirmarReservaClient';
+import { calcularAnticipo, orderIdAnticipo } from '@/lib/anticipo';
 import type { Metadata } from 'next';
 
 interface Props {
@@ -107,6 +108,21 @@ export default async function ConfirmarReservaPage({ params }: Props) {
           }
         : null;
 
+    // Cotizaciones del agente de WhatsApp: el viajero puede pagar el 30 % de anticipo o el total.
+    const infoAnticipo = esWhatsApp && boldDataProp ? calcularAnticipo(Number(reserva.precioTotal), Number(reserva.comisionBold ?? 0)) : null;
+    const anticipoProp = infoAnticipo && infoAnticipo.anticipoCobro > 0
+        ? {
+              boldData: {
+                  ...boldDataProp!,
+                  orderId: orderIdAnticipo(reserva.codigo),
+                  amount: infoAnticipo.anticipoCobro,
+                  integrity: generateBoldHash(orderIdAnticipo(reserva.codigo), infoAnticipo.anticipoCobro, 'COP'),
+              },
+              anticipoCobro: infoAnticipo.anticipoCobro,
+              saldo: infoAnticipo.saldo,
+          }
+        : null;
+
     const datos = getDatos(reserva.datos) as Record<string, unknown>;
     const aeropuerto = (reserva.aeropuertoNombre ?? datos.aeropuertoNombre) as string | undefined;
     const municipioTexto = reserva.otroMunicipio
@@ -150,6 +166,7 @@ export default async function ConfirmarReservaPage({ params }: Props) {
             }}
             boldData={boldDataProp}
             detalle={detalle}
+            anticipo={anticipoProp}
         />
     );
 }

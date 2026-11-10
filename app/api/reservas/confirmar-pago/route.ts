@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { consultarTransaccionBold } from '@/lib/bold';
+import { parseOrderId, cambiosPorAnticipo, datosPagoTotal } from '@/lib/anticipo';
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic';
@@ -85,9 +86,11 @@ export async function POST(req: NextRequest) {
  * Handle payment confirmation for an individual Reserva
  */
 async function handleReservaPayment(orderId: string) {
+    // El anticipo del 30 % llega con orderId `{codigo}-A30` (ver lib/anticipo.ts).
+    const { codigo: codigoReserva, esAnticipo } = parseOrderId(orderId);
     // Buscar la reserva existente
     const reserva = await prisma.reserva.findUnique({
-        where: { codigo: orderId }
+        where: { codigo: codigoReserva }
     });
 
     if (!reserva) {
@@ -117,11 +120,15 @@ async function handleReservaPayment(orderId: string) {
     }
 
     // Actualizar el estado de la reserva
+    const extrasPago: Record<string, unknown> = esAnticipo
+        ? (({ datos, notas }) => ({ datos, notas }))(cambiosPorAnticipo(reserva as any))
+        : { datos: datosPagoTotal(reserva.datos) };
     const updated = await prisma.reserva.update({
-        where: { codigo: orderId },
+        where: { codigo: codigoReserva },
         data: {
             estado: 'CONFIRMED_UNASSIGNED',
-            estadoPago: 'APROBADO'
+            estadoPago: 'APROBADO',
+            ...(extrasPago as any),
         },
         include: {
             servicio: true,
