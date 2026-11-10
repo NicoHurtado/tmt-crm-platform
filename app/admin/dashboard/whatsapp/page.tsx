@@ -70,9 +70,18 @@ interface Kpis {
 
 interface Mensaje { rol: string; texto: string; fecha: string }
 
+const ETIQUETA_ROL: Record<string, string> = { user: 'Cliente', equipo: 'Equipo TMT', nota: 'Nota interna (el cliente no la ve)', assistant: 'Asistente' }
+const ESTILO_ROL: Record<string, string> = {
+    user: 'bg-gray-100 text-gray-900',
+    equipo: 'bg-blue-50 text-blue-900 border border-blue-100',
+    nota: 'bg-amber-50 text-amber-900 border border-dashed border-amber-300',
+    assistant: 'bg-emerald-50 text-emerald-900 border border-emerald-100',
+}
+
 const MOTIVOS: Record<string, string> = {
     equipo_en_chat: 'El equipo está escribiendo',
     equipo_manual: 'Pausado por el equipo',
+    contacto_operativo: 'Contacto operativo (el asistente no responde)',
     incidente: 'Incidente',
     reclamo: 'Reclamo',
     pide_persona: 'Pidió un asesor',
@@ -148,6 +157,7 @@ export default function WhatsAppPanelPage() {
     const [editando, setEditando] = useState<Conocimiento | null>(null)
     const [nueva, setNueva] = useState({ pregunta: '', respuesta: '' })
     const [ocupado, setOcupado] = useState<string | null>(null)
+    const [nota, setNota] = useState('')
 
     const cargar = useCallback(async () => {
         try {
@@ -406,12 +416,33 @@ export default function WhatsAppPanelPage() {
                         <div className="space-y-2">
                             {chat.mensajes.map((m, i) => (
                                 <div key={i} className={`flex ${m.rol === 'user' ? 'justify-start' : 'justify-end'}`}>
-                                    <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${m.rol === 'user' ? 'bg-gray-100 text-gray-900' : m.rol === 'equipo' ? 'bg-blue-50 text-blue-900 border border-blue-100' : 'bg-emerald-50 text-emerald-900 border border-emerald-100'}`}>
-                                        <p className="text-[11px] font-semibold opacity-70 mb-0.5">{m.rol === 'user' ? 'Cliente' : m.rol === 'equipo' ? 'Equipo TMT' : 'Asistente'} · {fechaHora(m.fecha)}</p>
+                                    <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${ESTILO_ROL[m.rol] || ESTILO_ROL.assistant}`}>
+                                        <p className="text-[11px] font-semibold opacity-70 mb-0.5">{ETIQUETA_ROL[m.rol] || 'Asistente'} · {fechaHora(m.fecha)}</p>
                                         {m.texto}
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+                    {chat && (
+                        <div className="border-t border-gray-200 pt-3 mt-2 space-y-2">
+                            <p className="text-sm font-medium text-gray-900">Nota para el asistente</p>
+                            <p className="text-xs text-gray-500">El cliente no la ve. El asistente la sigue en sus próximas respuestas de este chat. Ej.: «Le dimos 10 % de descuento; pídale los datos y avísenos para enviarle el enlace».</p>
+                            <Textarea value={nota} onChange={e => setNota(e.target.value)} rows={2} placeholder="Escriba la instrucción" />
+                            <div className="flex flex-wrap gap-2">
+                                <Button size="sm" disabled={nota.trim().length < 2 || ocupado === 'nota'} onClick={async () => {
+                                    const c = chat.conv
+                                    await accion('nota', { accion: 'nota', telefono: c.telefono, texto: nota.trim() }, 'Nota guardada')
+                                    setNota('')
+                                    abrirChat(c)
+                                }}>Guardar nota</Button>
+                                {chat.conv.motivoPausa !== 'contacto_operativo' && (
+                                    <Button size="sm" variant="outline" disabled={ocupado === chat.conv.telefono} onClick={async () => {
+                                        await accion(chat.conv.telefono, { accion: 'ignorar', telefono: chat.conv.telefono }, 'Marcado como contacto operativo: el asistente no le responderá')
+                                        setChat(null)
+                                    }}>Es conductor, guía o aliado (no responder)</Button>
+                                )}
+                            </div>
                         </div>
                     )}
                 </DialogContent>

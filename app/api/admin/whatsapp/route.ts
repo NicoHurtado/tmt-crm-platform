@@ -16,6 +16,8 @@ const ACCIONES = new Set([
     'mensajes',
     'devolver',
     'pausar',
+    'nota',
+    'ignorar',
     'conocimiento_estado',
     'conocimiento_agregar',
     'conocimiento_borrar',
