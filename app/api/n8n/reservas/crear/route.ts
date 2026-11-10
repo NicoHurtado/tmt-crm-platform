@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
 
         const codigo = await generateUniqueCodigo();
 
-        await prisma.reserva.create({
+        const reservaCreada = await prisma.reserva.create({
             data: {
                 codigo,
                 nombreCliente: String(nombreCliente).trim(),
@@ -286,7 +286,19 @@ export async function POST(request: NextRequest) {
                 clientePaga: true,
                 esReservaAliado: false,
             },
+            include: { servicio: true, vehiculo: true, conductor: true, aliado: true, asistentes: true },
         });
+
+        // Mismo correo que envía el formulario web al crear una reserva con pago en Bold
+        // ("Reserva recibida"), con copia a la empresa: así el equipo se entera de que la
+        // reserva quedó en la plataforma. Bloqueante, como en /api/reservas (en Vercel los
+        // envíos en segundo plano se cortan al responder); un fallo de correo no rompe la reserva.
+        try {
+            const { sendPendientePagoEmail } = await import('@/lib/email-service');
+            await sendPendientePagoEmail(reservaCreada as any, idioma === 'EN' ? 'EN' : 'ES');
+        } catch (emailError) {
+            console.error('[n8n crear reserva] Error enviando correo de reserva recibida:', emailError);
+        }
 
         const nombreServicio =
             (servicio.nombre as { es: string; en: string })[idioma === 'EN' ? 'en' : 'es'];

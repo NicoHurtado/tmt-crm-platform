@@ -9,6 +9,10 @@ vi.mock('@/lib/prisma', () => ({
     },
 }));
 
+vi.mock('@/lib/email-service', () => ({
+    sendPendientePagoEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('crypto', async () => {
     const actual = await vi.importActual<typeof import('crypto')>('crypto');
     return { ...actual, randomInt: vi.fn().mockReturnValue(0) };
@@ -184,6 +188,18 @@ describe('POST /api/n8n/reservas/crear', () => {
         expect(created.datos.trasladoDestino).toBe('Guatapé');
         expect(created.notas).toBe('3 maletas');
         expect(created.municipio).toBe('MEDELLIN');
+
+        const { sendPendientePagoEmail } = await import('@/lib/email-service');
+        expect(sendPendientePagoEmail).toHaveBeenCalledTimes(1);
+        expect((sendPendientePagoEmail as any).mock.calls[0][1]).toBe('ES');
+    });
+
+    it('si el correo falla, la reserva igual se crea', async () => {
+        const { sendPendientePagoEmail } = await import('@/lib/email-service');
+        (sendPendientePagoEmail as any).mockRejectedValueOnce(new Error('SMTP caído'));
+        const res = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2 }));
+        expect(res.status).toBe(200);
+        expect((await res.json()).success).toBe(true);
     });
 
     it('aeropuerto: exige aeropuerto y tipo', async () => {
