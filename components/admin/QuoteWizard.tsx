@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { FiX, FiAlertCircle, FiCopy, FiCheck, FiDollarSign, FiCreditCard, FiEdit2 } from 'react-icons/fi';
+import { FiX, FiAlertCircle, FiCopy, FiCheck, FiDollarSign, FiCreditCard, FiEdit2, FiPlus, FiInfo } from 'react-icons/fi';
+import ClienteLookup from './ClienteLookup';
+import type { ClienteEncontrado } from '@/lib/clientes';
 import Step0ServiceInfo from '../reservas/wizard/Step0ServiceInfo';
 import Step1TripDetails from '../reservas/wizard/Step1TripDetails';
 import Step2ContactInfo from '../reservas/wizard/Step2ContactInfo';
@@ -36,12 +38,37 @@ interface Service {
     vehiculosPermitidos?: any[];
 }
 
+/** Un servicio ya armado dentro de una cotización con varios servicios. */
+export interface QuoteItem {
+    /** Cuerpo listo para POST /api/admin/cotizaciones (un servicio). */
+    payload: Record<string, any>;
+    servicioNombre: string;
+    fecha: string | null; // YYYY-MM-DD
+    hora: string;
+    numeroPasajeros: number;
+    total: number;
+}
+
+/** Datos personales que se repiten de un servicio al siguiente de la misma cotización. */
+export type ContactoInicial = Pick<ReservationFormData,
+    'nombreCliente' | 'whatsappCliente' | 'emailCliente' | 'tipoDocumentoCliente' | 'numeroDocumentoCliente'>;
+
 interface QuoteWizardProps {
     service: Service;
     isOpen: boolean;
     onClose: () => void;
     aliadoId?: string | null;
     clientePaga?: boolean;
+    /** Servicios que ya están en la cotización en curso (antes de este). */
+    itemsPrevios?: QuoteItem[];
+    /** Agrega este servicio a la cotización en curso y vuelve a la lista de servicios. */
+    onAddToQuote?: (item: QuoteItem) => void;
+    /** Genera la cotización con estos servicios. Devuelve el código (RES… o PED…). */
+    onGenerate?: (items: QuoteItem[]) => Promise<string>;
+    /** Datos del cliente tomados del primer servicio de la cotización. */
+    contactoInicial?: ContactoInicial | null;
+    /** Método de pago fijado por el primer servicio (toda la cotización se paga igual). */
+    metodoPagoFijo?: 'TARJETA' | 'EFECTIVO' | null;
 }
 
 function BreakdownRow({ label, value, dimmed }: { label: string; value: number; dimmed?: boolean }) {
@@ -53,7 +80,7 @@ function BreakdownRow({ label, value, dimmed }: { label: string; value: number; 
     );
 }
 
-export default function QuoteWizard({ service, isOpen, onClose, aliadoId, clientePaga }: QuoteWizardProps) {
+export default function QuoteWizard({ service, isOpen, onClose, aliadoId, clientePaga, itemsPrevios = [], onAddToQuote, onGenerate, contactoInicial, metodoPagoFijo }: QuoteWizardProps) {
     const [currentStep, setCurrentStep] = useState(0);
     const [maxStepReached, setMaxStepReached] = useState(0);
     const [errorMessage, setErrorMessage] = useState<string>('');
@@ -63,10 +90,18 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
         hora: '',
         municipio: '',
         numeroPasajeros: 0,
-        nombreCliente: '',
-        whatsappCliente: '',
-        emailCliente: '',
-        asistentes: [{ nombre: '', tipoDocumento: TipoDocumento.CC, numeroDocumento: '', email: '', telefono: '' }],
+        nombreCliente: contactoInicial?.nombreCliente || '',
+        whatsappCliente: contactoInicial?.whatsappCliente || '',
+        emailCliente: contactoInicial?.emailCliente || '',
+        tipoDocumentoCliente: contactoInicial?.tipoDocumentoCliente,
+        numeroDocumentoCliente: contactoInicial?.numeroDocumentoCliente || '',
+        asistentes: [{
+            nombre: contactoInicial?.nombreCliente || '',
+            tipoDocumento: contactoInicial?.tipoDocumentoCliente || TipoDocumento.CC,
+            numeroDocumento: contactoInicial?.numeroDocumentoCliente || '',
+            email: contactoInicial?.emailCliente || '',
+            telefono: contactoInicial?.whatsappCliente || '',
+        }],
         precioBase: 0,
         precioAdicionales: 0,
         recargoNocturno: 0,
@@ -78,11 +113,13 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
         cantidadHoras: service.esPorHoras ? 4 : undefined,
     });
     const [precioPersonalizado, setPrecioPersonalizado] = useState<string>('');
-    const [metodoPago, setMetodoPago] = useState<'TARJETA' | 'EFECTIVO'>('TARJETA');
+    const [metodoPago, setMetodoPago] = useState<'TARJETA' | 'EFECTIVO'>(metodoPagoFijo || 'TARJETA');
     const [loading, setLoading] = useState(false);
     const [quoteLink, setQuoteLink] = useState<string>('');
     const [reservationCode, setReservationCode] = useState<string>('');
     const [copied, setCopied] = useState(false);
+    // Cuántos servicios llevaba la cotización generada (el padre vacía la lista al generar).
+    const [serviciosGenerados, setServiciosGenerados] = useState(0);
     const [activeTab, setActiveTab] = useState<'interno' | 'tercero'>('tercero');
     const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
     // Pricing del aliado seleccionado (misma fuente que el wizard de reservas):
@@ -300,38 +337,63 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
         }
     };
 
+    /** Este servicio, listo para enviarse a la API. */
+    const buildItem = (): QuoteItem => {
+        const fecha = formData.fecha ? formData.fecha.toISOString().split('T')[0] : null;
+        return {
+            payload: {
+                ...formData,
+                fecha,
+                servicioId: service.id,
+                // Breakdown calculado (para que la API lo use)
+                comisionAliado,
+                // Override manual (null si el admin no modificó)
+                precioPersonalizado: precioOverride && precioOverride > 0 ? precioOverride : null,
+                metodoPago: clientePaga === false ? 'EFECTIVO' : metodoPago,
+                aliadoId: aliadoId || null,
+                clientePaga: clientePaga !== undefined ? clientePaga : true,
+            },
+            servicioNombre: processedService.nombre,
+            fecha,
+            hora: formData.hora,
+            numeroPasajeros: formData.numeroPasajeros,
+            total: precioFinal,
+        };
+    };
+
+    const handleAddToQuote = () => {
+        if (!validateStep(4) || !onAddToQuote) return;
+        onAddToQuote(buildItem());
+    };
+
     const handleGenerateQuote = async () => {
         if (!validateStep(4)) return;
 
         setLoading(true);
         try {
-            const res = await fetch('/api/admin/cotizaciones', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...formData,
-                    fecha: formData.fecha ? formData.fecha.toISOString().split('T')[0] : null,
-                    servicioId: service.id,
-                    // Breakdown calculado (para que la API lo use)
-                    comisionAliado,
-                    // Override manual (null si el admin no modificó)
-                    precioPersonalizado: precioOverride && precioOverride > 0 ? precioOverride : null,
-                    metodoPago: clientePaga === false ? 'EFECTIVO' : metodoPago,
-                    aliadoId: aliadoId || null,
-                    clientePaga: clientePaga !== undefined ? clientePaga : true,
-                }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || 'Error al crear cotización');
+            const items = [...itemsPrevios, buildItem()];
+            let codigo: string;
+            if (onGenerate) {
+                codigo = await onGenerate(items);
+            } else {
+                const res = await fetch('/api/admin/cotizaciones', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(items[0].payload),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || 'Error al crear cotización');
+                }
+                codigo = data.data.codigo;
             }
 
             // Usar el link de tracking directamente en lugar del de cotización
-            const trackingLink = `${window.location.origin}/tracking/${data.data.codigo}`;
+            // (para varios servicios el código es el del pedido, PED…).
+            const trackingLink = `${window.location.origin}/tracking/${codigo}`;
             setQuoteLink(trackingLink);
-            setReservationCode(data.data.codigo);
+            setReservationCode(codigo);
+            setServiciosGenerados(items.length);
             setCurrentStep(5);
 
         } catch (error: any) {
@@ -340,6 +402,33 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
             setLoading(false);
         }
     };
+
+    const aplicarCliente = (c: ClienteEncontrado) => {
+        const tipoDoc = (c.tipoDocumento as TipoDocumento) || formData.tipoDocumentoCliente || TipoDocumento.CC;
+        const numeroDoc = c.numeroDocumento || formData.numeroDocumentoCliente || '';
+        const asistentes = formData.asistentes.length > 0
+            ? [...formData.asistentes]
+            : [{ nombre: '', tipoDocumento: tipoDoc, numeroDocumento: '', email: '', telefono: '' }];
+        asistentes[0] = {
+            ...asistentes[0],
+            nombre: c.nombre,
+            email: c.email,
+            telefono: c.whatsapp,
+            tipoDocumento: tipoDoc,
+            numeroDocumento: numeroDoc,
+        };
+        updateFormData({
+            nombreCliente: c.nombre,
+            whatsappCliente: c.whatsapp,
+            emailCliente: c.email,
+            tipoDocumentoCliente: tipoDoc,
+            numeroDocumentoCliente: numeroDoc,
+            asistentes,
+        });
+    };
+
+    const totalCotizacion = itemsPrevios.reduce((s, it) => s + it.total, 0) + precioFinal;
+    const numServicios = itemsPrevios.length + 1;
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(quoteLink);
@@ -442,6 +531,15 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
                         />
                     )}
 
+                    {currentStep === 2 && contactoInicial && (
+                        <div className="mb-6 flex items-start gap-2 p-3 rounded-lg border border-green-200 bg-green-50 text-sm text-green-800">
+                            <FiInfo className="mt-0.5 flex-shrink-0" />
+                            <span>Datos del cliente tomados del primer servicio de esta cotización. Puedes cambiarlos si este servicio es para otra persona.</span>
+                        </div>
+                    )}
+                    {currentStep === 2 && !contactoInicial && (
+                        <ClienteLookup onSelect={aplicarCliente} />
+                    )}
                     {currentStep === 2 && (
                         <Step2ContactInfo
                             formData={formData}
@@ -562,11 +660,17 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
                             {clientePaga !== false ? (
                                 <div className="space-y-3">
                                     <label className="block text-sm font-semibold text-gray-700">Método de Pago</label>
+                                    {metodoPagoFijo && (
+                                        <p className="text-xs text-gray-500 -mt-1">
+                                            Toda la cotización se paga con el mismo método: {metodoPagoFijo === 'TARJETA' ? 'tarjeta (en línea)' : 'efectivo'}.
+                                        </p>
+                                    )}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         <button
                                             type="button"
                                             onClick={() => setMetodoPago('EFECTIVO')}
-                                            className={`p-4 rounded-xl border-2 transition-all text-left ${
+                                            disabled={!!metodoPagoFijo && metodoPagoFijo !== 'EFECTIVO'}
+                                            className={`disabled:opacity-40 disabled:cursor-not-allowed p-4 rounded-xl border-2 transition-all text-left ${
                                                 metodoPago === 'EFECTIVO'
                                                     ? 'border-green-500 bg-green-50 shadow-md ring-2 ring-green-200'
                                                     : 'border-gray-200 bg-white hover:border-green-300 hover:bg-green-50/50'
@@ -586,7 +690,8 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
                                         <button
                                             type="button"
                                             onClick={() => setMetodoPago('TARJETA')}
-                                            className={`p-4 rounded-xl border-2 transition-all text-left ${
+                                            disabled={!!metodoPagoFijo && metodoPagoFijo !== 'TARJETA'}
+                                            className={`disabled:opacity-40 disabled:cursor-not-allowed p-4 rounded-xl border-2 transition-all text-left ${
                                                 metodoPago === 'TARJETA'
                                                     ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200'
                                                     : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50'
@@ -617,6 +722,21 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
                                     </div>
                                 </div>
                             )}
+
+                            {itemsPrevios.length > 0 && (
+                                <div className="border border-gray-200 rounded-xl p-5 space-y-2">
+                                    <h3 className="font-semibold text-gray-800 mb-1">Cotización completa ({numServicios} servicios)</h3>
+                                    {itemsPrevios.map((it, i) => (
+                                        <BreakdownRow key={i} label={`${i + 1}. ${it.servicioNombre} · ${it.fecha ?? ''} ${it.hora}`} value={it.total} dimmed />
+                                    ))}
+                                    <BreakdownRow label={`${numServicios}. ${processedService.nombre} (este)`} value={precioFinal} />
+                                    <div className="border-t border-gray-300 pt-2 flex justify-between font-bold text-gray-900">
+                                        <span>Total de la cotización</span>
+                                        <span className="text-lg text-[#D6A75D]">{formatPrice(totalCotizacion)}</span>
+                                    </div>
+                                    <p className="text-xs text-gray-500">El cliente recibirá un solo correo con los {numServicios} servicios desglosados.</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -626,7 +746,7 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
                                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <FiCheck className="text-green-600 text-4xl" />
                                 </div>
-                                <h2 className="text-3xl font-bold text-gray-900 mb-2">Reserva Generada</h2>
+                                <h2 className="text-3xl font-bold text-gray-900 mb-2">{serviciosGenerados > 1 ? `Cotización Generada (${serviciosGenerados} servicios)` : 'Reserva Generada'}</h2>
                                 <p className="text-gray-600">Código: <span className="font-mono font-bold text-[#D6A75D]">{reservationCode}</span></p>
                             </div>
 
@@ -724,13 +844,26 @@ export default function QuoteWizard({ service, isOpen, onClose, aliadoId, client
                             >
                                 Volver
                             </button>
+                            {currentStep === 4 && onAddToQuote && (
+                                <button
+                                    onClick={handleAddToQuote}
+                                    disabled={loading}
+                                    className="px-4 sm:px-6 py-3 border-2 border-[#D6A75D] text-[#8a6a33] font-bold rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    <FiPlus /> Añadir otro servicio
+                                </button>
+                            )}
                             <button
                                 onClick={currentStep === 4 ? handleGenerateQuote : handleNext}
                                 disabled={currentStep === 4 && loading}
                                 className="flex-1 bg-[#D6A75D] hover:bg-[#C5964A] text-black font-bold py-3 px-6 rounded-lg transition-all disabled:opacity-50"
                             >
                                 {currentStep === 4
-                                    ? (loading ? 'Generando...' : (clientePaga !== false ? 'Generar' : 'Reservar de una vez'))
+                                    ? (loading
+                                        ? 'Generando...'
+                                        : numServicios > 1
+                                            ? `Generar cotización (${numServicios} servicios)`
+                                            : (clientePaga !== false ? 'Generar' : 'Reservar de una vez'))
                                     : 'Continuar'}
                             </button>
                         </div>

@@ -13,6 +13,8 @@ import {
   tplTourCompartido,
   tplCotizacionPendiente,
   tplCotizacionLista,
+  tplCotizacionMultiple,
+  PedidoCotizacionTemplate,
   tplCancelacion,
   tplServicioCompletado,
   tplAliadoNuevaReserva,
@@ -196,6 +198,21 @@ export async function sendCotizacionGeneradaEmail(
     ? `Your Quote is Ready — ${reserva.codigo}`
     : `Tu Cotización está Lista — ${reserva.codigo}`;
   await send(reserva.emailCliente, subject, html);
+}
+
+// ─── TRIGGER 9b: Cotización con varios servicios (Admin → Cliente, un correo) ─
+
+export async function sendCotizacionMultipleEmail(
+  pedido: PedidoCotizacionTemplate & { emailCliente: string },
+  language: 'ES' | 'EN' = 'ES'
+) {
+  const lang = toLang(language);
+  const html = tplCotizacionMultiple(pedido, lang);
+  const n = pedido.reservas.length;
+  const subject = lang === 'EN'
+    ? `Your Quote is Ready (${n} services) — ${pedido.codigo}`
+    : `Tu Cotización está Lista (${n} servicios) — ${pedido.codigo}`;
+  await send(pedido.emailCliente, subject, html);
 }
 
 // ─── TRIGGER 10: Tour Compartido ─────────────────────────────────────────────

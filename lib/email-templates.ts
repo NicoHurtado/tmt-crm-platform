@@ -583,6 +583,82 @@ export const tplCotizacionLista = (r: ReservaTemplate, lang: 'ES' | 'EN'): strin
   return getEmailLayout(buildBilingual(section(false), section(true), lang), lang);
 };
 
+// ─── TEMPLATE 8b: Cotización con varios servicios (un solo correo) ───────────
+
+export type PedidoCotizacionTemplate = {
+  codigo: string;
+  nombreCliente: string;
+  metodoPago: string;
+  estadoPago?: string | null;
+  subtotal: { toNumber(): number } | number;
+  comisionBold: { toNumber(): number } | number;
+  precioTotal: { toNumber(): number } | number;
+  reservas: ReservaTemplate[];
+};
+
+export const tplCotizacionMultiple = (p: PedidoCotizacionTemplate, lang: 'ES' | 'EN'): string => {
+  const total = toNum(p.precioTotal);
+  const comisionBold = toNum(p.comisionBold);
+  const sinPagoPendiente = p.estadoPago === 'APROBADO';
+  const esTarjeta = p.metodoPago === 'TARJETA';
+  const n = p.reservas.length;
+
+  const section = (isES: boolean): string => {
+    const l: 'ES' | 'EN' = isES ? 'ES' : 'EN';
+
+    const servicios = p.reservas.map((r, i) => {
+      const priceRows = buildPriceRows(r, isES);
+      // En tarjeta el 6 % de Bold va dentro del total de cada servicio: se muestra
+      // para que las filas sumen el total del servicio.
+      const boldItem = toNum((r as { comisionBold?: { toNumber(): number } | number | null }).comisionBold);
+      if (boldItem > 0) priceRows.push({ label: isES ? 'Comisión pago con tarjeta' : 'Card payment fee', value: formatPrice(boldItem) });
+      return `
+        ${sectionHead(`${isES ? 'Servicio' : 'Service'} ${i + 1} ${isES ? 'de' : 'of'} ${n} · ${svcName(r.servicio.nombre, l)}`)}
+        ${detailsTable([
+          { label: isES ? 'Código' : 'Code', value: r.codigo },
+          ...serviceDetailsRows(r, isES).slice(1),
+        ])}
+        ${priceTable(priceRows, isES ? 'Total de este servicio' : 'Service total', formatPrice(toNum(r.precioTotal)))}
+        ${r.notas ? alertBox(`<strong>${isES ? 'Notas:' : 'Notes:'}</strong> ${r.notas}`, 'info') : ''}`;
+    }).join('');
+
+    const resumenRows: PriceRow[] = p.reservas.map((r, i) => ({
+      label: `${i + 1}. ${svcName(r.servicio.nombre, l)}`,
+      value: formatPrice(toNum(r.precioTotal)),
+    }));
+
+    return `
+      ${badgeHtml(isES ? 'Cotización Lista' : 'Quote Ready', '#166534', '#dcfce7')}
+      <p style="margin:0 0 6px;font-size:16px;color:#374151;">${isES ? `Hola, <strong>${p.nombreCliente}</strong>` : `Hello, <strong>${p.nombreCliente}</strong>`}</p>
+      <p style="margin:0 0 24px;font-size:14px;color:#6b7280;line-height:1.7;">
+        ${isES
+          ? `Tu cotización personalizada con <strong>${n} servicios</strong> está lista. Abajo encuentras el detalle de cada uno.${sinPagoPendiente ? '' : ' Puedes pagarlos todos en un solo pago.'}`
+          : `Your personalized quote with <strong>${n} services</strong> is ready. Below you'll find the details of each one.${sinPagoPendiente ? '' : ' You can pay for all of them in a single payment.'}`}
+      </p>
+      ${codigoBlock(p.codigo, isES ? 'Código de Cotización' : 'Quote Code')}
+      ${servicios}
+      ${sectionHead(isES ? 'Resumen de tu Cotización' : 'Quote Summary')}
+      ${priceTable(resumenRows, isES ? 'Total a Pagar' : 'Total Amount', formatPrice(total))}
+      ${esTarjeta && comisionBold > 0
+        ? `<p style="margin:-16px 0 24px;font-size:12px;color:#9ca3af;">${isES ? `Incluye ${formatPrice(comisionBold)} de comisión por pago con tarjeta.` : `Includes ${formatPrice(comisionBold)} card payment fee.`}</p>`
+        : ''}
+      ${!esTarjeta && !sinPagoPendiente ? alertBox(isES ? 'Pago en efectivo al momento del servicio.' : 'Cash payment at the time of service.', 'info') : ''}
+      ${ctaBtn(
+        sinPagoPendiente || !esTarjeta
+          ? (isES ? 'Ver mi Cotización' : 'View my Quote')
+          : (isES ? 'Ver Cotización y Pagar' : 'View Quote & Pay'),
+        getTrackingUrl(p.codigo, l),
+      )}
+      <p style="text-align:center;margin:4px 0 28px;font-size:12px;color:#9ca3af;">
+        ${esTarjeta && !sinPagoPendiente
+          ? (isES ? 'Completa el pago para asegurar tus reservas' : 'Complete payment to secure your bookings')
+          : (isES ? 'Guarda este correo para consultar tus reservas' : 'Keep this email to check your bookings')}
+      </p>`;
+  };
+
+  return getEmailLayout(buildBilingual(section(false), section(true), lang), lang);
+};
+
 // ─── TEMPLATE 9: Cancelación ─────────────────────────────────────────────────
 
 export const tplCancelacion = (r: ReservaTemplate, lang: 'ES' | 'EN'): string => {
