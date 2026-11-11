@@ -17,7 +17,14 @@ import { calculateBoldCommission } from '@/lib/bold';
 import { getConfiguracion, totalPorPersona } from '@/types/servicio-config';
 import { buildDatosFromBody } from '@/types/reserva-datos';
 import { TipoServicio, Municipio, EstadoReserva, EstadoPago } from '@prisma/client';
+import { calcularAnticipo } from '@/lib/anticipo';
 import crypto from 'crypto';
+
+/** Silla para niños: valor fijo por silla y por día (documento comercial, 10/11/2026). */
+const VALOR_SILLA_NINO = 70_000;
+/** Descuento autorizado: 10 % sobre los dos trayectos de aeropuerto, solo si el viajero lo pide. */
+const DESCUENTO_IDA_REGRESO = 0.10;
+type FormaPago = 'BOLD' | 'EFECTIVO' | 'TRANSFERENCIA';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,9 +84,19 @@ export async function POST(request: NextRequest) {
             body.datosDinamicos && typeof body.datosDinamicos === 'object' ? body.datosDinamicos : {};
         const cantidadHorasRaw = body.cantidadHoras ?? datosDinamicos.cantidadHoras;
         const cantidadHoras = cantidadHorasRaw != null && cantidadHorasRaw !== '' ? Number(cantidadHorasRaw) : undefined;
+        // soloConsultar: calcula el valor sin crear la reserva (el agente lo usa antes del resumen).
+        const soloConsultar = body.soloConsultar === true || body.soloConsultar === 'true';
+        const formaPago: FormaPago = (['EFECTIVO', 'TRANSFERENCIA'] as const).includes(String(body.formaPago || '').toUpperCase() as any)
+            ? (String(body.formaPago).toUpperCase() as FormaPago) : 'BOLD';
+        const sillasNinos = Math.max(0, Math.min(10, Math.floor(Number(body.sillasNinos) || 0)));
+        const descuentoIdaRegreso = body.descuentoIdaRegreso === true || body.descuentoIdaRegreso === 'true';
+        const documento = typeof body.documento === 'string' ? body.documento.trim().slice(0, 40) : '';
+        const factura = typeof body.factura === 'string' ? body.factura.trim().slice(0, 300) : '';
 
-        const missing = ['nombreCliente', 'whatsappCliente', 'emailCliente', 'fecha', 'numeroPasajeros']
-            .filter((k) => !body[k]);
+        const requeridos = soloConsultar
+            ? ['fecha', 'numeroPasajeros']
+            : ['nombreCliente', 'whatsappCliente', 'emailCliente', 'fecha', 'numeroPasajeros'];
+        const missing = requeridos.filter((k) => !body[k]);
         if (!servicioTipo && !servicioId) missing.push('servicioTipo o servicioId');
         if (missing.length > 0) {
             return fail(`Campos requeridos: ${missing.join(', ')}`);
@@ -89,7 +106,7 @@ export async function POST(request: NextRequest) {
             return fail('numeroPasajeros debe ser un número entero mayor a 0');
         }
 
-        if (typeof emailCliente !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailCliente)) {
+        if (!soloConsultar && (typeof emailCliente !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailCliente))) {
             return fail('emailCliente inválido');
         }
 
@@ -234,20 +251,76 @@ export async function POST(request: NextRequest) {
             tarifaMunicipio = comp.tarifaMunicipio;
         }
 
-        const subtotal = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio;
-        if (!Number.isFinite(subtotal) || subtotal <= 0) {
+        precioAdicionales += sillasNinos * VALOR_SILLA_NINO;
+        const bruto = precioBase + precioAdicionales + recargoNocturno + tarifaMunicipio;
+        if (!Number.isFinite(bruto) || bruto <= 0) {
             return fail('El servicio no tiene precio configurado para estos datos', 400, { status: 'sin_precio' });
         }
+        if (descuentoIdaRegreso && !servicio.esAeropuerto) {
+            return fail('El descuento de ida y regreso solo aplica a traslados de aeropuerto', 400, { status: 'descuento_no_aplica' });
+        }
+        const descuento = descuentoIdaRegreso ? Math.round(bruto * DESCUENTO_IDA_REGRESO) : 0;
+        const subtotal = bruto - descuento;
         // Bold cobra montos enteros en COP: se redondea la comisión para que el total sea entero.
-        const comisionBold = Math.round(calculateBoldCommission(subtotal));
+        // El recargo del 6 % solo aplica al pago con tarjeta (Bold); en efectivo o transferencia no.
+        const comisionTarjeta = Math.round(calculateBoldCommission(subtotal));
+        const totalTarjeta = subtotal + comisionTarjeta;
+        const anticipo = calcularAnticipo(totalTarjeta, comisionTarjeta);
+        const comisionBold = formaPago === 'BOLD' ? comisionTarjeta : 0;
         const precioTotal = subtotal + comisionBold;
 
-        const datos = buildDatosFromBody({
+        const nombreServicio =
+            (servicio.nombre as { es: string; en: string })[idioma === 'EN' ? 'en' : 'es'];
+        const valores = {
+            servicio: nombreServicio,
+            vehiculo: vehiculoNombre,
+            fecha: fechaSolo,
+            hora,
+            numeroPasajeros,
+            desglose: {
+                precioBase,
+                adicionales: precioAdicionales,
+                sillasNinos: sillasNinos * VALOR_SILLA_NINO,
+                recargoNocturno,
+                recargoMunicipio: tarifaMunicipio,
+                descuentoIdaRegreso: descuento,
+                subtotal,
+                comisionTarjeta,
+            },
+            // Total pagando en efectivo o por transferencia (sin recargo del 6 %).
+            totalEfectivo: subtotal,
+            // Total pagando con tarjeta por Bold (con recargo del 6 %).
+            totalTarjeta,
+            // Anticipo del 30 % por Bold (incluye el 6 % sobre lo que paga) y saldo al llegar.
+            anticipoBold: anticipo.anticipoCobro,
+            saldoAlLlegar: anticipo.saldo,
+        };
+        if (soloConsultar) {
+            return NextResponse.json({ success: true, status: 'ok', consulta: true, ...valores });
+        }
+
+        const lineasNotas = [
+            typeof notas === 'string' && notas.trim() ? notas.trim() : '',
+            documento ? `Documento: ${documento}` : '',
+            factura ? `Factura electrónica: ${factura}` : '',
+            sillasNinos ? `Sillas para niños: ${sillasNinos}` : '',
+            descuento ? `Descuento 10 % ida y regreso aeropuerto: -$${descuento.toLocaleString('es-CO')}` : '',
+            formaPago === 'EFECTIVO' ? `💵 PAGO EN EFECTIVO el día del servicio: $${subtotal.toLocaleString('es-CO')}` : '',
+            formaPago === 'TRANSFERENCIA' ? `🏦 TRANSFERENCIA POR VERIFICAR: $${subtotal.toLocaleString('es-CO')} (Bre-B o Bancolombia). Confirmar la reserva cuando llegue el comprobante.` : '',
+        ].filter(Boolean);
+
+        const datos: Record<string, unknown> = buildDatosFromBody({
             ...body,
             aeropuertoNombre: aeropuerto ?? undefined,
             cantidadHoras: cantidadHoras ?? undefined,
             datosDinamicos,
         });
+        if (documento) datos.documentoCliente = documento;
+        if (factura) datos.facturaElectronica = factura;
+        if (sillasNinos) datos.sillasNinos = sillasNinos;
+        datos.formaPago = formaPago;
+        if (formaPago === 'TRANSFERENCIA') datos.pago = { modalidad: 'TRANSFERENCIA_POR_VERIFICAR', montoPagado: null, saldoPorCobrar: subtotal };
+        if (formaPago === 'EFECTIVO') datos.pago = { modalidad: 'EFECTIVO_DIA_SERVICIO', montoPagado: 0, saldoPorCobrar: subtotal };
 
         const codigo = await generateUniqueCodigo();
 
@@ -270,18 +343,20 @@ export async function POST(request: NextRequest) {
                 municipioConfigId,
                 aeropuertoNombre: aeropuerto,
                 datos: datos as any,
-                notas: typeof notas === 'string' && notas.trim() ? notas.trim() : null,
+                notas: lineasNotas.length ? lineasNotas.join('\n') : null,
                 precioBase,
                 precioAdicionales,
                 recargoNocturno,
                 tarifaMunicipio,
-                descuentoAliado: 0,
+                descuentoAliado: descuento,
                 comisionBold,
                 comisionAliado: 0,
                 precioTotal,
-                estado: EstadoReserva.PENDING_PAYMENT,
-                estadoPago: EstadoPago.PENDIENTE,
-                metodoPago: 'TARJETA',
+                // Efectivo: confirmada de una vez, como en el formulario web. Bold y transferencia:
+                // pendiente hasta que Bold apruebe o el equipo verifique el comprobante.
+                estado: formaPago === 'EFECTIVO' ? EstadoReserva.CONFIRMED_UNASSIGNED : EstadoReserva.PENDING_PAYMENT,
+                estadoPago: formaPago === 'EFECTIVO' ? null : EstadoPago.PENDIENTE,
+                metodoPago: formaPago === 'BOLD' ? 'TARJETA' : 'EFECTIVO',
                 origen: 'whatsapp_bot',
                 clientePaga: true,
                 esReservaAliado: false,
@@ -294,35 +369,34 @@ export async function POST(request: NextRequest) {
         // reserva quedó en la plataforma. Bloqueante, como en /api/reservas (en Vercel los
         // envíos en segundo plano se cortan al responder); un fallo de correo no rompe la reserva.
         try {
-            const { sendPendientePagoEmail } = await import('@/lib/email-service');
-            await sendPendientePagoEmail(reservaCreada as any, idioma === 'EN' ? 'EN' : 'ES');
+            const emailLang = idioma === 'EN' ? 'EN' : 'ES';
+            if (formaPago === 'EFECTIVO') {
+                // Igual que el formulario web con pago en efectivo: confirmación y evento de calendario.
+                const { sendReservaConfirmadaEmail } = await import('@/lib/email-service');
+                await sendReservaConfirmadaEmail(reservaCreada as any, emailLang, null);
+                try {
+                    const { createCalendarEvent } = await import('@/lib/google-calendar-service');
+                    const eventId = await createCalendarEvent(reservaCreada as any);
+                    if (eventId) await prisma.reserva.update({ where: { id: reservaCreada.id }, data: { googleCalendarEventId: eventId } });
+                } catch (calendarError) {
+                    console.error('[n8n crear reserva] Error de calendario:', calendarError);
+                }
+            } else {
+                const { sendPendientePagoEmail } = await import('@/lib/email-service');
+                await sendPendientePagoEmail(reservaCreada as any, emailLang);
+            }
         } catch (emailError) {
-            console.error('[n8n crear reserva] Error enviando correo de reserva recibida:', emailError);
+            console.error('[n8n crear reserva] Error enviando correo:', emailError);
         }
-
-        const nombreServicio =
-            (servicio.nombre as { es: string; en: string })[idioma === 'EN' ? 'en' : 'es'];
 
         return NextResponse.json({
             success: true,
             status: 'ok',
             codigo,
+            formaPago,
+            estadoReserva: formaPago === 'EFECTIVO' ? 'CONFIRMADA' : 'PENDIENTE_DE_PAGO',
             url: `${appUrl()}/reservas/confirmar/${codigo}`,
-            servicio: nombreServicio,
-            vehiculo: vehiculoNombre,
-            fecha: fechaSolo,
-            hora,
-            numeroPasajeros,
-            desglose: {
-                precioBase,
-                adicionales: precioAdicionales,
-                recargoNocturno,
-                recargoMunicipio: tarifaMunicipio,
-                subtotal,
-                comisionTarjeta: comisionBold,
-            },
-            totalTarjeta: precioTotal,
-            totalEfectivo: subtotal,
+            ...valores,
             // Compatibilidad con el bot anterior
             precioEstimado: precioTotal,
         });

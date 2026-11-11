@@ -88,10 +88,20 @@ const MOTIVOS: Record<string, string> = {
     reserva_existente: 'Reserva existente',
     urgente: 'Urgente',
     grupo_empresa: 'Grupo o empresa',
+    verificar_transferencia: 'Verificar transferencia',
+    sin_decidir: 'Sin decidir',
+    consulta: 'Consulta',
+    descuento: 'Pide descuento',
+    falla_sistema: 'Falla del sistema',
+    falta_conductor: 'Falta conductor',
+    servicio_proximo: 'Servicio próximo sin pago',
+    sin_respuesta: 'Sin respuesta del equipo',
 }
 
 const ESTADOS_COT: Record<string, { label: string; className: string }> = {
     enviada: { label: 'Esperando pago', className: 'bg-amber-100 text-amber-800' },
+    enviada_alertada: { label: 'Sin pago · servicio próximo', className: 'bg-red-100 text-red-700' },
+    pagada_sin_conductor: { label: 'Pagada · falta conductor', className: 'bg-red-100 text-red-700' },
     reemplazada: { label: 'Reemplazada', className: 'bg-gray-100 text-gray-600' },
     pagada: { label: 'Pagada', className: 'bg-emerald-100 text-emerald-800' },
     conductor_enviado: { label: 'Conductor enviado', className: 'bg-emerald-100 text-emerald-800' },
@@ -228,7 +238,7 @@ export default function WhatsAppPanelPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                     ['Conversaciones hoy', kpis?.conversacionesHoy, `${kpis?.atendidasPorBot ?? 0} atendidas por el asistente`],
-                    ['Requieren atención', kpis?.traspasosPendientes, 'Chats pasados al equipo'],
+                    ['Requieren atención', kpis?.traspasosPendientes, 'Avisos sin respuesta del equipo'],
                     ['Cotizaciones abiertas', kpis?.cotizacionesAbiertas, `${kpis?.cotizacionesHoy ?? 0} creadas hoy`],
                     ['Reservas pagadas', kpis?.pagadas, `${cop(kpis?.ventasPagadas)} recibidos`],
                 ].map(([titulo, valor, detalle]) => (
@@ -298,6 +308,11 @@ export default function WhatsAppPanelPage() {
                                             <Button size="sm" variant="outline" disabled={ocupado === c.telefono}
                                                 onClick={() => accion(c.telefono, { accion: 'pausar', telefono: c.telefono }, 'El asistente queda en pausa 24 h en este chat')}>
                                                 <Pause className="h-3 w-3 mr-1" />Pausar asistente
+                                            </Button>
+                                        ) : c.atencion === 'traspaso' && !c.pausaHasta ? (
+                                            <Button size="sm" disabled={ocupado === c.telefono}
+                                                onClick={() => accion(c.telefono, { accion: 'devolver', telefono: c.telefono }, 'Aviso marcado como atendido')}>
+                                                <Play className="h-3 w-3 mr-1" />Marcar atendido
                                             </Button>
                                         ) : (
                                             <Button size="sm" disabled={ocupado === c.telefono}

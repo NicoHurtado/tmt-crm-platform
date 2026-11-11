@@ -4,13 +4,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('@/lib/prisma', () => ({
     prisma: {
         servicio: { findFirst: vi.fn() },
-        reserva: { findUnique: vi.fn(), create: vi.fn() },
+        reserva: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
         municipioConfig: { findMany: vi.fn() },
     },
 }));
 
 vi.mock('@/lib/email-service', () => ({
     sendPendientePagoEmail: vi.fn().mockResolvedValue(undefined),
+    sendReservaConfirmadaEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/google-calendar-service', () => ({
+    createCalendarEvent: vi.fn().mockResolvedValue('evt-1'),
 }));
 
 vi.mock('crypto', async () => {
@@ -280,5 +285,58 @@ describe('POST /api/n8n/reservas/crear', () => {
     it('responde con el nombre en inglés cuando idioma es EN', async () => {
         const res = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2, idioma: 'EN' }));
         expect((await res.json()).servicio).toBe('Guatapé Transfer');
+    });
+
+    it('soloConsultar: devuelve valores sin crear la reserva ni pedir contacto', async () => {
+        prisma.servicio.findFirst.mockResolvedValue(servicioAeropuerto);
+        const res = await POST(req({ servicioId: 'svc-aeropuerto', fecha: FUTURA, hora: '23:00', numeroPasajeros: 2,
+            aeropuertoNombre: 'JOSE_MARIA_CORDOVA', aeropuertoTipo: 'DESDE', soloConsultar: true }));
+        const d = await res.json();
+        expect(res.status).toBe(200);
+        expect(d.consulta).toBe(true);
+        expect(d.totalEfectivo).toBe(160_000);
+        expect(d.totalTarjeta).toBe(169_600);
+        expect(d.anticipoBold).toBe(48_000 + 2_880);
+        expect(d.saldoAlLlegar).toBe(112_000);
+        expect(prisma.reserva.create).not.toHaveBeenCalled();
+    });
+
+    it('efectivo: reserva confirmada, sin recargo del 6 %, correo de confirmación y calendario', async () => {
+        const res = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2, formaPago: 'EFECTIVO', documento: 'CC 123', factura: 'No' }));
+        const d = await res.json();
+        expect(d.estadoReserva).toBe('CONFIRMADA');
+        const created = prisma.reserva.create.mock.calls[0][0].data;
+        expect(created.estado).toBe('CONFIRMED_UNASSIGNED');
+        expect(created.metodoPago).toBe('EFECTIVO');
+        expect(created.comisionBold).toBe(0);
+        expect(created.precioTotal).toBe(140_000);
+        expect(created.notas).toContain('PAGO EN EFECTIVO');
+        expect(created.notas).toContain('Documento: CC 123');
+        const { sendReservaConfirmadaEmail, sendPendientePagoEmail } = await import('@/lib/email-service');
+        expect(sendReservaConfirmadaEmail).toHaveBeenCalledTimes(1);
+        expect(sendPendientePagoEmail).not.toHaveBeenCalled();
+    });
+
+    it('transferencia: queda pendiente, sin recargo y marcada para verificar', async () => {
+        await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2, formaPago: 'TRANSFERENCIA' }));
+        const created = prisma.reserva.create.mock.calls[0][0].data;
+        expect(created.estado).toBe('PENDING_PAYMENT');
+        expect(created.comisionBold).toBe(0);
+        expect(created.precioTotal).toBe(140_000);
+        expect(created.notas).toContain('TRANSFERENCIA POR VERIFICAR');
+        expect(created.datos.pago.modalidad).toBe('TRANSFERENCIA_POR_VERIFICAR');
+    });
+
+    it('silla para niños y descuento de ida y regreso al aeropuerto', async () => {
+        prisma.servicio.findFirst.mockResolvedValue(servicioAeropuerto);
+        const res = await POST(req({ ...cliente, servicioId: 'svc-aeropuerto', fecha: FUTURA, hora: '10:00', numeroPasajeros: 2,
+            aeropuertoNombre: 'JOSE_MARIA_CORDOVA', aeropuertoTipo: 'HACIA', lugarRecogida: 'Hotel', sillasNinos: 1, descuentoIdaRegreso: true }));
+        const d = await res.json();
+        expect(d.desglose.sillasNinos).toBe(70_000);
+        expect(d.desglose.descuentoIdaRegreso).toBe(21_000);
+        expect(d.totalEfectivo).toBe(189_000);
+        prisma.servicio.findFirst.mockResolvedValue(servicioTraslado);
+        const r2 = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2, descuentoIdaRegreso: true }));
+        expect((await r2.json()).status).toBe('descuento_no_aplica');
     });
 });
