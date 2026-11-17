@@ -1,5 +1,6 @@
 import { getLocalizedText } from '@/types/multi-language';
 import { getStateLabel } from '@/lib/state-transitions';
+import { origenDestinoReserva, getDatos } from '@/types/reserva-datos';
 
 export const exportarReservasPDF = async (data: any[], viewMode: 'nueva' | 'antigua', filtros: any) => {
     const { default: jsPDF } = await import('jspdf');
@@ -114,7 +115,9 @@ export const exportarReservasExcel = (data: any[], viewMode: 'nueva' | 'antigua'
     let excelData = [];
 
     if (viewMode === 'nueva') {
-        excelData = data.map((row: any) => ({
+        excelData = data.map((row: any) => {
+            const ruta = origenDestinoReserva(row);
+            return {
             'CÓDIGO': row.codigo,
             'CLIENTE': row.nombreCliente,
             'EMAIL': row.emailCliente,
@@ -122,12 +125,17 @@ export const exportarReservasExcel = (data: any[], viewMode: 'nueva' | 'antigua'
             'SERVICIO': row.servicio?.nombre ? getLocalizedText(row.servicio.nombre, 'ES') : '-',
             'FECHA': new Date(row.fecha).toLocaleDateString('es-CO'),
             'HORA': row.hora,
+            'ORIGEN': ruta.origen || '-',
+            'DESTINO': ruta.destino || '-',
+            'VUELO': getDatos(row.datos).numeroVuelo || '',
+            'PASAJEROS': row.numeroPasajeros ?? '',
             'ESTADO': getStateLabel(row.estado),
             'ALIADO': row.aliado?.nombre || 'Independiente',
             'COMISIÓN': Number(row.comisionAliado) || 0,
             'TOTAL': Number(row.precioTotal) || 0,
             'NOTAS': row.notas || row.notasEspeciales || '' // Columna de Notas Adicionales
-        }));
+            };
+        });
     } else {
         excelData = data.map((row: any) => ({
             'CANAL': row.canal || '-',
@@ -149,7 +157,7 @@ export const exportarReservasExcel = (data: any[], viewMode: 'nueva' | 'antigua'
 
     // Ajustar ancho de columnas
     const colWidths = viewMode === 'nueva'
-        ? [10, 20, 25, 15, 25, 12, 8, 15, 15, 12, 12, 40] // Anchos estimados
+        ? [10, 20, 25, 15, 25, 12, 8, 35, 35, 10, 10, 15, 15, 12, 12, 40] // Anchos estimados
         : [15, 20, 8, 20, 12, 10, 12, 15, 12, 40];
 
     ws['!cols'] = colWidths.map(w => ({ wch: w }));

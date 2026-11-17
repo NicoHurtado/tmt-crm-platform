@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { Reserva, Servicio, Conductor, Vehiculo, Aliado } from '@prisma/client';
-import { getDatos } from '@/types/reserva-datos';
+import { getDatos, origenDestinoReserva } from '@/types/reserva-datos';
 
 // Tipo extendido para incluir relaciones
 type ReservaConRelaciones = Reserva & {
@@ -149,36 +149,12 @@ function formatEventDetails(reserva: ReservaConRelaciones): {
         : `⚠️ HORA POR CONFIRMAR - Reserva #${reserva.codigo} - ${reserva.nombreCliente}`;
 
     // Determinar origen y destino según el tipo de servicio
-    let origenEvento = '';
-    let destinoEvento = '';
-    let municipio = '';
-
-    // Formatear el municipio
-    if (reserva.municipio === 'OTRO' && reserva.otroMunicipio) {
-        municipio = reserva.otroMunicipio;
-    } else {
-        municipio = reserva.municipio || '';
-    }
-
+    const { origen, destino: destinoEvento } = origenDestinoReserva(reserva as any);
+    const origenEvento = origen || 'Por definir';
+    const municipio = reserva.municipio === 'OTRO' && reserva.otroMunicipio
+        ? reserva.otroMunicipio
+        : reserva.municipio || '';
     const d = getDatos(reserva.datos);
-
-    if (d.aeropuertoTipo === 'DESDE') {
-        origenEvento = d.aeropuertoNombre === 'JOSE_MARIA_CORDOVA'
-            ? 'Aeropuerto José María Córdova'
-            : 'Aeropuerto Olaya Herrera';
-        destinoEvento = d.lugarRecogida || municipio;
-    } else if (d.aeropuertoTipo === 'HACIA') {
-        origenEvento = d.lugarRecogida || municipio;
-        destinoEvento = d.aeropuertoNombre === 'JOSE_MARIA_CORDOVA'
-            ? 'Aeropuerto José María Córdova'
-            : 'Aeropuerto Olaya Herrera';
-    } else {
-        origenEvento = d.lugarRecogida || 'Por definir';
-        destinoEvento = (d.trasladoDestino as string | undefined) ||
-            (reserva.municipio === 'OTRO' && reserva.otroMunicipio
-                ? reserva.otroMunicipio
-                : reserva.municipio || '');
-    }
 
     // Fecha legible en español
     const fechaLegible = new Date(reserva.fecha).toLocaleDateString('es-CO', {

@@ -8,16 +8,24 @@
 // sin aliado): tours por persona con `totalPorPersona`; el resto con
 // `recalcularPrecioWebDirecto` (Olaya Herrera, por horas, compartido, adicionales,
 // recargo nocturno y recargo de municipio vía MunicipioConfig).
+//
+// Huésped referido por un aliado ("vengo de parte de Amoblados Velásquez"): el agente envía
+// `aliado` (nombre o código). La reserva queda a nombre del aliado y se cobra IGUAL que en su
+// página co-branded: precio del aliado por vehículo + su comisión (o ±10 % en tours por persona).
+//
+// Tours: se agendan hasta las 8:00 p. m. (hora Colombia) del día anterior (lib/tour-anticipacion).
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { checkApiKey, unauthorized } from '../../_auth';
 import { recalcularPrecioWebDirecto } from '@/lib/priceCalculator';
 import { categoriaDeServicio, modeloPrecioDeServicio } from '@/lib/servicio-categoria';
 import { calculateBoldCommission } from '@/lib/bold';
-import { getConfiguracion, totalPorPersona } from '@/types/servicio-config';
+import { getConfiguracion, totalPorPersona, comisionPorPersona } from '@/types/servicio-config';
 import { buildDatosFromBody } from '@/types/reserva-datos';
 import { TipoServicio, Municipio, EstadoReserva, EstadoPago } from '@prisma/client';
 import { calcularAnticipo } from '@/lib/anticipo';
+import { buscarAliado } from '@/lib/aliado-match';
+import { esServicioTour, plazoTour, HORA_LIMITE_TOUR } from '@/lib/tour-anticipacion';
 import crypto from 'crypto';
 
 /** Silla para niños: valor fijo por silla y por día (documento comercial, 10/11/2026). */
@@ -94,6 +102,9 @@ export async function POST(request: NextRequest) {
         const descuentoIdaRegreso = body.descuentoIdaRegreso === true || body.descuentoIdaRegreso === 'true';
         const documento = typeof body.documento === 'string' ? body.documento.trim().slice(0, 40) : '';
         const factura = typeof body.factura === 'string' ? body.factura.trim().slice(0, 300) : '';
+        // Aliado que refirió al huésped: nombre ("Housy Host") o código ("697025").
+        const aliadoTexto = [body.aliado, body.codigoAliado, body.aliadoNombre]
+            .find((v) => typeof v === 'string' && v.trim()) as string | undefined;
 
         const requeridos = soloConsultar
             ? ['fecha', 'numeroPasajeros']
@@ -149,6 +160,74 @@ export async function POST(request: NextRequest) {
                 { status: 'municipal', linkReserva: `${appUrl()}/reservas/transporte-municipal` }
             );
         }
+
+        // Tours: hasta las 8:00 p. m. (hora Colombia) del día anterior.
+        if (esServicioTour(servicio as any)) {
+            const plazo = plazoTour(fechaSolo);
+            if (!plazo.permitido) {
+                return fail(
+                    `Los tours se agendan hasta las ${HORA_LIMITE_TOUR - 12}:00 p. m. del día anterior. La fecha más próxima disponible es ${plazo.primeraFechaDisponible}.`,
+                    400,
+                    { status: 'tour_fuera_de_plazo', primeraFechaDisponible: plazo.primeraFechaDisponible }
+                );
+            }
+        }
+
+        // Aliado que refirió al huésped.
+        let aliado: { id: string; nombre: string; codigo: string; tipo: string; email: string; soloPagoTarjeta: boolean; soloPagoEfectivo: boolean } | null = null;
+        if (aliadoTexto) {
+            const aliados = await prisma.aliado.findMany({
+                where: { activo: true },
+                select: { id: true, nombre: true, codigo: true, tipo: true, email: true, soloPagoTarjeta: true, soloPagoEfectivo: true },
+            });
+            const r = buscarAliado(aliadoTexto, aliados);
+            if (r.estado !== 'encontrado') {
+                const candidatos = r.candidatos.map((a) => a.nombre.trim());
+                return fail(
+                    r.estado === 'ambiguo'
+                        ? `"${aliadoTexto}" coincide con varios aliados: ${candidatos.join(', ')}. Pregunta al huésped cuál es.`
+                        : `No hay un aliado activo llamado "${aliadoTexto}".`,
+                    400,
+                    { status: r.estado === 'ambiguo' ? 'aliado_ambiguo' : 'aliado_no_encontrado', candidatos }
+                );
+            }
+            aliado = r.aliado;
+            if (aliado.soloPagoTarjeta && formaPago !== 'BOLD') {
+                return fail(`${aliado.nombre.trim()} solo acepta pago con tarjeta (Bold)`, 400, { status: 'aliado_solo_tarjeta' });
+            }
+            if (aliado.soloPagoEfectivo && formaPago === 'BOLD') {
+                return fail(`${aliado.nombre.trim()} solo acepta pago en efectivo`, 400, { status: 'aliado_solo_efectivo' });
+            }
+        }
+
+        // Precios propios del aliado para este servicio (los mismos de su página co-branded).
+        const servicioAliado = aliado
+            ? await prisma.servicioAliado.findUnique({
+                where: { aliadoId_servicioId: { aliadoId: aliado.id, servicioId: servicio.id } },
+                include: { preciosVehiculos: { where: { activo: true }, include: { vehiculo: true } } },
+            })
+            : null;
+        const preciosAliado = servicioAliado?.activo !== false ? (servicioAliado?.preciosVehiculos ?? []) : [];
+        // Vista del servicio con los precios del aliado: vehículos y recargo nocturno propios.
+        const servicioPrecio: any = preciosAliado.length > 0
+            ? {
+                ...servicio,
+                vehiculosPermitidos: preciosAliado.map((pv) => ({
+                    vehiculoId: pv.vehiculoId,
+                    precio: Number(pv.precioBase),
+                    precioOlaya: pv.precioBaseOlaya != null ? Number(pv.precioBaseOlaya) : null,
+                    vehiculo: pv.vehiculo,
+                })),
+                ...(servicioAliado?.sobrescribirRecargoNocturno
+                    ? {
+                        aplicaRecargoNocturno: servicioAliado.aplicaRecargoNocturno ?? false,
+                        montoRecargoNocturno: servicioAliado.montoRecargoNocturno,
+                        recargoNocturnoInicio: servicioAliado.recargoNocturnoInicio,
+                        recargoNocturnoFin: servicioAliado.recargoNocturnoFin,
+                    }
+                    : {}),
+            }
+            : servicio;
 
         const cfg = getConfiguracion((servicio as any).configuracion);
         const esPorPersona = cfg.tipoTarifa === 'POR_PERSONA';
@@ -212,14 +291,12 @@ export async function POST(request: NextRequest) {
         let vehiculoId: string | null = null;
         let vehiculoNombre: string | null = null;
         if (!esPorPersona) {
-            const vehiculoEntry = [...servicio.vehiculosPermitidos]
-                .sort((a, b) => a.vehiculo.capacidadMaxima - b.vehiculo.capacidadMaxima)
-                .find((v) =>
-                    v.vehiculo.capacidadMaxima >= numeroPasajeros &&
-                    ((v.vehiculo as any).capacidadMinima == null || (v.vehiculo as any).capacidadMinima <= numeroPasajeros)
-                ) ?? [...servicio.vehiculosPermitidos]
-                .sort((a, b) => a.vehiculo.capacidadMaxima - b.vehiculo.capacidadMaxima)
-                .find((v) => v.vehiculo.capacidadMaxima >= numeroPasajeros);
+            const opciones: Array<{ vehiculoId: string; vehiculo: { nombre: string; capacidadMaxima: number; capacidadMinima?: number | null } }> =
+                [...servicioPrecio.vehiculosPermitidos].sort((a: any, b: any) => a.vehiculo.capacidadMaxima - b.vehiculo.capacidadMaxima);
+            const vehiculoEntry = opciones.find((v) =>
+                v.vehiculo.capacidadMaxima >= numeroPasajeros &&
+                (v.vehiculo.capacidadMinima == null || v.vehiculo.capacidadMinima <= numeroPasajeros)
+            ) ?? opciones.find((v) => v.vehiculo.capacidadMaxima >= numeroPasajeros);
             if (!vehiculoEntry) {
                 return fail(`No hay vehículo disponible para ${numeroPasajeros} pasajeros`, 400, { status: 'sin_vehiculo' });
             }
@@ -236,7 +313,7 @@ export async function POST(request: NextRequest) {
             precioBase = totalPorPersona(cfg.preciosPorPersona, numeroPasajeros);
         } else {
             const comp = recalcularPrecioWebDirecto({
-                servicio: servicio as any,
+                servicio: servicioPrecio,
                 vehiculoId,
                 numeroPasajeros,
                 cantidadHoras: cantidadHoras ?? null,
@@ -262,7 +339,28 @@ export async function POST(request: NextRequest) {
             return fail('El descuento de ida y regreso solo aplica a traslados de aeropuerto', 400, { status: 'descuento_no_aplica' });
         }
         const descuento = descuentoIdaRegreso ? Math.round(bruto * DESCUENTO_IDA_REGRESO) : 0;
-        const subtotal = bruto - descuento;
+
+        // Comisión del aliado — misma regla que POST /api/reservas en modo aliado.
+        let comisionAliado = 0;
+        if (aliado) {
+            if (esPorPersona) {
+                comisionAliado = comisionPorPersona(precioBase, aliado.tipo, {
+                    tipo: (servicioAliado?.comisionPorPersonaTipo ?? null) as any,
+                    valor: servicioAliado?.comisionPorPersonaValor != null ? Number(servicioAliado.comisionPorPersonaValor) : null,
+                });
+            } else {
+                const pv = preciosAliado.find((p) => p.vehiculoId === vehiculoId);
+                if (pv) {
+                    const esOlaya = aeropuerto === 'OLAYA_HERRERA';
+                    const tipoComision = esOlaya && pv.tipoComisionOlaya != null ? pv.tipoComisionOlaya : pv.tipoComision;
+                    const valor = esOlaya && pv.comisionValorOlaya != null ? Number(pv.comisionValorOlaya) : Number(pv.comisionValor);
+                    comisionAliado = tipoComision === 'PORCENTAJE'
+                        ? Math.round((bruto - descuento) * (valor / 100))
+                        : Math.round(valor);
+                }
+            }
+        }
+        const subtotal = bruto - descuento + comisionAliado;
         // Bold cobra montos enteros en COP: se redondea la comisión para que el total sea entero.
         // El recargo del 6 % solo aplica al pago con tarjeta (Bold); en efectivo o transferencia no.
         const comisionTarjeta = Math.round(calculateBoldCommission(subtotal));
@@ -279,6 +377,9 @@ export async function POST(request: NextRequest) {
             fecha: fechaSolo,
             hora,
             numeroPasajeros,
+            aliado: aliado ? aliado.nombre.trim() : null,
+            // false = el aliado no tiene precios propios para este servicio: se usó el precio directo.
+            precioDelAliado: aliado ? (esPorPersona || preciosAliado.length > 0) : null,
             desglose: {
                 precioBase,
                 adicionales: precioAdicionales,
@@ -286,6 +387,7 @@ export async function POST(request: NextRequest) {
                 recargoNocturno,
                 recargoMunicipio: tarifaMunicipio,
                 descuentoIdaRegreso: descuento,
+                comisionAliado,
                 subtotal,
                 comisionTarjeta,
             },
@@ -306,6 +408,7 @@ export async function POST(request: NextRequest) {
         }
 
         const lineasNotas = [
+            aliado ? `🤝 Referido por ${aliado.nombre.trim()} (agente de WhatsApp)` : '',
             typeof notas === 'string' && notas.trim() ? notas.trim() : '',
             documento ? `Documento: ${documento}` : '',
             factura ? `Factura electrónica: ${factura}` : '',
@@ -360,7 +463,7 @@ export async function POST(request: NextRequest) {
                 tarifaMunicipio,
                 descuentoAliado: descuento,
                 comisionBold,
-                comisionAliado: 0,
+                comisionAliado,
                 precioTotal,
                 // Efectivo: confirmada de una vez, como en el formulario web. Bold y transferencia:
                 // pendiente hasta que Bold apruebe o el equipo verifique el comprobante.
@@ -369,7 +472,8 @@ export async function POST(request: NextRequest) {
                 metodoPago: formaPago === 'BOLD' ? 'TARJETA' : 'EFECTIVO',
                 origen: 'whatsapp_bot',
                 clientePaga: true,
-                esReservaAliado: false,
+                esReservaAliado: !!aliado,
+                aliadoId: aliado?.id ?? null,
             },
             include: { servicio: true, vehiculo: true, conductor: true, aliado: true, asistentes: true },
         });
@@ -383,7 +487,7 @@ export async function POST(request: NextRequest) {
             if (formaPago === 'EFECTIVO') {
                 // Igual que el formulario web con pago en efectivo: confirmación y evento de calendario.
                 const { sendReservaConfirmadaEmail } = await import('@/lib/email-service');
-                await sendReservaConfirmadaEmail(reservaCreada as any, emailLang, null);
+                await sendReservaConfirmadaEmail(reservaCreada as any, emailLang, aliado?.email || null);
                 try {
                     const { createCalendarEvent } = await import('@/lib/google-calendar-service');
                     const eventId = await createCalendarEvent(reservaCreada as any);

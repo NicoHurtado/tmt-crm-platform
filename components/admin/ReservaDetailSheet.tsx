@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/sheet'
 import { getStateLabel, getStateBadge } from '@/lib/state-transitions'
 import { getLocalizedText } from '@/types/multi-language'
+import { origenDestinoReserva } from '@/types/reserva-datos'
 import type { EstadoReserva } from '@prisma/client'
 
 
@@ -186,9 +187,15 @@ export default function ReservaDetailSheet({
                 {reserva.numeroPasajeros !== undefined && (
                   <Field label="Pasajeros" value={String(reserva.numeroPasajeros)} />
                 )}
-                {reserva.datos?.lugarRecogida && (
-                  <Field label="Recogida" value={reserva.datos.lugarRecogida} />
-                )}
+                {(() => {
+                  const ruta = origenDestinoReserva(reserva as any)
+                  return (
+                    <>
+                      {ruta.origen && <Field label="Origen" value={ruta.origen} />}
+                      {ruta.destino && <Field label="Destino" value={ruta.destino} />}
+                    </>
+                  )
+                })()}
               </Section>
 
               <Separator />

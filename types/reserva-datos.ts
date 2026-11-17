@@ -57,3 +57,38 @@ export function buildDatosFromBody(body: Record<string, any>): DatosReserva {
 
     return datos
 }
+
+const NOMBRE_AEROPUERTO: Record<string, string> = {
+    JOSE_MARIA_CORDOVA: 'Aeropuerto José María Córdova',
+    OLAYA_HERRERA: 'Aeropuerto Olaya Herrera',
+}
+
+/**
+ * Origen y destino legibles de una reserva (calendario, Excel).
+ * Aeropuerto: la dirección del viajero (`lugarRecogida`) es el destino en llegadas (DESDE)
+ * y el origen en salidas (HACIA). Resto: recogida → destino del traslado o del tour.
+ */
+export function origenDestinoReserva(reserva: {
+    datos: unknown
+    municipio?: string | null
+    otroMunicipio?: string | null
+    aeropuertoNombre?: string | null
+    servicio?: { destinoAutoFill?: string | null } | null
+}): { origen: string; destino: string } {
+    const d = getDatos(reserva.datos)
+    const municipio = reserva.municipio === 'OTRO' && reserva.otroMunicipio
+        ? reserva.otroMunicipio
+        : reserva.municipio || ''
+    const aeropuerto = NOMBRE_AEROPUERTO[String(d.aeropuertoNombre || reserva.aeropuertoNombre || '')] || 'Aeropuerto Olaya Herrera'
+
+    if (d.aeropuertoTipo === 'DESDE') {
+        return { origen: aeropuerto, destino: d.lugarRecogida || municipio }
+    }
+    if (d.aeropuertoTipo === 'HACIA') {
+        return { origen: d.lugarRecogida || municipio, destino: aeropuerto }
+    }
+    return {
+        origen: d.lugarRecogida || '',
+        destino: (d.trasladoDestino as string | undefined) || reserva.servicio?.destinoAutoFill || municipio,
+    }
+}

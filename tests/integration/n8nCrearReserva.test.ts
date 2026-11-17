@@ -6,6 +6,8 @@ vi.mock('@/lib/prisma', () => ({
         servicio: { findFirst: vi.fn() },
         reserva: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
         municipioConfig: { findMany: vi.fn() },
+        aliado: { findMany: vi.fn() },
+        servicioAliado: { findUnique: vi.fn() },
     },
 }));
 
@@ -90,6 +92,26 @@ const servicioPorHoras = {
 
 const FUTURA = '2099-12-12';
 
+const ALIADOS = [
+    { id: 'al-amoblados', nombre: 'AMOBLADOS VELASQUEZ ', codigo: '982705', tipo: 'AIRBNB', email: 'amoblados@test.com', soloPagoTarjeta: false, soloPagoEfectivo: false },
+    { id: 'al-housy', nombre: 'HOUSY HOST ', codigo: '697025', tipo: 'AIRBNB', email: 'housy@test.com', soloPagoTarjeta: true, soloPagoEfectivo: false },
+];
+
+const servicioTourPrivado = {
+    ...base,
+    id: 'svc-jardin',
+    tipoServicio: 'OTRO',
+    esTraslado: false,
+    nombre: { es: 'Full Day Jardín', en: 'Jardín Full Day' },
+};
+
+/** YYYY-MM-DD en hora Colombia, desplazado `dias` desde hoy. */
+function diaBogota(dias: number): string {
+    const d = new Date(Date.now() - 5 * 3600_000);
+    d.setUTCDate(d.getUTCDate() + dias);
+    return d.toISOString().slice(0, 10);
+}
+
 function req(body: unknown, key = 'test-key') {
     return new Request('http://localhost/api/n8n/reservas/crear', {
         method: 'POST',
@@ -120,6 +142,8 @@ describe('POST /api/n8n/reservas/crear', () => {
         prisma.municipioConfig.findMany.mockResolvedValue([
             { id: 'mc-rionegro', nombreES: 'Rionegro', nombreEN: 'Rionegro', recargo: 40_000 },
         ]);
+        prisma.aliado.findMany.mockResolvedValue(ALIADOS);
+        prisma.servicioAliado.findUnique.mockResolvedValue(null);
         const mod = await import('@/app/api/n8n/reservas/crear/route');
         POST = mod.POST as any;
     });
@@ -363,5 +387,81 @@ describe('POST /api/n8n/reservas/crear', () => {
         prisma.servicio.findFirst.mockResolvedValue(servicioTraslado);
         const r2 = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2, descuentoIdaRegreso: true }));
         expect((await r2.json()).status).toBe('descuento_no_aplica');
+    });
+    describe('huésped referido por un aliado', () => {
+        it('queda a nombre del aliado y cobra el precio del aliado + su comisión', async () => {
+            prisma.servicioAliado.findUnique.mockResolvedValue({
+                activo: true, sobrescribirRecargoNocturno: false,
+                preciosVehiculos: [{
+                    vehiculoId: 'veh-auto', precioBase: 150_000, precioBaseOlaya: null,
+                    tipoComision: 'PORCENTAJE', comisionValor: 10, tipoComisionOlaya: null, comisionValorOlaya: null,
+                    vehiculo: VEHICULOS[0].vehiculo,
+                }],
+            });
+            const res = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2,
+                formaPago: 'EFECTIVO', aliado: 'vengo de parte de Amoblados Velázquez' }));
+            const d = await res.json();
+            expect(d.success).toBe(true);
+            expect(d.aliado).toBe('AMOBLADOS VELASQUEZ');
+            expect(d.precioDelAliado).toBe(true);
+            expect(d.desglose.precioBase).toBe(150_000);
+            expect(d.desglose.comisionAliado).toBe(15_000);
+            expect(d.totalEfectivo).toBe(165_000);
+            const created = prisma.reserva.create.mock.calls[0][0].data;
+            expect(created).toMatchObject({ aliadoId: 'al-amoblados', esReservaAliado: true, comisionAliado: 15_000, precioTotal: 165_000 });
+            expect(created.notas).toContain('Referido por AMOBLADOS VELASQUEZ');
+            const { sendReservaConfirmadaEmail } = await import('@/lib/email-service');
+            expect(sendReservaConfirmadaEmail).toHaveBeenCalledWith(expect.anything(), 'ES', 'amoblados@test.com');
+        });
+
+        it('sin precios propios del aliado usa el precio directo y sigue a su nombre', async () => {
+            const res = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2, aliado: '982705' }));
+            const d = await res.json();
+            expect(d.precioDelAliado).toBe(false);
+            expect(d.totalEfectivo).toBe(140_000);
+            expect(prisma.reserva.create.mock.calls[0][0].data).toMatchObject({ aliadoId: 'al-amoblados', comisionAliado: 0 });
+        });
+
+        it('tour por persona: +10 % para airbnb, igual que su página', async () => {
+            prisma.servicio.findFirst.mockResolvedValue(servicioPorPersona);
+            const res = await POST(req({ ...cliente, servicioId: 'svc-comuna13', fecha: FUTURA, numeroPasajeros: 2, aliado: 'Housy Host' }));
+            const d = await res.json();
+            expect(d.desglose.precioBase).toBe(540_000);
+            expect(d.desglose.comisionAliado).toBe(54_000);
+            expect(d.totalEfectivo).toBe(594_000);
+        });
+
+        it('respeta "solo tarjeta" del aliado (Housy)', async () => {
+            const res = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2, aliado: 'Housy', formaPago: 'EFECTIVO' }));
+            expect((await res.json()).status).toBe('aliado_solo_tarjeta');
+            expect(prisma.reserva.create).not.toHaveBeenCalled();
+        });
+
+        it('aliado desconocido: no crea la reserva y lo avisa', async () => {
+            const res = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2, aliado: 'Hotel Intercontinental' }));
+            expect((await res.json()).status).toBe('aliado_no_encontrado');
+            expect(prisma.reserva.create).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('plazo de los tours (hasta las 8 p. m. del día anterior)', () => {
+        it('no agenda un tour para hoy y dice la fecha más próxima', async () => {
+            prisma.servicio.findFirst.mockResolvedValue(servicioTourPrivado);
+            const res = await POST(req({ ...cliente, servicioId: 'svc-jardin', fecha: diaBogota(0), hora: '07:00', numeroPasajeros: 2, soloConsultar: true }));
+            const d = await res.json();
+            expect(d.status).toBe('tour_fuera_de_plazo');
+            expect(d.primeraFechaDisponible > diaBogota(0)).toBe(true);
+        });
+
+        it('agenda un tour para pasado mañana a cualquier hora', async () => {
+            prisma.servicio.findFirst.mockResolvedValue(servicioTourPrivado);
+            const res = await POST(req({ ...cliente, servicioId: 'svc-jardin', fecha: diaBogota(2), hora: '07:00', numeroPasajeros: 2 }));
+            expect((await res.json()).success).toBe(true);
+        });
+
+        it('los traslados no tienen ese plazo', async () => {
+            const res = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: diaBogota(0), hora: '23:00', numeroPasajeros: 2 }));
+            expect((await res.json()).success).toBe(true);
+        });
     });
 });
