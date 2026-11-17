@@ -86,6 +86,8 @@ export async function POST(request: NextRequest) {
         const cantidadHoras = cantidadHorasRaw != null && cantidadHorasRaw !== '' ? Number(cantidadHorasRaw) : undefined;
         // soloConsultar: calcula el valor sin crear la reserva (el agente lo usa antes del resumen).
         const soloConsultar = body.soloConsultar === true || body.soloConsultar === 'true';
+        // Transferencia con anticipo del 30 % (sin recargo); el saldo se paga el día del servicio.
+        const anticipoTransferencia = body.anticipo === true || body.anticipo === 'true';
         const formaPago: FormaPago = (['EFECTIVO', 'TRANSFERENCIA'] as const).includes(String(body.formaPago || '').toUpperCase() as any)
             ? (String(body.formaPago).toUpperCase() as FormaPago) : 'BOLD';
         const sillasNinos = Math.max(0, Math.min(10, Math.floor(Number(body.sillasNinos) || 0)));
@@ -293,8 +295,12 @@ export async function POST(request: NextRequest) {
             totalTarjeta,
             // Anticipo del 30 % por Bold (incluye el 6 % sobre lo que paga) y saldo al llegar.
             anticipoBold: anticipo.anticipoCobro,
+            // Anticipo del 30 % por transferencia (sin recargo) y saldo al llegar.
+            anticipoTransferencia: anticipo.anticipoBase,
             saldoAlLlegar: anticipo.saldo,
         };
+        const conAnticipoTransferencia = formaPago === 'TRANSFERENCIA' && anticipoTransferencia;
+        const cop = (n: number) => `$${n.toLocaleString('es-CO')}`;
         if (soloConsultar) {
             return NextResponse.json({ success: true, status: 'ok', consulta: true, ...valores });
         }
@@ -306,7 +312,9 @@ export async function POST(request: NextRequest) {
             sillasNinos ? `Sillas para niños: ${sillasNinos}` : '',
             descuento ? `Descuento 10 % ida y regreso aeropuerto: -$${descuento.toLocaleString('es-CO')}` : '',
             formaPago === 'EFECTIVO' ? `💵 PAGO EN EFECTIVO el día del servicio: $${subtotal.toLocaleString('es-CO')}` : '',
-            formaPago === 'TRANSFERENCIA' ? `🏦 TRANSFERENCIA POR VERIFICAR: $${subtotal.toLocaleString('es-CO')} (Bre-B o Bancolombia). Confirmar la reserva cuando llegue el comprobante.` : '',
+            conAnticipoTransferencia
+                ? `🏦 ANTICIPO 30 % POR TRANSFERENCIA POR VERIFICAR: ${cop(anticipo.anticipoBase)} (Bre-B o Bancolombia). Confirmar la reserva cuando llegue el comprobante. SALDO por cobrar al llegar: ${cop(anticipo.saldo)} (efectivo en pesos o dólares, o tarjeta + 6 %).`
+                : formaPago === 'TRANSFERENCIA' ? `🏦 TRANSFERENCIA POR VERIFICAR: ${cop(subtotal)} (Bre-B o Bancolombia). Confirmar la reserva cuando llegue el comprobante.` : '',
         ].filter(Boolean);
 
         const datos: Record<string, unknown> = buildDatosFromBody({
@@ -319,7 +327,9 @@ export async function POST(request: NextRequest) {
         if (factura) datos.facturaElectronica = factura;
         if (sillasNinos) datos.sillasNinos = sillasNinos;
         datos.formaPago = formaPago;
-        if (formaPago === 'TRANSFERENCIA') datos.pago = { modalidad: 'TRANSFERENCIA_POR_VERIFICAR', montoPagado: null, saldoPorCobrar: subtotal };
+        // saldoPorCobrar es lo que queda por cobrar una vez el equipo verifica la transferencia.
+        if (conAnticipoTransferencia) datos.pago = { modalidad: 'TRANSFERENCIA_ANTICIPO_POR_VERIFICAR', montoEsperado: anticipo.anticipoBase, montoPagado: null, anticipoBase: anticipo.anticipoBase, saldoPorCobrar: anticipo.saldo };
+        else if (formaPago === 'TRANSFERENCIA') datos.pago = { modalidad: 'TRANSFERENCIA_POR_VERIFICAR', montoEsperado: subtotal, montoPagado: null, saldoPorCobrar: 0 };
         if (formaPago === 'EFECTIVO') datos.pago = { modalidad: 'EFECTIVO_DIA_SERVICIO', montoPagado: 0, saldoPorCobrar: subtotal };
 
         const codigo = await generateUniqueCodigo();
@@ -397,6 +407,12 @@ export async function POST(request: NextRequest) {
             estadoReserva: formaPago === 'EFECTIVO' ? 'CONFIRMADA' : 'PENDIENTE_DE_PAGO',
             url: `${appUrl()}/reservas/confirmar/${codigo}`,
             ...valores,
+            // Transferencia: lo que el viajero debe transferir (30 % o total) y lo que queda al llegar.
+            ...(formaPago === 'TRANSFERENCIA' ? {
+                anticipo: conAnticipoTransferencia,
+                montoATransferir: conAnticipoTransferencia ? anticipo.anticipoBase : subtotal,
+                saldoTrasTransferencia: conAnticipoTransferencia ? anticipo.saldo : 0,
+            } : {}),
             // Compatibilidad con el bot anterior
             precioEstimado: precioTotal,
         });

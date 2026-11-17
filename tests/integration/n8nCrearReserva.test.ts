@@ -325,6 +325,31 @@ describe('POST /api/n8n/reservas/crear', () => {
         expect(created.precioTotal).toBe(140_000);
         expect(created.notas).toContain('TRANSFERENCIA POR VERIFICAR');
         expect(created.datos.pago.modalidad).toBe('TRANSFERENCIA_POR_VERIFICAR');
+        // Pago total: al verificarlo no queda saldo por cobrar.
+        expect(created.datos.pago.saldoPorCobrar).toBe(0);
+        expect(created.datos.pago.montoEsperado).toBe(140_000);
+    });
+
+    it('transferencia con anticipo del 30 %: transfiere el 30 % sin recargo y el saldo queda al llegar', async () => {
+        const res = await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2, formaPago: 'TRANSFERENCIA', anticipo: true }));
+        const d = await res.json();
+        expect(d.anticipo).toBe(true);
+        expect(d.montoATransferir).toBe(42_000);
+        expect(d.saldoTrasTransferencia).toBe(98_000);
+        expect(d.anticipoTransferencia).toBe(42_000);
+        const created = prisma.reserva.create.mock.calls[0][0].data;
+        expect(created.estado).toBe('PENDING_PAYMENT');
+        expect(created.comisionBold).toBe(0);
+        expect(created.precioTotal).toBe(140_000);
+        expect(created.notas).toContain('ANTICIPO 30 % POR TRANSFERENCIA');
+        expect(created.notas).toContain('SALDO por cobrar al llegar: $98.000');
+        expect(created.datos.pago).toMatchObject({ modalidad: 'TRANSFERENCIA_ANTICIPO_POR_VERIFICAR', montoEsperado: 42_000, saldoPorCobrar: 98_000 });
+    });
+
+    it('el anticipo solo cambia algo en transferencia', async () => {
+        await POST(req({ ...cliente, servicioId: 'svc-guatape', fecha: FUTURA, hora: '07:00', numeroPasajeros: 2, formaPago: 'EFECTIVO', anticipo: true }));
+        const created = prisma.reserva.create.mock.calls[0][0].data;
+        expect(created.datos.pago.modalidad).toBe('EFECTIVO_DIA_SERVICIO');
     });
 
     it('silla para niños y descuento de ida y regreso al aeropuerto', async () => {
